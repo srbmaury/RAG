@@ -542,8 +542,17 @@ export default function Home() {
             <span className="home-drop-icon"><Upload size={20}/></span><div><strong>Bring more knowledge into Atlas</strong><p>Drop PDF, DOCX, TXT or Markdown files. Up to {Math.round(user.max_file_bytes/1024/1024)} MB each.</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Choose files</button>
           </div>
         </section>}
-        {wid && tab==='documents' && <section><div className="crumb">Workspace<span>›</span>Documents</div><div className="heading-row"><div><span className="eyebrow">YOUR LIBRARY</span><h1>Documents</h1><p className="subtitle">The files behind your answers.</p></div>{uploadButton}</div><div className="library-bar"><label className="document-search"><Search/><input type="search" aria-label="Search documents" placeholder="Search documents…" value={filter} onChange={e=>setFilter(e.target.value)}/></label><span className="caption">{filtered.length} of {docs.length} documents</span></div>{renderDocuments(filtered)}<div className={`upload-area ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}><Upload/><div><strong>Drop your documents here</strong><p>PDF, DOCX, TXT, MD · up to {Math.round(user.max_file_bytes/1024/1024)} MB per file</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Browse files</button></div></section>}
-
+        {wid && tab==='documents' && <section className="document-library-v3">
+          <div className="crumb">Workspace<span>›</span>Library</div>
+          <div className="library-intro"><div><span className="section-kicker">YOUR KNOWLEDGE LIBRARY</span><h1>Documents</h1><p>Every file you add becomes part of the answers Atlas can explain and reference.</p></div>{uploadButton}</div>
+          <div className="library-stat-strip"><span><strong>{docs.length}</strong> Documents</span><span><strong>{ready.length}</strong> Ready to search</span><span><strong>{storage?prettyBytes(storage):'0 KB'}</strong> Storage used</span></div>
+          <div className="library-workspace">
+            <div className="library-workspace-heading"><div><h2>All documents</h2><p>Search and manage files in this workspace</p></div><span>{filtered.length} files</span></div>
+            <div className="library-search-row"><label><Search size={17}/><input type="search" aria-label="Search documents" placeholder="Search your documents…" value={filter} onChange={e=>setFilter(e.target.value)}/></label></div>
+            {renderDocuments(filtered)}
+          </div>
+          <div className={`home-dropzone ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}><span className="home-drop-icon"><Upload size={20}/></span><div><strong>Add documents to your library</strong><p>Drag in PDFs, Word files, plain text, or Markdown · max {Math.round(user.max_file_bytes/1024/1024)} MB each.</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Browse files</button></div>
+        </section>}
         {wid && tab==='sources' && <section className="connected-page">
           <div className="crumb">Workspace<span>›</span>Sources</div><div className="heading-row"><div><span className="eyebrow">YOUR INTEGRATIONS</span><h1>Connected sources</h1><p className="subtitle">Connect external services to your research workspace. Access stays read-only.</p></div>
           <button className="btn" onClick={()=>void refreshSourceStatuses()}>Refresh connections</button></div>
