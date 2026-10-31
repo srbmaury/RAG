@@ -11,7 +11,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, 
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
-from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, uid
+from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, DriveOAuthState, uid
 from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
 from . import config
 from .ingest import SUPPORTED
@@ -21,6 +21,8 @@ from .ai import generate, enabled
 from .query_context import retrieval_query
 from . import uploads
 from .gmail import router as gmail_router
+from .external_sources import router as external_router
+from .drive import router as drive_router
 from starlette.concurrency import run_in_threadpool
 
 @asynccontextmanager
@@ -38,6 +40,8 @@ async def lifespan(app):
 
 app = FastAPI(title='Atlas Document Intelligence', lifespan=lifespan)
 app.include_router(gmail_router)
+app.include_router(external_router)
+app.include_router(drive_router)
 
 def database():
     with Session() as db: yield db
@@ -157,7 +161,9 @@ def delete_workspace(wid: str, body: DeleteWorkspaceRequest, actor=Depends(user)
     ids = [d.id for d in documents]
     # Use explicit deletes for SQLite and PostgreSQL; no reliance on ORM cascades.
     db.query(GmailOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(DriveOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(GmailConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(ExternalConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(Conversation).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(Chunk).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(Document).filter_by(workspace_id=wid).delete(synchronize_session=False)
@@ -332,6 +338,111 @@ def delete_conversation(wid: str, cid: str, actor=Depends(user), db=Depends(data
     db.delete(owned_conversation(wid, cid, actor, db))
     db.commit()
     return {'ok': True}
+
+class ConnectedQuestion(Question):
+    include_gmail: bool = False
+    gmail_query: str = Field(default='newer_than:30d', max_length=400)
+    providers: List[str] = Field(default_factory=list, max_length=4)
+
+
+@app.post('/api/workspaces/{wid}/connected-chat')
+def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
+                   actor=Depends(user), db=Depends(database)):
+    """Retrieve evidence across workspace documents and optionally live Gmail."""
+    workspace(wid, actor, db)
+    if not body.question.strip():
+        raise HTTPException(422, 'Enter a question.')
+    if body.document_ids:
+        count = db.query(Document).filter(Document.workspace_id == wid,
+                    Document.id.in_(body.document_ids)).count()
+        if count != len(set(body.document_ids)):
+            raise HTTPException(404, 'Selected document not found.')
+    from .gmail import connection, access_token, gmail_get, email_from_json, GMAIL_API
+    from .ai import client, ollama_chat
+    from .sources import Evidence
+    from .external_sources import read_connection, source_search, PROVIDERS
+    from .drive import access_token as drive_access_token, drive_search, drive_evidence
+    import json
+    import re
+    if any(p not in (*PROVIDERS, 'drive') for p in body.providers):
+        raise HTTPException(422, 'Unknown connected provider.')
+    evidence = []
+    document_evidence = {}
+    try:
+        for item in retrieve(wid, retrieval_query(body.question, body.history), body.document_ids)[:6]:
+            evidence.append(Evidence('documents', item['chunk_id'], item['name'],
+                                     item['text'][:1800], None))
+            document_evidence[item['chunk_id']] = item
+        if body.include_gmail:
+            entry = connection(db, actor, wid)
+            token = access_token(entry, db)
+            matches = gmail_get(token, GMAIL_API + '/messages',
+                    {'q': body.gmail_query, 'maxResults': 8}).get('messages', [])
+            for m in matches:
+                msg = email_from_json(gmail_get(token, GMAIL_API + '/messages/' + m['id'],
+                                               {'format': 'full'}))
+                evidence.append(Evidence('gmail', msg['id'], msg['subject'],
+                                         (msg['body'] or msg['snippet'])[:1300],
+                                         msg['url'], msg['date']))
+        if 'drive' in body.providers:
+            drive_token=drive_access_token(db,actor,wid)
+            drive_items=drive_evidence(drive_token,drive_search(drive_token,body.question))
+            for hit in drive_items:
+                evidence.append(Evidence('drive',hit['id'],hit['title'],
+                                         hit['excerpt'],hit.get('url')))
+        for provider in dict.fromkeys(p for p in body.providers if p != 'drive'):
+            _, provider_token = read_connection(db, actor, wid, provider)
+            for hit in source_search(provider, provider_token, body.question)[:5]:
+                evidence.append(Evidence(provider, hit['id'], hit['title'],
+                                         hit.get('excerpt', '')[:1300], hit.get('url')))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception('Connected retrieval failed')
+        raise HTTPException(502, 'Could not retrieve connected sources.') from exc
+    if not evidence:
+        return {'answer': 'No matching evidence was found in the selected sources.',
+                'sources': [], 'mode': 'insufficient_evidence'}
+    # A local 8k-context model cannot accept all retrieved source bodies at once.
+    # Keep source IDs stable across retries so citations always refer to real evidence.
+    from .connected_synthesis import synthesize_connected
+    try:
+        answer, payload = synthesize_connected(
+            body.question, evidence, config.AI_PROVIDER, config.API_KEY,
+            config.CHAT_MODEL, client, ollama_chat
+        )
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        import logging
+        logging.getLogger(__name__).warning('Connected model reached generation/context limit: %s', exc)
+        raise HTTPException(422, 'The local model could not complete this cross-source answer. Try a narrower Gmail query or fewer source types.') from exc
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception('Connected synthesis failed')
+        raise HTTPException(502, 'Connected answer generation failed. Check the AI provider logs.') from exc
+    refs = {int(x) for x in re.findall(r'\[(\d+)\]', answer or '')}
+    if not refs or any(n < 1 or n > len(payload) for n in refs):
+        return {'answer': 'AI did not produce verifiable citations. Try a narrower question.',
+                'sources': [], 'mode': 'citation_check_failed'}
+    # Preserve positional [n] citations used by the standard chat renderer.
+    # Non-document evidence carries a URL so the UI opens the original record.
+    sources = []
+    for entry in payload:
+        original = document_evidence.get(entry.get('origin_id')) if entry.get('provider') == 'documents' else None
+        sources.append({
+            'chunk_id': original['chunk_id'] if original else str(entry['source_id']),
+            'document_id': original['document_id'] if original else '',
+            'name': entry['title'],
+            'page': original['page'] if original else 0,
+            'text': entry['text'],
+            'location_type': original['location_type'] if original else entry.get('provider','source'),
+            'provider': entry.get('provider'),
+            'url': entry.get('url'),
+        })
+    return {'answer': answer, 'sources': sources, 'mode': 'connected'}
+
 
 @app.post('/api/workspaces/{wid}/chat')
 def chat(wid: str, body: Question, actor=Depends(user), db=Depends(database)):

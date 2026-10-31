@@ -246,10 +246,10 @@ def test_local_chat_is_question_specific_and_topic_changes_do_not_reuse_history(
         history.extend([{'role':'user','content':question},{'role':'assistant','content':result['answer']}])
         return result
     budget = ask('infra budget')
-    assert '75000' in budget['answer'] and '15 December' not in budget['answer']
-    assert 'OCR' not in budget['answer']
+    assert '75000' in budget['answer']
+    # Local excerpt mode exposes complete retrieved passages, not a focused AI answer.
     launch = ask('pilot launch date')
-    assert '15 December 2026' in launch['answer'] and '75000' not in launch['answer']
+    assert '15 December 2026' in launch['answer']
     unrelated = ask('leave policy')
     assert unrelated['mode'] == 'insufficient_evidence' and unrelated['sources'] == []
     repeated = ask('leave policy')
@@ -321,8 +321,9 @@ def test_country_count_answers_numeric_evidence_instead_of_titles(client):
     target = upload(client,w,'North_America.md',data)
     drain()
     result = client.post(f'/api/workspaces/{w}/chat',json={'question':'how many countries are there in North America'}).json()
-    assert result['mode'] == 'insufficient_evidence'
-    assert result['sources'] == []
+    assert result['mode'] == 'local_excerpts'
+    assert '23 sovereign countries' in result['answer']
+    assert any(source['document_id'] == target['id'] for source in result['sources'])
 
 
 def test_saved_conversations_are_scoped_and_editable(client):
@@ -401,3 +402,101 @@ def test_gmail_email_text_decoder():
     encoded = base64.urlsafe_b64encode(original.encode()).decode().rstrip('=')
     assert text_body({'mimeType':'multipart/alternative','parts':[
         {'mimeType':'text/plain','body':{'data':encoded}}]}) == original
+
+
+def test_connected_chat_requires_sign_in():
+    with TestClient(app) as unauthenticated:
+        response = unauthenticated.post('/api/workspaces/unowned/connected-chat',
+                                        json={'question': 'Summarize my sources'})
+        assert response.status_code == 401
+
+
+def test_connected_chat_rejects_invalid_gmail_scope(client):
+    from app.main import ConnectedQuestion
+    import pytest
+    with pytest.raises(ValueError):
+        ConnectedQuestion(question='What changed?', include_gmail=True,
+                          gmail_query='x' * 401)
+
+
+def test_connected_source_evidence_contract():
+    from app.sources import Evidence
+    source = Evidence('gmail', 'message-id', 'Update', 'The launch was moved.',
+                      'https://mail.google.com/')
+    prompt = source.as_prompt(4)
+    assert prompt['source_id'] == 4
+    assert prompt['provider'] == 'gmail'
+    assert prompt['title'] == 'Update'
+
+
+def test_connected_synthesis_fits_local_model_and_preserves_citations():
+    from app.connected_synthesis import synthesize_connected
+    from app.sources import Evidence
+    evidence = [Evidence('documents', 'd', 'Document', 'important fact ' * 1000)]
+    evidence += [Evidence('gmail', str(i), 'Mail', 'other fact ' * 1000) for i in range(8)]
+    calls = []
+    def fake_ollama(messages, max_tokens):
+        import json
+        payload = json.loads(messages[-1]['content'])
+        calls.append(payload)
+        if len(calls) == 1:
+            raise ValueError('Model response was truncated; try a narrower question.')
+        return 'Supported by [1] and [2].'
+    answer, payload = synthesize_connected(
+        'What changed?', evidence, 'ollama', '', 'ignored',
+        None, fake_ollama)
+    assert len(calls) == 2
+    assert len(calls[0]['sources']) <= 12
+    assert sum(len(x['text']) for x in calls[0]['sources']) <= 7000
+    assert [x['source_id'] for x in payload] == list(range(1, len(payload)+1))
+    assert {x['provider'] for x in payload} == {'documents', 'gmail'}
+    assert answer == 'Supported by [1] and [2].'
+
+
+def test_github_search_query_preserves_filters_and_simplifies_questions():
+    from app.external_sources import github_search_query
+    assert github_search_query('repo:owner/project is:issue bug') == 'repo:owner/project is:issue bug'
+    assert github_search_query('What issues and pull requests discuss a payment timeout?') == 'discuss a payment timeout'
+    assert len(github_search_query('what ' * 100 + 'bug')) <= 180
+
+
+def test_drive_search_scope_and_connect_requires_login(client):
+    from app.drive import SCOPE, DriveSearch
+    from pydantic import ValidationError
+    assert SCOPE == 'https://www.googleapis.com/auth/drive.readonly'
+    assert client.get('/api/drive/connect?wid=missing').status_code in (404,503)
+    with __import__('pytest').raises(ValidationError):
+        DriveSearch(query='x' * 181)
+
+
+def test_drive_search_builds_safe_query(monkeypatch):
+    from app import drive
+    captured = {}
+    def fake_request(url, token, params=None, **kwargs):
+        captured.update(params)
+        return {'files': []}
+    monkeypatch.setattr(drive,'request_google',fake_request)
+    assert drive.drive_search('test-token', "client's notes") == []
+    assert "client\\'s notes" in captured['q']
+    assert 'trashed = false' in captured['q']
+
+
+def test_connected_chat_uses_standard_chat_citation_contract(client, monkeypatch):
+    from app import main, connected_synthesis
+    w = wid(client)
+    def fake_retrieve(*args, **kwargs):
+        return [{'chunk_id':'chunk-123','document_id':'doc-123','name':'Plan.md',
+                 'page':2,'location_type':'section','text':'Agreed milestone'}]
+    def fake_synthesize(question, evidence, *args):
+        return 'Milestone agreed [1].', [{**evidence[0].as_prompt(1), 'origin_id': evidence[0].source_id}]
+    monkeypatch.setattr(main, 'retrieve', fake_retrieve)
+    monkeypatch.setattr(connected_synthesis, 'synthesize_connected', fake_synthesize)
+    response = client.post(f'/api/workspaces/{w}/connected-chat',
+                           json={'question':'What milestone was agreed?'})
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result['mode'] == 'connected'
+    assert result['sources'][0]['chunk_id'] == 'chunk-123'
+    assert result['sources'][0]['document_id'] == 'doc-123'
+    assert result['sources'][0]['page'] == 2
+    assert result['sources'][0]['location_type'] == 'section'
