@@ -141,6 +141,28 @@ def create_workspace(body: Named, actor=Depends(user), db=Depends(database)):
     db.add(item); db.commit()
     return {'id': item.id, 'name': item.name}
 
+class DeleteWorkspaceRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+@app.delete('/api/workspaces/{wid}')
+def delete_workspace(wid: str, body: DeleteWorkspaceRequest, actor=Depends(user), db=Depends(database)):
+    item = workspace(wid, actor, db)
+    if body.name != item.name:
+        raise HTTPException(422, 'Type the exact workspace name to confirm deletion.')
+    documents = db.query(Document).filter_by(workspace_id=wid).all()
+    if any(d.status in ('queued', 'processing') for d in documents):
+        raise HTTPException(409, 'Wait for document uploads and processing to finish before deleting this workspace.')
+    ids = [d.id for d in documents]
+    # Use explicit deletes for SQLite and PostgreSQL; no reliance on ORM cascades.
+    db.query(Conversation).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(Chunk).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(Document).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.delete(item)
+    db.commit()
+    for did in ids:
+        (DATA / 'files' / did).unlink(missing_ok=True)
+    return {'ok': True}
+
 @app.get('/api/workspaces/{wid}/documents')
 def documents(wid: str, actor=Depends(user), db=Depends(database)):
     workspace(wid, actor, db)
