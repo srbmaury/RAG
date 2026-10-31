@@ -2,6 +2,14 @@
 
 A working first release for bulk document ingestion, private workspaces, source-backed chat, and persistent multi-conversation history. Built with Next.js/TypeScript, FastAPI, SQLAlchemy, and PostgreSQL/pgvector, with an API-key-free local mode.
 
+## Connected-source research (experimental)
+
+The **Connected search** navigation entry can combine workspace document passages and live Gmail results in one AI answer. Gmail is opt-in for each question, with a user-specified Gmail search scope (default: last 30 days). The backend verifies workspace ownership and Gmail connection before retrieving mail. It fetches up to eight matching messages on demand, and up to six document excerpts. Generated answers require citation references; the interface displays source passages and original Gmail URLs.
+
+This initial endpoint **does not yet include production-ready Google Drive, GitHub, Notion, or Slack connectors**. Those require separate per-user OAuth installation, permission scoping, encrypted connection storage, refresh/revocation handling, and provider-specific adapters. Do not enter provider access tokens in the UI. Future adapters should use the evidence contract in `backend/app/sources.py`, avoid bulk ingestion by default, and maintain the original source's permission boundary.
+
+The current connected questions are one-shot, not saved in chat history. Read-only retrieval does not send, edit, or delete Gmail messages. This feature is not yet covered by an end-to-end integration test.
+
 ## UI design preview
 
 Open [the interactive Atlas design preview](docs/Atlas_Research_Workspace.html) locally in a browser to review the current Home, Ask Atlas, Documents, Gmail, and workspace-management layouts. This standalone HTML uses fictional sample content and does not connect to the backend. The Next.js frontend in `frontend/app/` remains the source of truth for the working app.
