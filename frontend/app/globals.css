@@ -238,3 +238,13 @@ h1,h2,h3{font-family:'DM Sans',system-ui,sans-serif;font-weight:700}
  .gmail-summary-panel{min-height:340px}
  .gmail-summary-state{min-height:310px}
 }
+
+.gmail-query-summary{margin:16px 0;padding:16px 18px;border:1px solid var(--line);border-radius:10px;background:var(--panel);display:flex;flex-direction:column;gap:12px}
+.gmail-query-summary-title{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.gmail-query-summary-title strong{font-size:13px}
+.gmail-query-presets{display:flex;gap:7px;flex-wrap:wrap}
+.gmail-query-controls{display:flex;align-items:stretch;gap:9px;flex-wrap:wrap}
+.gmail-query-controls input{flex:1;min-width:190px;padding:10px 12px;border:1px solid var(--line2);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px}
+.gmail-query-controls select{border:1px solid var(--line2);border-radius:8px;background:var(--bg);color:var(--text);padding:9px;font-size:12px}
+.gmail-query-summary>.caption{line-height:1.6}
+@media(max-width:760px){.gmail-query-controls button{flex:1}.gmail-query-summary{padding:14px}}
