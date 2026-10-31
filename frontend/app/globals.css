@@ -341,3 +341,8 @@ button.source-provider-card.selected{border-color:var(--brand);background:var(--
 .source-dialog .connected-card form{margin-top:14px}
 @media(max-width:640px){.source-dialog{padding:17px;max-height:90dvh}.source-connect-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:390px){.source-connect-grid{grid-template-columns:1fr}}
+
+.source-provider-heading{display:flex;align-items:center;gap:12px;color:var(--text);margin-bottom:4px}
+.source-provider-heading svg{color:var(--brand);width:20px;height:20px;flex-shrink:0}
+.source-provider-card .source-provider-heading strong{font-size:14px;font-weight:700}
+.source-provider-card>.source-card-action{margin-top:auto}
