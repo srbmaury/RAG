@@ -510,6 +510,7 @@ def test_health_and_processing_stats(client):
     assert response.json()=={'queued':0,'processing':0,'ready':0,'failed':0}
     created=upload(client,workspace_id,'metrics.md','A sufficiently long sample for metrics.')
     assert client.get(f'/api/workspaces/{workspace_id}/processing-stats').json()['queued']==1
+    drain()
 
 def test_retrieval_diversifies_sources():
     from app.retrieval import diversify_ranked_chunks
