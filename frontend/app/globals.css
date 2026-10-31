@@ -125,3 +125,17 @@ h1,h2,h3{font-family:'DM Sans',system-ui,sans-serif;font-weight:700}
 .chat-history-empty{padding:12px;line-height:1.55}
 @media(max-width:1350px){.chat-workspace{grid-template-columns:195px minmax(0,1fr)}.chat-workspace .research{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:750px){.chat-workspace{grid-template-columns:minmax(0,1fr)}.chat-history{position:static}.chat-history-list{display:flex;gap:5px;max-height:145px;overflow:auto}.chat-history-item{min-width:190px;max-width:235px}.chat-history-open{padding:9px}}
+
+/* Workspace management and recent conversation discovery */
+.workspace-manage-row{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.workspace-manage-row>button:first-child{flex:1;min-width:0}
+.workspace-delete{flex:none;border:1px solid var(--line2);background:var(--panel);color:var(--sub);border-radius:7px;padding:10px;display:grid;place-items:center}
+.workspace-delete:hover{color:#b44740;background:var(--hover)}
+.workspace-delete-confirm{margin:15px 0;padding:15px;border:1px solid var(--line2);border-radius:9px}
+.workspace-delete-confirm strong{font-size:13px}
+.workspace-delete-confirm p{color:var(--sub);font-size:12px;margin:8px 0 11px}
+.workspace-delete-confirm input{width:100%;border:1px solid var(--line2);border-radius:7px;padding:10px;background:var(--panel)}
+.workspace-delete-confirm .dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.btn.danger{background:#9d3430;border-color:#9d3430;color:white}
+.btn.danger:hover{background:#822b28}
+.sidebar-research .workspace-stat span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
