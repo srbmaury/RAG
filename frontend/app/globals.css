@@ -308,3 +308,10 @@ button.source-provider-card.selected{border-color:var(--brand);background:var(--
  .sidebar>.sidebar-research{display:none}
  .sidebar>.bottom{margin-top:auto}
 }
+
+/* Sources navigation and cleaner compact sidebar */
+.source-card-action{color:var(--brand)!important;font-weight:650;margin-top:auto}
+.source-provider-card:hover:not(.disabled){border-color:var(--brand);background:var(--active)}
+.crumb-link{border:0;background:none;color:var(--sub);padding:0;font:inherit;cursor:pointer}
+.crumb-link:hover{text-decoration:underline;color:var(--brand)}
+.sidebar-research{scrollbar-gutter:stable}
