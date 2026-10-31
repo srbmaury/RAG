@@ -265,8 +265,14 @@ def chat(wid: str, body: Question, actor=Depends(user), db=Depends(database)):
     try:
         sources = retrieve(wid, query, body.document_ids)
         result = generate(body.question, sources, [t.model_dump() for t in body.history])
-    except Exception:
-        raise HTTPException(502, 'AI provider could not complete the request. Check server configuration and try again.')
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception('Chat retrieval or generation failed')
+        if isinstance(exc, (ConnectionError, TimeoutError)):
+            detail = 'AI provider connection failed or timed out. Check the provider service and retry.'
+        else:
+            detail = 'Answer generation failed. Check your AI provider configuration and server logs, then retry.'
+        raise HTTPException(502, detail) from exc
     # Do not return passages for documents deleted or reindexed during the provider call.
     if sources:
         current = db.query(Chunk.id).filter(Chunk.workspace_id == wid, Chunk.id.in_([s['chunk_id'] for s in sources])).count()
