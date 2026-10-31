@@ -401,3 +401,27 @@ def test_gmail_email_text_decoder():
     encoded = base64.urlsafe_b64encode(original.encode()).decode().rstrip('=')
     assert text_body({'mimeType':'multipart/alternative','parts':[
         {'mimeType':'text/plain','body':{'data':encoded}}]}) == original
+
+
+def test_connected_chat_requires_sign_in(client):
+    response = client.post('/api/workspaces/unowned/connected-chat',
+                           json={'question': 'Summarize my sources'})
+    assert response.status_code == 401
+
+
+def test_connected_chat_rejects_invalid_gmail_scope(client):
+    from app.main import ConnectedQuestion
+    import pytest
+    with pytest.raises(ValueError):
+        ConnectedQuestion(question='What changed?', include_gmail=True,
+                          gmail_query='x' * 401)
+
+
+def test_connected_source_evidence_contract():
+    from app.sources import Evidence
+    source = Evidence('gmail', 'message-id', 'Update', 'The launch was moved.',
+                      'https://mail.google.com/')
+    prompt = source.as_prompt(4)
+    assert prompt['source_id'] == 4
+    assert prompt['provider'] == 'gmail'
+    assert prompt['title'] == 'Update'
