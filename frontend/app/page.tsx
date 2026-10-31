@@ -59,11 +59,17 @@ export default function Home() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [wid, setWid] = useState('');
   const [docs, setDocs] = useState<Doc[]>([]);
-  const [tab, setTab] = useState<'overview' | 'documents' | 'chat' | 'gmail' | 'connected'>('chat');
+  const [tab, setTab] = useState<'overview' | 'documents' | 'chat' | 'gmail' | 'connected' | 'sources'>('chat');
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [sourceStatuses,setSourceStatuses] = useState<{provider:string;connected:boolean;account:string|null}[]>([]);
+  const [sourceProvider,setSourceProvider] = useState<'github'|'notion'|'slack'>('github');
+  const [sourceCredential,setSourceCredential] = useState('');
+  const [sourceSearch,setSourceSearch] = useState('');
+  const [sourceResults,setSourceResults] = useState<{provider:string;id:string;title:string;excerpt:string;url?:string}[]>([]);
+  const [sourceBusy,setSourceBusy] = useState(false);
   const [connectedQuestion,setConnectedQuestion] = useState('');
   const [connectedGmail,setConnectedGmail] = useState(false);
   const [connectedGmailQuery,setConnectedGmailQuery] = useState('newer_than:30d');
@@ -329,6 +335,36 @@ export default function Home() {
       window.location.assign(value.authorization_url);
     }catch(e){setError((e as Error).message);setGmailBusy(false);}
   }
+  async function refreshSourceStatuses(){
+    if(!wid)return;
+    try {setSourceStatuses(await api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`));}
+    catch(e){setError((e as Error).message);}
+  }
+  async function connectSource(){
+    if(!sourceCredential.trim())return;
+    setSourceBusy(true);setError('');
+    try{
+      await api(`/workspaces/${wid}/sources/${sourceProvider}`,{method:'POST',body:JSON.stringify({token:sourceCredential.trim()})});
+      setSourceCredential('');await refreshSourceStatuses();
+    }catch(e){setError((e as Error).message);}
+    finally{setSourceBusy(false);}
+  }
+  async function disconnectSource(provider:string){
+    if(!window.confirm(`Disconnect ${provider} from this workspace?`))return;
+    setSourceBusy(true);setError('');
+    try{await api(`/workspaces/${wid}/sources/${provider}`,{method:'DELETE'});await refreshSourceStatuses();setSourceResults([]);}
+    catch(e){setError((e as Error).message);}
+    finally{setSourceBusy(false);}
+  }
+  async function searchSource(){
+    if(!sourceSearch.trim())return;
+    setSourceBusy(true);setError('');
+    try{
+      const r=await api<{results:{provider:string;id:string;title:string;excerpt:string;url?:string}[]}>(`/workspaces/${wid}/sources/${sourceProvider}/search`,{method:'POST',body:JSON.stringify({query:sourceSearch.trim()})});
+      setSourceResults(r.results);
+    }catch(e){setError((e as Error).message);}
+    finally{setSourceBusy(false);}
+  }
   async function askConnected(){
     if(!wid||!connectedQuestion.trim()||connectedBusy)return;
     setConnectedBusy(true);setError('');
@@ -447,7 +483,7 @@ export default function Home() {
     <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
       <div className="brand-row"><AtlasMark/><span>Atlas</span><button className="sidebar-collapse" aria-label="Collapse sidebar" onClick={()=>{setSidebarCollapsed(true);setSidebarOpen(false);}}><PanelLeftClose/></button></div>
       <button className="workspace-btn" onClick={()=>setNewWorkspace(true)}><span className="ws-avatar">{workspace?.name[0]?.toUpperCase() || 'A'}</span><span><strong>{workspace?.name || 'Choose workspace'}</strong><small>{workspaces.length} workspace{workspaces.length===1?'':'s'}</small></span><ChevronDown/></button>
-      <nav className="nav" aria-label="Main navigation">{([{id:'overview',label:'Home',icon:HomeIcon},{id:'chat',label:'Ask Atlas',icon:Search},{id:'documents',label:'Documents',icon:FileText},{id:'gmail',label:'Gmail',icon:MessageSquare},{id:'connected',label:'Connected search',icon:Layers3}] as const).map(item=><button key={item.id} className={tab===item.id?'active':''} title={item.label} aria-current={tab===item.id?'page':undefined} onClick={()=>navigate(item.id)}><item.icon/><span>{item.label}</span></button>)}</nav>
+      <nav className="nav" aria-label="Main navigation">{([{id:'overview',label:'Home',icon:HomeIcon},{id:'chat',label:'Ask Atlas',icon:Search},{id:'documents',label:'Documents',icon:FileText},{id:'gmail',label:'Gmail',icon:MessageSquare},{id:'connected',label:'Connected search',icon:Layers3},{id:'sources',label:'Sources',icon:FolderOpen}] as const).map(item=><button key={item.id} className={tab===item.id?'active':''} title={item.label} aria-current={tab===item.id?'page':undefined} onClick={()=>navigate(item.id)}><item.icon/><span>{item.label}</span></button>)}</nav>
       <div className="sidebar-research"><div className="section-label">RECENT CHATS</div><button className="workspace-stat" onClick={()=>{newChat();}}><Plus/><span>New conversation</span></button>{chats.slice(0,6).map(item=><button key={item.id} className="workspace-stat" onClick={()=>void loadChat(item.id)} title={item.title}><MessageSquare/><span>{item.title}</span></button>)}<button className="workspace-stat" onClick={()=>{navigate('chat');void refreshChats();}}><Clock3/><span>All conversations ({chats.length})</span></button><div className="section-label">IN THIS WORKSPACE</div><button className="workspace-stat" onClick={()=>navigate('documents')}><FolderOpen/><span>{docs.length} documents</span></button><button className="workspace-stat" onClick={()=>navigate('chat')}><Layers3/><span>{totalChunks.toLocaleString()} searchable passages</span></button></div>
       <div className="bottom"><div className="usage"><div><span>Workspace storage</span><span>{storage ? prettyBytes(storage) : '0 KB'}</span></div><p>{ready.length} documents ready to explore</p></div><div className="profile"><span className="avatar">{initials}</span><div><strong>{user.email.split('@')[0]}</strong><small>{user.email}</small></div><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={()=>void signOut()}><LogOut/></button></div></div>
     </aside>
@@ -483,6 +519,34 @@ export default function Home() {
         </section>}
         {wid && tab==='documents' && <section><div className="crumb">Workspace<span>›</span>Documents</div><div className="heading-row"><div><h1>Documents</h1><p className="subtitle">The files behind your answers.</p></div>{uploadButton}</div><div className="library-bar"><label className="document-search"><Search/><input type="search" aria-label="Search documents" placeholder="Search documents…" value={filter} onChange={e=>setFilter(e.target.value)}/></label><span className="caption">{filtered.length} of {docs.length} documents</span></div>{renderDocuments(filtered)}<div className={`upload-area ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}><Upload/><div><strong>Drop your documents here</strong><p>PDF, DOCX, TXT, MD · up to {Math.round(user.max_file_bytes/1024/1024)} MB per file</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Browse files</button></div></section>}
 
+        {wid && tab==='sources' && <section className="connected-page">
+          <div className="crumb">Workspace<span>›</span>Sources</div><div className="heading-row"><div><h1>Connected sources</h1><p className="subtitle">Connect external services to your research workspace. Access stays read-only.</p></div>
+          <button className="btn" onClick={()=>void refreshSourceStatuses()}>Refresh connections</button></div>
+          <div className="source-connect-grid">
+            {(['github','notion','slack'] as const).map(p=><button type="button" key={p} className={`source-provider-card ${sourceProvider===p?'selected':''}`} onClick={()=>{setSourceProvider(p);setSourceResults([]);}}>
+              <strong>{p==='github'?'GitHub':p==='notion'?'Notion':'Slack'}</strong>
+              <span>{sourceStatuses.find(x=>x.provider===p)?.connected?'Connected · '+sourceStatuses.find(x=>x.provider===p)?.account:'Not connected'}</span>
+            </button>)}
+            <div className="source-provider-card disabled"><strong>Google Drive</strong><span>OAuth connection not yet implemented</span></div>
+            <div className="source-provider-card disabled"><strong>Gmail</strong><span>Connect from the Gmail page</span></div>
+            <div className="source-provider-card disabled"><strong>Documents</strong><span>Use the Documents page to upload files</span></div>
+          </div>
+          <div className="connected-card">
+            <h2>{sourceProvider==='github'?'GitHub':sourceProvider==='notion'?'Notion':'Slack'} connection</h2>
+            <p className="caption">Provide a read-only provider-issued token. Atlas validates it and stores it encrypted on the server. This setup is not yet one-click OAuth.</p>
+            <form onSubmit={e=>{e.preventDefault();void connectSource()}}>
+              <input className="connected-field" type="password" autoComplete="off" aria-label="Provider access token" value={sourceCredential} onChange={e=>setSourceCredential(e.target.value)} placeholder="Paste read-only access token"/>
+              <button type="submit" className="btn primary" disabled={sourceBusy||!sourceCredential.trim()}>{sourceBusy?'Connecting…':'Connect account'}</button>
+            </form>
+            {sourceStatuses.some(x=>x.provider===sourceProvider&&x.connected)&&<>
+              <div className="source-search-controls"><input className="connected-field" value={sourceSearch} onChange={e=>setSourceSearch(e.target.value)} placeholder={sourceProvider==='github'?'Search issues and PRs':sourceProvider==='notion'?'Search page titles':'Search messages'} aria-label="Search connected provider"/>
+              <button className="btn" disabled={sourceBusy||!sourceSearch.trim()} onClick={()=>void searchSource()}>Search</button>
+              <button className="btn" disabled={sourceBusy} onClick={()=>void disconnectSource(sourceProvider)}>Disconnect</button></div>
+              {sourceResults.map(x=><div className="connected-evidence" key={x.id}><strong>{x.title}</strong><p>{x.excerpt}</p>{x.url&&<a href={x.url} target="_blank" rel="noopener noreferrer">Open source <ArrowUpRight size={14}/></a>}</div>)}
+            </>}
+          </div>
+          <p className="caption">For GitHub, use a fine-grained read-only token for selected repositories. Notion requires an integration token with access to shared pages. Slack search requires a token with the search:read permission. No connector sends or modifies content.</p>
+        </section>}
         {wid && tab==='connected' && <section className="connected-page">
           <div className="crumb">Workspace<span>›</span>Connected search</div>
           <h1>Ask across your sources</h1>
