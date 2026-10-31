@@ -217,3 +217,28 @@
  .atlas-v3 .chat-workspace .chat-pane{height:clamp(400px,calc(100dvh - 315px),740px)}
  .atlas-v3 .chat-workspace .evidence-panel{max-height:none}
 }
+
+/* Spacious answer-first research layout. Input remains anchored below the transcript. */
+.atlas-v3 .chat-workspace .research{
+  grid-template-columns:minmax(0,1fr) minmax(220px,255px);
+  gap:14px;
+}
+.atlas-v3 .chat-workspace .chat-pane{
+  height:clamp(600px,calc(100dvh - 235px),1040px);
+}
+.atlas-v3 .chat-workspace .thread{
+  padding:clamp(20px,2.2vw,34px);
+  min-height:0;
+}
+.atlas-v3 .chat-workspace .evidence-panel{
+  max-height:clamp(600px,calc(100dvh - 235px),1040px);
+}
+.atlas-v3 .chat-workspace .answer{width:100%;max-width:none}
+.atlas-v3 .chat-workspace .answer-row{min-width:0}
+@media(max-width:1050px){
+  .atlas-v3 .chat-workspace .research{grid-template-columns:minmax(0,1fr)}
+  .atlas-v3 .chat-workspace .evidence-panel{max-height:360px}
+}
+@media(max-width:790px){
+  .atlas-v3 .chat-workspace .chat-pane{height:clamp(500px,calc(100dvh - 210px),880px)}
+}
