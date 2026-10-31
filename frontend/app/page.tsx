@@ -258,16 +258,21 @@ export default function Home() {
       if(activeChat.current===item.id)newChat();
     }catch(e){setError((e as Error).message);}
   }
-  async function ask(question = query) {
+  async function ask(question = query, startNewConversation = false) {
     if (!question.trim() || busy) return;
     const target=wid;
-    const history=chatMessages.current.slice(-12).map(m=>({role:m.role,content:m.content.slice(0,6000)}));
+    // Home is a new research entry point, never a follow-up to a previously opened chat.
+    if (startNewConversation) {
+      activeChat.current=null;setChatId(null);chatTitle.current='New chat';
+      chatMessages.current=[];setMessages([]);setNotes('');setSource(null);setEvidenceTab('sources');
+    }
+    const history=(startNewConversation?[]:chatMessages.current).slice(-12).map(m=>({role:m.role,content:m.content.slice(0,6000)}));
     setQuery('');setTab('chat');setError('');setBusy(true);
-    const title=chatTitle.current==='New chat'?question.trim().slice(0,100):chatTitle.current;
-    const previous=chatMessages.current;
+    const title=startNewConversation||chatTitle.current==='New chat'?question.trim().slice(0,100):chatTitle.current;
+    const previous=startNewConversation?[]:chatMessages.current;
     const pending: Message[]=[...previous,{role:'user',content:question}];
     chatMessages.current=pending;setMessages(pending);
-    let id=activeChat.current;
+    let id=startNewConversation?null:activeChat.current;
     try {
       if (!id) {
         const created=await api<SavedChat>(`/workspaces/${target}/conversations`,{method:'POST',body:JSON.stringify({title,messages:pending})});
@@ -526,8 +531,8 @@ export default function Home() {
             <div className="hero-symbol" aria-hidden="true"><AtlasMark/></div>
           </div>
           <div className="home-prompt-panel"><div className="home-prompt-top"><Sparkles size={17}/><span>Ask Atlas</span><span className="home-prompt-hint">Search your knowledge</span></div>
-            <form onSubmit={e=>{e.preventDefault();void ask();}}>
-              <textarea aria-label="Ask Atlas" placeholder="What would you like to understand?" value={query} maxLength={4000} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(ready.length||connectedGmail||connectedProviders.length)void ask();}}}/>
+            <form onSubmit={e=>{e.preventDefault();void ask(query,true);}}>
+              <textarea aria-label="Ask Atlas" placeholder="What would you like to understand?" value={query} maxLength={4000} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(ready.length||connectedGmail||connectedProviders.length)void ask(query,true);}}}/>
               <div className="home-prompt-bottom"><div className="home-scope-summary"><FileText size={15}/>{ready.length} ready documents <span>·</span> <button type="button" onClick={()=>navigate('sources')}>Manage sources <ArrowUpRight size={13}/></button></div><button className="home-send" aria-label="Ask Atlas" disabled={busy||!query.trim()||(!ready.length&&!connectedGmail&&!connectedProviders.length)}>{busy?<LoaderCircle size={18} className="spin"/>:<ArrowUp size={18}/>}</button></div>
             </form></div>
           <div className="home-section-header"><div><span className="section-kicker">PICK UP WHERE YOU LEFT OFF</span><h2>Your workspace</h2></div><button className="text-action" onClick={()=>navigate('sources')}>Connected sources <ArrowUpRight size={15}/></button></div>
