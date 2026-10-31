@@ -160,10 +160,10 @@ def extract_drive_binary(body, mime):
                 finally: page.close()
         finally:
             pdf.close()
-        return '\\n'.join(parts)[:6000]
+        return '\n'.join(parts)[:6000]
     if mime == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
         doc = WordDocument(io.BytesIO(body))
-        return '\\n'.join(p.text for p in doc.paragraphs if p.text.strip())[:6000]
+        return '\n'.join(p.text for p in doc.paragraphs if p.text.strip())[:6000]
     return ''
 
 def drive_evidence(token,items):
