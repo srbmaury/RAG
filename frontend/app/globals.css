@@ -166,3 +166,25 @@ h1,h2,h3{font-family:'DM Sans',system-ui,sans-serif;font-weight:700}
 .gmail-selection{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .gmail-selection .btn{padding:6px 10px;font-size:11px}
 @media(max-width:600px){.gmail-selection{align-items:flex-start}.gmail-actions{flex-wrap:wrap}}
+
+/* Workspace selector: rows contain a selection button and a separate delete action. */
+.workspace-list>.workspace-manage-row{display:flex;align-items:center;gap:9px;margin:0}
+.workspace-list>.workspace-manage-row>button:first-child{
+  display:flex;flex:1;min-width:0;align-items:center;justify-content:flex-start;
+  gap:12px;padding:10px 12px;min-height:56px;border:1px solid var(--line2);
+  border-radius:8px;background:var(--panel);text-align:left;color:var(--text)
+}
+.workspace-list>.workspace-manage-row>button:first-child.selected{
+  border-color:color-mix(in srgb,var(--brand) 35%,var(--line2));background:var(--active)
+}
+.workspace-list>.workspace-manage-row>button:first-child .ws-avatar{
+  width:34px;height:34px;min-width:34px;flex:none;display:grid;place-items:center
+}
+.workspace-list>.workspace-manage-row>button:first-child strong{
+  flex:1;min-width:0;margin:0;text-align:left;font-size:13px;line-height:1.4;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+.workspace-list>.workspace-manage-row>button:first-child svg{margin-left:auto}
+.workspace-list>.workspace-manage-row>.workspace-delete{
+  width:40px;height:40px;min-width:40px;display:grid;place-items:center;padding:0
+}
