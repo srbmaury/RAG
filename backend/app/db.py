@@ -61,6 +61,19 @@ class Chunk(Base):
     embedding = Column(Vector(1536).with_variant(JSON(), 'sqlite'))
     embedding_model = Column(String)
 
+class GmailConnection(Base):
+    __tablename__ = 'gmail_connections'
+    workspace_id = Column(String, ForeignKey('workspaces.id', ondelete='CASCADE'), primary_key=True)
+    email = Column(String, nullable=False)
+    refresh_token = Column(Text, nullable=False)
+
+class GmailOAuthState(Base):
+    __tablename__ = 'gmail_oauth_states'
+    value = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    workspace_id = Column(String, ForeignKey('workspaces.id', ondelete='CASCADE'), nullable=False)
+    expires = Column(Float, nullable=False)
+
 class Conversation(Base):
     __tablename__ = 'conversations'
     id = Column(String, primary_key=True, default=uid)

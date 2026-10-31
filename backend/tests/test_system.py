@@ -368,3 +368,36 @@ def test_workspace_deletion_requires_owner_and_confirmation(client):
     assert not (config.DATA/'files'/document['id']).exists()
     assert client.get(f'/api/workspaces/{w}/conversations/{created["id"]}').status_code==404
     assert all(item['id']!=w for item in client.get('/api/workspaces').json())
+
+
+def test_gmail_routes_are_authenticated_and_config_guarded(client, monkeypatch):
+    from app import gmail
+    w = wid(client)
+    route = f'/api/workspaces/{w}/gmail'
+    assert client.get(f'/api/gmail/status?wid={w}').json()['connected'] is False
+    assert client.post(route+'/search',json={'query':'in:inbox'}).status_code == 409
+    assert client.post(route+'/summarize',json={'message_ids':[]}).status_code == 422
+    with TestClient(app) as stranger:
+        assert stranger.get(f'/api/gmail/status?wid={w}').status_code == 401
+    monkeypatch.setattr(gmail,'CLIENT','')
+    assert client.get(f'/api/gmail/connect?wid={w}').status_code == 503
+
+
+def test_gmail_summary_reports_provider_configuration_without_gmail_access(client, monkeypatch):
+    from app import gmail
+    w = wid(client)
+    monkeypatch.setattr(gmail.config, 'AI_PROVIDER', 'none')
+    monkeypatch.setattr(gmail.config, 'API_KEY', '')
+    result = client.post(f'/api/workspaces/{w}/gmail/summarize',
+        json={'message_ids': ['abc123']})
+    assert result.status_code == 409
+    assert 'AI provider' in result.json()['detail']
+
+
+def test_gmail_email_text_decoder():
+    import base64
+    from app.gmail import text_body
+    original = 'A deadline is next Tuesday.'
+    encoded = base64.urlsafe_b64encode(original.encode()).decode().rstrip('=')
+    assert text_body({'mimeType':'multipart/alternative','parts':[
+        {'mimeType':'text/plain','body':{'data':encoded}}]}) == original

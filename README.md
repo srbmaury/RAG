@@ -2,6 +2,10 @@
 
 A working first release for bulk document ingestion, private workspaces, source-backed chat, and persistent multi-conversation history. Built with Next.js/TypeScript, FastAPI, SQLAlchemy, and PostgreSQL/pgvector, with an API-key-free local mode.
 
+## UI design preview
+
+Open [the interactive Atlas design preview](docs/Atlas_Research_Workspace.html) locally in a browser to review the current Home, Ask Atlas, Documents, Gmail, and workspace-management layouts. This standalone HTML uses fictional sample content and does not connect to the backend. The Next.js frontend in `frontend/app/` remains the source of truth for the working app.
+
 ## Run locally
 
 Requires Python 3.9+ and Node 20.9+.
@@ -115,3 +119,17 @@ Do not expose this development release publicly until the authentication, abuse 
 - `backend/app/worker.py`: durable job claiming, leases, ingestion.
 - `frontend/app/page.tsx`: workspace, library, saved chats, source viewer.
 - `compose.yaml`: PostgreSQL development deployment.
+
+## Gmail connector (read-only, opt-in)
+
+Atlas can connect a Gmail mailbox to a workspace and let you search and summarize selected messages without sending, deleting, or modifying mail. Mail is fetched on demand and is **not automatically added to the RAG document index**. The summarization request sends the selected email text to your configured AI provider (OpenAI or Ollama); for private local processing choose Ollama.
+
+1. Enable Gmail API in a Google Cloud project, configure an OAuth consent screen, and create an OAuth **Web application** client.
+2. Set the Google OAuth redirect URI to `http://localhost:3000/api/gmail/callback` for local development. In production use `https://your-atlas-domain/api/gmail/callback` as both the registered redirect URI and `GOOGLE_REDIRECT_URI`.
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` in the backend environment (`.env` for local development).
+4. Generate `GMAIL_TOKEN_ENCRYPTION_KEY` using `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` and keep it in a protected secret store. Back up the key; losing it makes stored connections unreadable. Never commit it.
+5. Install backend dependencies and restart both services. Open **Gmail** in Atlas, choose **Connect Gmail**, authorize read-only access, and search your mailbox. Select up to 15 messages and choose **Summarize selected**.
+
+**Security and policy:** Gmail's `gmail.readonly` is a **restricted scope**. A public app may need Google's OAuth verification and a security assessment for server-side restricted-scope data handling. Do not launch this integration publicly until you've completed applicable requirements and reviewed the privacy policy and deletion behavior. This implementation encrypts refresh tokens at rest and never puts them in browser state; disconnecting removes Atlas's saved token, though users can additionally revoke consent at Google. No background mailbox sync is configured. Avoid sending sensitive mail to a hosted AI provider unless users understand and consent to that data flow.
+
+**Limits:** Summaries are generated on demand from up to 15 selected messages; HTML-only messages currently fall back to Gmail snippets, attachments are not parsed, and citations link back to Gmail. The integration does not yet provide automatic scheduled digests or inbox-to-document indexing.
