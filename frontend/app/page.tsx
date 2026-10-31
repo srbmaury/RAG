@@ -341,7 +341,7 @@ export default function Home() {
       window.location.assign(value.authorization_url);
     }catch(e){setError((e as Error).message);setGmailBusy(false);}
   }
-  useEffect(()=>{if(tab==='sources'&&wid){void refreshDrive();void api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`).then(setSourceStatuses).catch(e=>setError((e as Error).message));}},[tab,wid]);
+  useEffect(()=>{if((tab==='sources'||tab==='chat')&&wid){void refreshDrive();void api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`).then(setSourceStatuses).catch(e=>setError((e as Error).message));}},[tab,wid]);
   async function refreshDrive(){
     if(!wid)return;
     try{setDriveStatus(await api<{connected:boolean;account:string|null;configured:boolean}>(`/workspaces/${wid}/drive/status`));}
@@ -525,8 +525,8 @@ export default function Home() {
           <div className="crumb">Ask Atlas<span>›</span><span className="crumb-title">{title}</span></div><div className="heading-row"><div className="research-heading"><h1 title={title}>{title}</h1><p className="subtitle">Answers grounded in your documents, with evidence you can inspect.</p></div><div className="actions"><button className="btn hide-small" disabled={!messages.length} onClick={()=>void copyConversation()}>{copied?<Check/>:<Copy/>}{copied?'Copied':'Copy chat'}</button><button className="btn primary" disabled={busy} onClick={newChat}><Plus/><span>New chat</span></button></div></div>
           <div className="filters"><button className="filter" onClick={()=>setScopeOpen(true)}><FileText/>{selected.length?`${selected.length} selected documents`:'All documents'}<ChevronDown/></button><span className="research-mode"><i/>{user.mode==='ai'?'AI research':'Source search'} · {ready.length} ready documents</span></div>
           <div className="unified-sources"><span className="unified-sources-label">Search sources</span><label><input type="checkbox" checked readOnly/> Documents</label>
-            <label><input type="checkbox" checked={connectedGmail} onChange={e=>setConnectedGmail(e.target.checked)}/> Gmail</label>
-            {(['drive','github','notion','slack'] as const).map(p=><label key={p}><input type="checkbox" checked={connectedProviders.includes(p)} onChange={e=>setConnectedProviders(old=>e.target.checked?[...old,p]:old.filter(x=>x!==p))}/>{p==='drive'?'Drive':p==='github'?'GitHub':p==='notion'?'Notion':'Slack'}</label>)}
+            <label><input type="checkbox" disabled={!gmailStatus?.connected} checked={connectedGmail} onChange={e=>setConnectedGmail(e.target.checked)}/> Gmail</label>
+            {(['drive','github','notion','slack'] as const).map(p=><label key={p} title={p==='drive'?(driveStatus?.connected?'':'Connect Drive in Sources first'):(sourceStatuses.find(x=>x.provider===p)?.connected?'':'Connect this source in Sources first')}><input type="checkbox" disabled={p==='drive'?!driveStatus?.connected:!sourceStatuses.some(x=>x.provider===p&&x.connected)} checked={connectedProviders.includes(p)} onChange={e=>setConnectedProviders(old=>e.target.checked?[...old,p]:old.filter(x=>x!==p))}/>{p==='drive'?'Drive':p==='github'?'GitHub':p==='notion'?'Notion':'Slack'}</label>)}
             <button type="button" className="unified-source-manage" onClick={()=>navigate('sources')}>Manage connections <ArrowUpRight size={13}/></button>
           </div>
           {connectedGmail&&<div className="unified-gmail-scope"><label>Gmail search scope <input aria-label="Gmail search scope" value={connectedGmailQuery} onChange={e=>setConnectedGmailQuery(e.target.value)}/></label></div>}
