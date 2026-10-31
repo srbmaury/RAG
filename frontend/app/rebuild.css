@@ -113,3 +113,34 @@
 @media(max-width:790px){.atlas-v3 .sidebar{width:246px}.atlas-v3 .main{margin-left:0}.atlas-v3 .content{padding:24px 19px 55px}.atlas-v3 .topbar{height:60px;padding:0 16px}.home-hero{padding-top:15px}.hero-symbol{width:110px;height:110px;border-radius:23px}.hero-symbol svg{width:55px;height:55px}.home-hero h1{font-size:clamp(29px,6vw,42px)}.home-activity-grid{grid-template-columns:1fr}.home-prompt-panel{padding:18px}.home-dropzone{flex-wrap:wrap}.home-dropzone .btn{margin-left:54px}}
 @media(max-width:520px){.hero-symbol{display:none}.integrations-grid{grid-template-columns:1fr}.integration-tile{min-height:174px}.home-section-header{align-items:start}.home-dropzone{padding:15px}.atlas-v3 .thread{padding:16px}.home-hero p{font-size:13px}}
 @media(prefers-reduced-motion:reduce){.integration-tile{transition:none}.integration-tile:hover{transform:none}}
+
+.document-library-v3{max-width:1080px;margin:auto}
+.library-intro{display:flex;align-items:center;justify-content:space-between;gap:25px;margin:12px 0 24px}
+.library-intro h1{font-size:clamp(30px,3.5vw,43px);margin:10px 0}
+.library-intro p{max-width:590px;font-size:13px;line-height:1.7;color:var(--muted)}
+.library-stat-strip{display:flex;align-items:center;gap:10px;margin:30px 0;flex-wrap:wrap}
+.library-stat-strip span{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--outline);border-radius:100px;padding:9px 15px;color:var(--muted);font-size:11px}
+.library-stat-strip strong{font-size:13px;color:var(--ink)}
+.library-workspace{border:1px solid var(--outline);border-radius:15px;background:var(--panel);padding:22px 22px 24px}
+.library-workspace-heading{display:flex;align-items:start;justify-content:space-between;margin-bottom:17px}
+.library-workspace-heading h2{font-size:17px}
+.library-workspace-heading p{font-size:11px;color:var(--muted);margin-top:4px}
+.library-workspace-heading>span{color:var(--forest);background:var(--mint);border-radius:100px;padding:5px 11px;font-weight:750;font-size:11px}
+.library-search-row{margin:0 0 19px;display:flex;gap:10px}
+.library-search-row label{display:flex;align-items:center;gap:10px;background:var(--wash);border:1px solid var(--outline);border-radius:9px;padding:0 13px;width:min(100%,430px);color:var(--muted)}
+.library-search-row input{width:100%;height:43px;background:transparent;border:0;outline:0;font-size:12px}
+.library-workspace .table-wrap{border-radius:10px}
+.atlas-v3 .gmail-page>.heading-row{margin-bottom:25px}
+.atlas-v3 .gmail-page>.heading-row h1{font-size:clamp(29px,3vw,39px)}
+.atlas-v3 .gmail-intro{padding:17px 20px;background:var(--mint);border:1px solid var(--outline);border-radius:12px}
+.atlas-v3 .gmail-search,.atlas-v3 .gmail-query-summary{border:1px solid var(--outline);padding:20px;border-radius:13px;background:var(--panel);margin:15px 0}
+.atlas-v3 .gmail-search>label{color:var(--ink);font-weight:800;font-size:12px}
+.atlas-v3 .gmail-query-summary-title strong{font-size:13px}
+.atlas-v3 .gmail-query-presets{margin:13px 0}
+.atlas-v3 .gmail-workspace{gap:16px;margin-top:20px}
+.atlas-v3 .gmail-mail-panel,.atlas-v3 .gmail-summary-panel{border:1px solid var(--outline);border-radius:13px;overflow:hidden;background:var(--panel)}
+.atlas-v3 .gmail-panel-head{background:var(--wash);border-bottom:1px solid var(--outline);padding:18px}
+.atlas-v3 .gmail-item{border-color:var(--outline);padding:15px}
+.atlas-v3 .gmail-item:hover{background:var(--wash)}
+.atlas-v3 .gmail-summary-panel .markdown{line-height:1.8}
+@media(max-width:640px){.library-intro{align-items:start;flex-direction:column}.library-workspace{padding:14px}.library-stat-strip{gap:7px;margin:18px 0}.library-stat-strip span{padding:7px 10px}.atlas-v3 .gmail-search,.atlas-v3 .gmail-query-summary{padding:15px}}
