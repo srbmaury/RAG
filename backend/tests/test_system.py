@@ -323,3 +323,33 @@ def test_country_count_answers_numeric_evidence_instead_of_titles(client):
     result = client.post(f'/api/workspaces/{w}/chat',json={'question':'how many countries are there in North America'}).json()
     assert result['mode'] == 'insufficient_evidence'
     assert result['sources'] == []
+
+
+def test_saved_conversations_are_scoped_and_editable(client):
+    w = wid(client)
+    route = f'/api/workspaces/{w}/conversations'
+    first = client.post(route, json={'title':'Budget research','messages':[{'role':'user','content':'What is the budget?'}]})
+    assert first.status_code == 200
+    cid = first.json()['id']
+    assert client.get(route).json()[0]['id'] == cid
+    assert client.get(f'{route}/{cid}').json()['messages'][0]['content'] == 'What is the budget?'
+    updated = client.put(f'{route}/{cid}', json={'title':'Budget research','messages':[
+        {'role':'user','content':'What is the budget?'},
+        {'role':'assistant','content':'INR 75000 [1]','result':{'answer':'INR 75000 [1]','sources':[],'mode':'ai'}}]})
+    assert updated.status_code == 200
+    assert len(updated.json()['messages']) == 2
+    renamed = client.patch(f'{route}/{cid}',json={'title':'Budget notes'})
+    assert renamed.status_code == 200 and renamed.json()['title'] == 'Budget notes'
+    with TestClient(app) as other:
+        other.post('/api/auth/register',json={'email':f'{time.time_ns()}@second.com','password':'another-long-password'})
+        ow = wid(other)
+        assert other.get(f'/api/workspaces/{ow}/conversations/{cid}').status_code == 404
+        assert other.delete(f'/api/workspaces/{ow}/conversations/{cid}').status_code == 404
+    assert client.delete(f'{route}/{cid}').status_code == 200
+    assert client.get(f'{route}/{cid}').status_code == 404
+
+
+def test_insights_endpoints_are_removed(client):
+    w = wid(client)
+    assert client.get(f'/api/workspaces/{w}/analyses').status_code == 404
+    assert client.post(f'/api/workspaces/{w}/analyses',json={'kind':'summary'}).status_code == 404
