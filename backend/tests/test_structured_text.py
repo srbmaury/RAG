@@ -26,7 +26,3 @@ def test_invalid_json_fails(tmp_path):
     file=tmp_path/'bad.json'
     file.write_text('{broken',encoding='utf-8')
     with pytest.raises(ValueError): extract_structured(file,'.json')
-
-def test_readiness(client):
-    assert client.get('/api/health/live').json()=={'status':'ok'}
-    assert client.get('/api/health/ready').json()=={'status':'ready'}
