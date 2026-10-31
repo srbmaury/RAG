@@ -61,6 +61,7 @@ export default function Home() {
   const [wid, setWid] = useState('');
   const [docs, setDocs] = useState<Doc[]>([]);
   const [tab, setTab] = useState<'overview' | 'documents' | 'chat' | 'gmail' | 'sources'>('chat');
+  const [historyOpen,setHistoryOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
