@@ -98,10 +98,13 @@ class Conversation(Base):
     updated = Column(Float, default=time.time, index=True)
 
 def init_db():
-    if engine.dialect.name == 'postgresql':
-        with engine.begin() as conn: conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
-    Base.metadata.create_all(engine)
-    if engine.dialect.name == 'postgresql':
-        with engine.begin() as conn:
-            conn.execute(text("CREATE INDEX IF NOT EXISTS chunks_text_idx ON chunks USING gin(to_tsvector('english', text))"))
-            conn.execute(text('CREATE INDEX IF NOT EXISTS chunks_vector_idx ON chunks USING hnsw (embedding vector_cosine_ops)'))
+    """Apply versioned schema migrations before accepting requests.
+
+    Development databases are disposable; migration revisions are the only
+    authoritative schema lifecycle from this release onward.
+    """
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    config = Config(str(Path(__file__).resolve().parents[1] / 'alembic.ini'))
+    command.upgrade(config, 'head')
