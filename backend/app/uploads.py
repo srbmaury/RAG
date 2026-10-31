@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from .config import DATA
-from .db import Document, Analysis, uid
+from .db import Document, uid
 
 PART_BYTES = 8 * 1024 * 1024
 TTL = 24 * 60 * 60
@@ -94,7 +94,6 @@ def finish(upload_id, wid, owner, db):
         os.replace(part,destination)
         try:
             db.add(doc)
-            db.query(Analysis).filter_by(workspace_id=wid).delete()
             db.commit()
         except IntegrityError:
             db.rollback(); destination.unlink(missing_ok=True)

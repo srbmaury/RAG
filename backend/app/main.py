@@ -11,8 +11,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, 
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import defer
-from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Analysis, uid
+from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, uid
 from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
 from . import config
 from .ingest import SUPPORTED
@@ -76,9 +75,6 @@ class Question(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     document_ids: List[str] = Field(default_factory=list, max_length=200)
     history: List[Turn] = Field(default_factory=list, max_length=12)
-
-class InsightRequest(BaseModel):
-    kind: str = Field(pattern='^(summary|risks|timeline)$')
 
 class UploadRequest(BaseModel):
     name: str = Field(min_length=1, max_length=300)
@@ -145,6 +141,28 @@ def create_workspace(body: Named, actor=Depends(user), db=Depends(database)):
     db.add(item); db.commit()
     return {'id': item.id, 'name': item.name}
 
+class DeleteWorkspaceRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+@app.delete('/api/workspaces/{wid}')
+def delete_workspace(wid: str, body: DeleteWorkspaceRequest, actor=Depends(user), db=Depends(database)):
+    item = workspace(wid, actor, db)
+    if body.name != item.name:
+        raise HTTPException(422, 'Type the exact workspace name to confirm deletion.')
+    documents = db.query(Document).filter_by(workspace_id=wid).all()
+    if any(d.status in ('queued', 'processing') for d in documents):
+        raise HTTPException(409, 'Wait for document uploads and processing to finish before deleting this workspace.')
+    ids = [d.id for d in documents]
+    # Use explicit deletes for SQLite and PostgreSQL; no reliance on ORM cascades.
+    db.query(Conversation).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(Chunk).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(Document).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.delete(item)
+    db.commit()
+    for did in ids:
+        (DATA / 'files' / did).unlink(missing_ok=True)
+    return {'ok': True}
+
 @app.get('/api/workspaces/{wid}/documents')
 def documents(wid: str, actor=Depends(user), db=Depends(database)):
     workspace(wid, actor, db)
@@ -206,7 +224,6 @@ async def upload(wid: str, files: List[UploadFile] = File(...), actor=Depends(us
                 results.append({**public_doc(existing), 'duplicate': True}); continue
             doc = Document(id=did, workspace_id=wid, name=name, size=count, digest=digest.hexdigest())
             db.add(doc)
-            db.query(Analysis).filter_by(workspace_id=wid).delete()
             db.commit()
             results.append(public_doc(doc))
         except IntegrityError:
@@ -240,7 +257,6 @@ def retry(wid: str, did: str, actor=Depends(user), db=Depends(database)):
     if doc.status not in ('failed', 'ready'): raise HTTPException(409, 'Document is already queued or processing.')
     db.query(Chunk).filter_by(document_id=did).delete()
     doc.status, doc.error, doc.chunk_count, doc.generation = 'queued', None, 0, doc.generation + 1
-    db.query(Analysis).filter_by(workspace_id=wid).delete()
     db.commit()
     return public_doc(doc)
 
@@ -249,9 +265,68 @@ def delete(wid: str, did: str, actor=Depends(user), db=Depends(database)):
     doc = document(wid, did, actor, db)
     db.delete(doc)
     # Reports can contain copied passages; invalidate them on source deletion.
-    db.query(Analysis).filter_by(workspace_id=wid).delete()
     db.commit()
     (DATA / 'files' / did).unlink(missing_ok=True)
+    return {'ok': True}
+
+
+class ConversationPayload(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    messages: list[dict] = Field(default_factory=list, max_length=300)
+
+class ConversationRename(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+
+def owned_conversation(wid, cid, actor, db):
+    workspace(wid, actor, db)
+    item = db.query(Conversation).filter_by(id=cid, workspace_id=wid).first()
+    if item is None:
+        raise HTTPException(404, 'Conversation not found.')
+    return item
+
+def conversation_data(item):
+    return {'id': item.id, 'title': item.title, 'messages': item.messages or [],
+            'created': item.created, 'updated': item.updated}
+
+@app.get('/api/workspaces/{wid}/conversations')
+def list_conversations(wid: str, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    items = db.query(Conversation).filter_by(workspace_id=wid).order_by(Conversation.updated.desc()).all()
+    return [{'id': c.id, 'title': c.title, 'updated': c.updated} for c in items]
+
+@app.post('/api/workspaces/{wid}/conversations')
+def create_conversation(wid: str, body: ConversationPayload, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    item = Conversation(workspace_id=wid, title=body.title.strip(), messages=body.messages)
+    db.add(item)
+    db.commit()
+    return conversation_data(item)
+
+@app.get('/api/workspaces/{wid}/conversations/{cid}')
+def get_conversation(wid: str, cid: str, actor=Depends(user), db=Depends(database)):
+    return conversation_data(owned_conversation(wid, cid, actor, db))
+
+@app.put('/api/workspaces/{wid}/conversations/{cid}')
+def update_conversation(wid: str, cid: str, body: ConversationPayload, actor=Depends(user), db=Depends(database)):
+    item = owned_conversation(wid, cid, actor, db)
+    item.title = body.title.strip()
+    item.messages = body.messages
+    item.updated = time.time()
+    db.commit()
+    return conversation_data(item)
+
+@app.patch('/api/workspaces/{wid}/conversations/{cid}')
+def rename_conversation(wid: str, cid: str, body: ConversationRename, actor=Depends(user), db=Depends(database)):
+    item = owned_conversation(wid, cid, actor, db)
+    item.title = body.title.strip()
+    item.updated = time.time()
+    db.commit()
+    return conversation_data(item)
+
+@app.delete('/api/workspaces/{wid}/conversations/{cid}')
+def delete_conversation(wid: str, cid: str, actor=Depends(user), db=Depends(database)):
+    db.delete(owned_conversation(wid, cid, actor, db))
+    db.commit()
     return {'ok': True}
 
 @app.post('/api/workspaces/{wid}/chat')
@@ -265,43 +340,16 @@ def chat(wid: str, body: Question, actor=Depends(user), db=Depends(database)):
     try:
         sources = retrieve(wid, query, body.document_ids)
         result = generate(body.question, sources, [t.model_dump() for t in body.history])
-    except Exception:
-        raise HTTPException(502, 'AI provider could not complete the request. Check server configuration and try again.')
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception('Chat retrieval or generation failed')
+        if isinstance(exc, (ConnectionError, TimeoutError)):
+            detail = 'AI provider connection failed or timed out. Check the provider service and retry.'
+        else:
+            detail = 'Answer generation failed. Check your AI provider configuration and server logs, then retry.'
+        raise HTTPException(502, detail) from exc
     # Do not return passages for documents deleted or reindexed during the provider call.
     if sources:
         current = db.query(Chunk.id).filter(Chunk.workspace_id == wid, Chunk.id.in_([s['chunk_id'] for s in sources])).count()
         if current != len(sources): raise HTTPException(409, 'Sources changed during the answer. Ask again.')
     return result
-
-@app.post('/api/workspaces/{wid}/analyses')
-def start_analysis(wid: str, body: InsightRequest, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
-    if not db.query(Document).filter_by(workspace_id=wid, status='ready').first(): raise HTTPException(409, 'Upload and process documents first.')
-    # Serialize requests for this workspace, including requests from other workers.
-    db.query(Workspace).filter_by(id=wid).update({Workspace.name: Workspace.name})
-    existing = db.query(Analysis).options(defer(Analysis.result)).filter(
-        Analysis.workspace_id == wid, Analysis.kind == body.kind,
-        Analysis.status.in_(['queued', 'processing', 'ready']),
-    ).order_by(Analysis.created.desc()).first()
-    # Source changes invalidate reports at upload, deletion, and reindex time.
-    if existing:
-        db.commit()
-        return {'id': existing.id, 'status': existing.status, 'reused': True}
-    job = Analysis(workspace_id=wid, kind=body.kind)
-    db.add(job); db.commit()
-    return {'id': job.id, 'status': job.status, 'reused': False}
-
-@app.get('/api/workspaces/{wid}/analyses')
-def analyses(wid: str, include_results: bool = True, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
-    # Show only the latest report per kind, including databases with older duplicates.
-    latest_ids = [db.query(Analysis.id).filter_by(workspace_id=wid, kind=kind).order_by(Analysis.created.desc()).limit(1).scalar() for kind in ('summary', 'risks', 'timeline')]
-    return [{'id': a.id, 'kind': a.kind, 'status': a.status, 'result': a.result if include_results else None, 'error': a.error, 'created': a.created} for a in db.query(Analysis).options(*([] if include_results else [defer(Analysis.result)])).filter(Analysis.id.in_([id for id in latest_ids if id])).order_by(Analysis.created.desc())]
-
-
-@app.get('/api/workspaces/{wid}/analyses/{aid}')
-def analysis_detail(wid: str, aid: str, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
-    report = db.query(Analysis).filter_by(id=aid, workspace_id=wid).first()
-    if not report: raise HTTPException(404, 'Report not found.')
-    return {'id': report.id, 'kind': report.kind, 'status': report.status, 'result': report.result, 'error': report.error}
