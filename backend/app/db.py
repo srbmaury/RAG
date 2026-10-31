@@ -70,18 +70,6 @@ class Conversation(Base):
     created = Column(Float, default=time.time)
     updated = Column(Float, default=time.time, index=True)
 
-class Analysis(Base):
-    __tablename__ = 'analyses'
-    id = Column(String, primary_key=True, default=uid)
-    workspace_id = Column(String, ForeignKey('workspaces.id', ondelete='CASCADE'), nullable=False, index=True)
-    kind = Column(String, nullable=False)
-    status = Column(String, default='queued', index=True)
-    result = Column(JSON)
-    error = Column(Text)
-    created = Column(Float, default=time.time)
-    lease = Column(Float, default=0)
-    generation = Column(Integer, default=0)
-
 def init_db():
     if engine.dialect.name == 'postgresql':
         with engine.begin() as conn: conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
