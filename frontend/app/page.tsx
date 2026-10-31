@@ -106,7 +106,7 @@ export default function Home() {
     setSelected(old => old.filter(id => documents.some(d => d.id === id)));
   }, [wid]);
   useEffect(() => {
-    setNotes(''); setDocs([]); setAnalyses([]); setOpenReports([]); setMessages([]); setChatId(null); activeChat.current=null; chatMessages.current=[]; setChats([]); setSelected([]); setPreview(null); setSource(null); setError(''); setNotice(''); setUploadSummary(null);
+    setNotes(''); setDocs([]); setMessages([]); setChatId(null); activeChat.current=null; chatMessages.current=[]; setChats([]); setSelected([]); setPreview(null); setSource(null); setError(''); setNotice(''); setUploadSummary(null);
     if (wid) {
       void api<ChatSummary[]>(`/workspaces/${wid}/conversations`).then(list => {if(scope.current===wid) setChats(list);}).catch(e=>setError(e.message));
     }
