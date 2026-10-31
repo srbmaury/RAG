@@ -74,6 +74,13 @@ class GmailConnection(Base):
     email = Column(String, nullable=False)
     refresh_token = Column(Text, nullable=False)
 
+class DriveOAuthState(Base):
+    __tablename__ = 'drive_oauth_states'
+    value = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    workspace_id = Column(String, ForeignKey('workspaces.id', ondelete='CASCADE'), nullable=False)
+    expires = Column(Float, nullable=False)
+
 class GmailOAuthState(Base):
     __tablename__ = 'gmail_oauth_states'
     value = Column(String, primary_key=True)
