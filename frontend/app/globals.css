@@ -327,3 +327,17 @@ button.source-provider-card.selected{border-color:var(--brand);background:var(--
 .unified-gmail-scope input{background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:7px;padding:8px 10px;width:min(100%,350px);font:inherit}
 .source-chip small{overflow-wrap:anywhere}
 @media(max-width:760px){.unified-sources{gap:6px}.unified-sources label{padding:7px 8px}}
+
+/* Connections: gallery first; details only on demand. */
+.source-connect-grid{grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:22px 0}
+.source-provider-card{min-height:125px;padding:18px;transition:border-color .15s ease,background .15s ease}
+.source-provider-card:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.source-dialog-backdrop{position:fixed;inset:0;background:rgba(14,24,19,.42);z-index:80;display:grid;place-items:center;padding:20px}
+.source-dialog{position:relative;background:var(--panel);color:var(--text);border:1px solid var(--line2);box-shadow:0 22px 80px rgba(0,0,0,.15);border-radius:14px;width:min(100%,620px);max-height:min(80dvh,850px);overflow:auto;padding:24px}
+.source-dialog>.connected-card{margin:0;border:0;padding:12px 0;background:transparent}
+.source-dialog-close{position:absolute;right:10px;top:10px;border:0;background:transparent;color:var(--sub);border-radius:7px;padding:7px;cursor:pointer}
+.source-dialog-close:hover{background:var(--hover);color:var(--text)}
+.source-dialog .connected-card h2{padding-right:35px;margin-bottom:10px}
+.source-dialog .connected-card form{margin-top:14px}
+@media(max-width:640px){.source-dialog{padding:17px;max-height:90dvh}.source-connect-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:390px){.source-connect-grid{grid-template-columns:1fr}}
