@@ -32,7 +32,7 @@ Local data is persisted under `data/`, excluded from Git. The browser calls the 
 
 ## Enable AI
 
-Add `OPENAI_API_KEY` to `.env` and restart the API. Credentials stay on the server. This enables embeddings and answers through the OpenAI Responses API. Uploaded passage text is sent to the configured AI provider during embedding, chat, and analysis; use documents you are authorized to process there. Responses use `store=False` (this does not promise zero provider-side retention).
+Set `AI_PROVIDER=openai` and add `OPENAI_API_KEY` to `.env`, then restart the API. The provided `.env.example` already defaults to `AI_PROVIDER=openai`; older `.env` files may still contain `AI_PROVIDER=none`, which disables generated answers even when a key is present. Credentials stay on the server. This enables embeddings and answers through the OpenAI Responses API. Uploaded passage text is sent to the configured AI provider during embedding, chat, and analysis; use documents you are authorized to process there. Responses use `store=False` (this does not promise zero provider-side retention).
 
 Defaults are configurable with `CHAT_MODEL` and `EMBED_MODEL`. Embeddings explicitly use 1,536 dimensions. Reindex documents with the circular-arrow button after enabling embeddings or changing the embedding model. Documents indexed without a key remain keyword-searchable until reindexed.
 
