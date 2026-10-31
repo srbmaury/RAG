@@ -3,6 +3,7 @@
 import {Children, useEffect, useRef, useState, useCallback, type ReactNode} from 'react';
 import {ArrowUp, ArrowUpRight, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, FileText, FolderOpen, Layers3, LogOut, Plus, Search, ShieldCheck, Sparkles, Trash2, Upload, X, LoaderCircle, RotateCcw, Download, MessageSquare, Mail, Github, HardDrive, Hash, Lightbulb, Clock3, Moon, Sun, Home as HomeIcon, PanelLeftClose, PanelLeftOpen, Menu, Copy, SlidersHorizontal, CheckCircle2, AlertCircle, NotebookPen, ArrowDownToLine} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import {conversationPlan} from '../lib/conversation';
 import './rebuild.css';
 import {IntegrationTile} from '../components/IntegrationTile';
 import {flushSync} from 'react-dom';
@@ -266,13 +267,13 @@ export default function Home() {
       activeChat.current=null;setChatId(null);chatTitle.current='New chat';
       chatMessages.current=[];setMessages([]);setNotes('');setSource(null);setEvidenceTab('sources');
     }
-    const history=(startNewConversation?[]:chatMessages.current).slice(-12).map(m=>({role:m.role,content:m.content.slice(0,6000)}));
+    const plan=conversationPlan(startNewConversation?'new':'followup',activeChat.current,chatMessages.current,question);
+    const history=plan.history;
     setQuery('');setTab('chat');setError('');setBusy(true);
     const title=startNewConversation||chatTitle.current==='New chat'?question.trim().slice(0,100):chatTitle.current;
-    const previous=startNewConversation?[]:chatMessages.current;
-    const pending: Message[]=[...previous,{role:'user',content:question}];
+    const pending: Message[]=plan.pending;
     chatMessages.current=pending;setMessages(pending);
-    let id=startNewConversation?null:activeChat.current;
+    let id=plan.id;
     try {
       if (!id) {
         const created=await api<SavedChat>(`/workspaces/${target}/conversations`,{method:'POST',body:JSON.stringify({title,messages:pending})});
@@ -508,7 +509,7 @@ export default function Home() {
   if (!user) return <div className="auth-page"><header><div className="brand-row"><AtlasMark/><span>Atlas</span></div>{themeButton}</header><div className="auth-grid"><div className="auth-intro"><span className="eyebrow">YOUR RESEARCH WORKSPACE</span><h1>Your knowledge,<br/>a conversation away.</h1><p>Bring your documents together. Ask better questions. Follow every answer back to the evidence.</p><div className="auth-points"><span><FileText/>All your documents, one place</span><span><MessageSquare/>Questions with context</span><span><ShieldCheck/>A workspace of your own</span></div></div><form className="auth-form" onSubmit={authenticate}><h2>{register ? 'Create your workspace' : 'Welcome back'}</h2><p>{register ? 'Make room for your next discovery.' : 'Continue where your research left off.'}</p><label>Email address<input type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@company.com"/></label><label>Password<input type="password" autoComplete={register ? 'new-password' : 'current-password'} required minLength={10} maxLength={200} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 10 characters"/></label>{error && <div className="feedback error" role="alert">{error}</div>}<button className="btn primary" disabled={busy}>{busy ? <LoaderCircle className="spin"/> : <ArrowUpRight/>}{register ? 'Create account' : 'Sign in'}</button><div className="auth-switch">{register ? 'Already have an account?' : 'New to Atlas?'} <button type="button" onClick={()=>{setRegister(!register);setError('');}}>{register ? 'Sign in' : 'Create an account'}</button></div></form></div></div>;
 
   return <div className={`app atlas-v3 ${sidebarCollapsed ? 'collapsed' : ''}`}>
-    <input ref={input} type="file" multiple accept=".pdf,.docx,.txt,.md" hidden onChange={e=>{if(e.target.files) void upload(e.target.files);}}/>
+    <input ref={input} type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm" hidden onChange={e=>{if(e.target.files) void upload(e.target.files);}}/>
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={()=>setSidebarOpen(false)}/>}
     <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
       <div className="brand-row"><AtlasMark/><span>Atlas</span><button className="sidebar-collapse" aria-label="Collapse sidebar" onClick={()=>{setSidebarCollapsed(true);setSidebarOpen(false);}}><PanelLeftClose/></button></div>
