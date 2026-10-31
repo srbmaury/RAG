@@ -3,6 +3,7 @@
 import {Children, useEffect, useRef, useState, useCallback, type ReactNode} from 'react';
 import {ArrowUp, ArrowUpRight, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, FileText, FolderOpen, Layers3, LogOut, Plus, Search, ShieldCheck, Sparkles, Trash2, Upload, X, LoaderCircle, RotateCcw, Download, MessageSquare, Mail, Github, HardDrive, Hash, Lightbulb, Clock3, Moon, Sun, Home as HomeIcon, PanelLeftClose, PanelLeftOpen, Menu, Copy, SlidersHorizontal, CheckCircle2, AlertCircle, NotebookPen, ArrowDownToLine} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import {IntegrationTile} from '../components/IntegrationTile';
 import {flushSync} from 'react-dom';
 import remarkGfm from 'remark-gfm';
 
@@ -498,7 +499,7 @@ export default function Home() {
   if (loading) return <div className="opening"><AtlasMark/><LoaderCircle className="spin"/><span>Opening your research workspace…</span></div>;
   if (!user) return <div className="auth-page"><header><div className="brand-row"><AtlasMark/><span>Atlas</span></div>{themeButton}</header><div className="auth-grid"><div className="auth-intro"><span className="eyebrow">YOUR RESEARCH WORKSPACE</span><h1>Your knowledge,<br/>a conversation away.</h1><p>Bring your documents together. Ask better questions. Follow every answer back to the evidence.</p><div className="auth-points"><span><FileText/>All your documents, one place</span><span><MessageSquare/>Questions with context</span><span><ShieldCheck/>A workspace of your own</span></div></div><form className="auth-form" onSubmit={authenticate}><h2>{register ? 'Create your workspace' : 'Welcome back'}</h2><p>{register ? 'Make room for your next discovery.' : 'Continue where your research left off.'}</p><label>Email address<input type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@company.com"/></label><label>Password<input type="password" autoComplete={register ? 'new-password' : 'current-password'} required minLength={10} maxLength={200} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 10 characters"/></label>{error && <div className="feedback error" role="alert">{error}</div>}<button className="btn primary" disabled={busy}>{busy ? <LoaderCircle className="spin"/> : <ArrowUpRight/>}{register ? 'Create account' : 'Sign in'}</button><div className="auth-switch">{register ? 'Already have an account?' : 'New to Atlas?'} <button type="button" onClick={()=>{setRegister(!register);setError('');}}>{register ? 'Sign in' : 'Create an account'}</button></div></form></div></div>;
 
-  return <div className={`app atlas-v2 ${sidebarCollapsed ? 'collapsed' : ''}`}>
+  return <div className={`app atlas-v3 ${sidebarCollapsed ? 'collapsed' : ''}`}>
     <input ref={input} type="file" multiple accept=".pdf,.docx,.txt,.md" hidden onChange={e=>{if(e.target.files) void upload(e.target.files);}}/>
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={()=>setSidebarOpen(false)}/>}
     <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
@@ -550,14 +551,13 @@ export default function Home() {
         {wid && tab==='sources' && <section className="connected-page">
           <div className="crumb">Workspace<span>›</span>Sources</div><div className="heading-row"><div><span className="eyebrow">YOUR INTEGRATIONS</span><h1>Connected sources</h1><p className="subtitle">Connect external services to your research workspace. Access stays read-only.</p></div>
           <button className="btn" onClick={()=>void refreshSourceStatuses()}>Refresh connections</button></div>
-          <div className="source-connect-grid"><button type="button" className={`source-provider-card ${gmailStatus?.connected?'is-connected':''}`} onClick={()=>navigate('gmail')}><span className="source-provider-heading"><Mail size={20}/><strong>Gmail</strong></span><span>{gmailStatus?.connected?`Connected · ${gmailStatus.email}`:'Connect Gmail to search and summarize emails'}</span><span className="source-card-action">Open Gmail workspace →</span></button>
-            {(['github','notion','slack'] as const).map(p=><button type="button" key={p} className={`source-provider-card ${sourceManage===p?'selected':''} ${sourceStatuses.some(x=>x.provider===p&&x.connected)?'is-connected':''}`} onClick={()=>{setSourceProvider(p);setSourceManage(p);setSourceResults([]);}}>
-              <span className="source-provider-heading">{p==='github'?<Github size={20}/>:p==='notion'?<NotebookPen size={20}/>:<Hash size={20}/>}<strong>{p==='github'?'GitHub':p==='notion'?'Notion':'Slack'}</strong></span>
-              <span>{sourceStatuses.find(x=>x.provider===p)?.connected?'Connected · '+sourceStatuses.find(x=>x.provider===p)?.account:'Not connected'}</span>
-            </button>)}
-            <button type="button" className={`source-provider-card ${driveStatus?.connected?'is-connected':''}`} onClick={()=>setSourceManage('drive')}><span className="source-provider-heading"><HardDrive size={20}/><strong>Google Drive</strong></span><span>{driveStatus?.connected?`Connected · ${driveStatus.account}`:driveStatus?.configured?'Not connected':'Google OAuth setup required'}</span><span className="source-card-action">Manage Drive →</span></button>
-            
-            
+          <div className="integration-overview"><div><h2>Your integrations</h2><p>Choose a service to connect or manage its access.</p></div><span>${[gmailStatus?.connected,driveStatus?.connected,...sourceStatuses.map(x=>x.connected)].filter(Boolean).length} connected</span></div>
+          <div className="integrations-grid">
+            <IntegrationTile name="Gmail" description="Search conversations and summarize email." icon={<Mail size={23}/>} connected={!!gmailStatus?.connected} account={gmailStatus?.email} onClick={()=>navigate('gmail')}/>
+            <IntegrationTile name="Google Drive" description="Explore documents and cloud files." icon={<HardDrive size={23}/>} connected={!!driveStatus?.connected} account={driveStatus?.account} onClick={()=>setSourceManage('drive')}/>
+            <IntegrationTile name="GitHub" description="Find issues, pull requests and decisions." icon={<Github size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='github')?.connected} account={sourceStatuses.find(x=>x.provider==='github')?.account} onClick={()=>{setSourceProvider('github');setSourceManage('github');setSourceResults([]);}}/>
+            <IntegrationTile name="Notion" description="Search shared pages and knowledge." icon={<NotebookPen size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='notion')?.connected} account={sourceStatuses.find(x=>x.provider==='notion')?.account} onClick={()=>{setSourceProvider('notion');setSourceManage('notion');setSourceResults([]);}}/>
+            <IntegrationTile name="Slack" description="Find team conversations and updates." icon={<Hash size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='slack')?.connected} account={sourceStatuses.find(x=>x.provider==='slack')?.account} onClick={()=>{setSourceProvider('slack');setSourceManage('slack');setSourceResults([]);}}/>
           </div>
           {sourceManage&&<div className="source-dialog-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setSourceManage(null)}}><div className="source-dialog" role="dialog" aria-modal="true" aria-label="Manage source connection"><button className="source-dialog-close" aria-label="Close connection details" onClick={()=>setSourceManage(null)}><X size={18}/></button>
           {sourceManage==='drive'&&<div className="connected-card" id="drive-connection">
