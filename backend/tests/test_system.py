@@ -456,3 +456,24 @@ def test_github_search_query_preserves_filters_and_simplifies_questions():
     assert github_search_query('repo:owner/project is:issue bug') == 'repo:owner/project is:issue bug'
     assert github_search_query('What issues and pull requests discuss a payment timeout?') == 'discuss a payment timeout'
     assert len(github_search_query('what ' * 100 + 'bug')) <= 180
+
+
+def test_drive_search_scope_and_connect_requires_login(client):
+    from app.drive import SCOPE, DriveSearch
+    from pydantic import ValidationError
+    assert SCOPE == 'https://www.googleapis.com/auth/drive.readonly'
+    assert client.get('/api/drive/connect?wid=missing').status_code == 401 or client.get('/api/drive/connect?wid=missing').status_code == 503
+    with __import__('pytest').raises(ValidationError):
+        DriveSearch(query='x' * 181)
+
+
+def test_drive_search_builds_safe_query(monkeypatch):
+    from app import drive
+    captured = {}
+    def fake_request(url, token, params=None, **kwargs):
+        captured.update(params)
+        return {'files': []}
+    monkeypatch.setattr(drive,'request_google',fake_request)
+    assert drive.drive_search('test-token', "client's notes") == []
+    assert "client\\'s notes" in captured['q']
+    assert 'trashed = false' in captured['q']
