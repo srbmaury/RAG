@@ -1,5 +1,9 @@
 """Google Drive read-only OAuth and on-demand source retrieval."""
 import hashlib
+import io
+import csv
+import pypdfium2 as pdfium
+from docx import Document as WordDocument
 import json
 import logging
 import os
@@ -27,10 +31,14 @@ def configured():
         raise HTTPException(503, 'Configure Google OAuth credentials for Drive.')
     crypt()
 
-def request_google(url, access_token, params=None, *, json_response=True):
+def request_google(url, access_token, params=None, *, json_response=True, binary=False):
     try:
         response = httpx.get(url, params=params, headers={'Authorization':'Bearer '+access_token}, timeout=20)
         response.raise_for_status()
+        if binary:
+            if len(response.content) > 12 * 1024 * 1024:
+                raise HTTPException(413, 'Drive file exceeds the 12 MB evidence limit.')
+            return response.content
         return response.json() if json_response else response.text
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
@@ -137,6 +145,27 @@ def drive_search(token,query):
              'url':item.get('webViewLink') or 'https://drive.google.com/file/d/'+item['id']+'/view',
              'mimeType':item.get('mimeType','')} for item in data.get('files',[]) if item.get('id')]
 
+def extract_drive_binary(body, mime):
+    """Small, on-demand extraction without adding files to the indexed library."""
+    if mime == 'application/pdf':
+        pdf = pdfium.PdfDocument(body)
+        parts = []
+        try:
+            for i in range(min(len(pdf), 20)):
+                page = pdf[i]
+                try:
+                    textpage = page.get_textpage()
+                    try: parts.append(textpage.get_text_bounded())
+                    finally: textpage.close()
+                finally: page.close()
+        finally:
+            pdf.close()
+        return '\\n'.join(parts)[:6000]
+    if mime == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        doc = WordDocument(io.BytesIO(body))
+        return '\\n'.join(p.text for p in doc.paragraphs if p.text.strip())[:6000]
+    return ''
+
 def drive_evidence(token,items):
     results=[]
     for item in items[:5]:
@@ -144,13 +173,19 @@ def drive_evidence(token,items):
         try:
             if mime=='application/vnd.google-apps.document':
                 body=request_google(DRIVE_API+'/'+item['id']+'/export',token,{'mimeType':'text/plain'},json_response=False)
+            elif mime=='application/vnd.google-apps.spreadsheet':
+                body=request_google(DRIVE_API+'/'+item['id']+'/export',token,{'mimeType':'text/csv'},json_response=False)
             elif mime.startswith('text/') or mime in ('application/json','application/xml'):
                 body=request_google(DRIVE_API+'/'+item['id'],token,{'alt':'media'},json_response=False)
+            elif mime in ('application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document'):
+                binary=request_google(DRIVE_API+'/'+item['id'],token,{'alt':'media'},binary=True)
+                body=extract_drive_binary(binary,mime)
             else:
                 continue
-            results.append({**item,'excerpt':body[:1500]})
-        except HTTPException:
-            log.warning('Skipping inaccessible Drive file %s',item['id'])
+            if body.strip():
+                results.append({**item,'excerpt':body[:1500]})
+        except (HTTPException, ValueError, pdfium.PdfiumError):
+            log.warning('Skipping inaccessible or unreadable Drive file %s',item['id'])
     return results
 
 class DriveSearch(BaseModel):
