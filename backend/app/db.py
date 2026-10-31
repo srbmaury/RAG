@@ -61,6 +61,13 @@ class Chunk(Base):
     embedding = Column(Vector(1536).with_variant(JSON(), 'sqlite'))
     embedding_model = Column(String)
 
+class ExternalConnection(Base):
+    __tablename__ = 'external_connections'
+    workspace_id = Column(String, ForeignKey('workspaces.id', ondelete='CASCADE'), primary_key=True)
+    provider = Column(String, primary_key=True)
+    account = Column(String, nullable=False)
+    secret = Column(Text, nullable=False)
+
 class GmailConnection(Base):
     __tablename__ = 'gmail_connections'
     workspace_id = Column(String, ForeignKey('workspaces.id', ondelete='CASCADE'), primary_key=True)
