@@ -69,6 +69,7 @@ export default function Home() {
   const [driveResults,setDriveResults] = useState<{id:string;title:string;excerpt:string;url:string}[]>([]);
   const [driveBusy,setDriveBusy] = useState(false);
   const [sourceStatuses,setSourceStatuses] = useState<{provider:string;connected:boolean;account:string|null}[]>([]);
+  const [sourceManage,setSourceManage] = useState<string|null>(null);
   const [sourceProvider,setSourceProvider] = useState<'github'|'notion'|'slack'>('github');
   const [sourceCredential,setSourceCredential] = useState('');
   const [sourceSearch,setSourceSearch] = useState('');
@@ -562,15 +563,16 @@ export default function Home() {
           <div className="crumb">Workspace<span>›</span>Sources</div><div className="heading-row"><div><h1>Connected sources</h1><p className="subtitle">Connect external services to your research workspace. Access stays read-only.</p></div>
           <button className="btn" onClick={()=>void refreshSourceStatuses()}>Refresh connections</button></div>
           <div className="source-connect-grid"><button type="button" className="source-provider-card" onClick={()=>navigate('gmail')}><strong>Gmail</strong><span>{gmailStatus?.connected?`Connected · ${gmailStatus.email}`:'Connect Gmail to search and summarize emails'}</span><span className="source-card-action">Open Gmail workspace →</span></button>
-            {(['github','notion','slack'] as const).map(p=><button type="button" key={p} className={`source-provider-card ${sourceProvider===p?'selected':''}`} onClick={()=>{setSourceProvider(p);setSourceResults([]);}}>
+            {(['github','notion','slack'] as const).map(p=><button type="button" key={p} className={`source-provider-card ${sourceProvider===p?'selected':''}`} onClick={()=>{setSourceProvider(p);setSourceManage(p);setSourceResults([]);}}>
               <strong>{p==='github'?'GitHub':p==='notion'?'Notion':'Slack'}</strong>
               <span>{sourceStatuses.find(x=>x.provider===p)?.connected?'Connected · '+sourceStatuses.find(x=>x.provider===p)?.account:'Not connected'}</span>
             </button>)}
-            <button type="button" className="source-provider-card" onClick={()=>document.getElementById('drive-connection')?.scrollIntoView({behavior:'smooth',block:'center'})}><strong>Google Drive</strong><span>{driveStatus?.connected?`Connected · ${driveStatus.account}`:driveStatus?.configured?'Not connected':'Google OAuth setup required'}</span><span className="source-card-action">Manage Drive →</span></button>
+            <button type="button" className="source-provider-card" onClick={()=>setSourceManage('drive')}><strong>Google Drive</strong><span>{driveStatus?.connected?`Connected · ${driveStatus.account}`:driveStatus?.configured?'Not connected':'Google OAuth setup required'}</span><span className="source-card-action">Manage Drive →</span></button>
             
-            <div className="source-provider-card disabled"><strong>Documents</strong><span>Use the Documents page to upload files</span></div>
+            
           </div>
-          <div className="connected-card" id="drive-connection">
+          {sourceManage&&<div className="source-dialog-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setSourceManage(null)}}><div className="source-dialog" role="dialog" aria-modal="true" aria-label="Manage source connection"><button className="source-dialog-close" aria-label="Close connection details" onClick={()=>setSourceManage(null)}><X size={18}/></button>
+          {sourceManage==='drive'&&<div className="connected-card" id="drive-connection">
             <h2>Google Drive</h2>
             <p className="caption">Authorize read-only access to browse and search Drive. Atlas fetches selected content on demand.</p>
             {driveStatus?.connected?<><p className="caption">Connected: {driveStatus.account}</p>
@@ -578,8 +580,8 @@ export default function Home() {
               {driveResults.map(x=><div className="connected-evidence" key={x.id}><strong>{x.title}</strong><p>{x.excerpt}</p><a href={x.url} target="_blank" rel="noopener noreferrer">Open in Drive <ArrowUpRight size={14}/></a></div>)}
             </>:<button className="btn primary" disabled={driveBusy||!driveStatus?.configured} onClick={()=>void connectDrive()}>Connect Google Drive</button>}
             {!driveStatus?.configured&&<p className="caption">Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_DRIVE_REDIRECT_URI on the server to enable Drive.</p>}
-          </div>
-          <div className="connected-card">
+          </div>}
+          {sourceManage!==null&&sourceManage!=='drive'&&<div className="connected-card">
             <h2>{sourceProvider==='github'?'GitHub':sourceProvider==='notion'?'Notion':'Slack'} connection</h2>
             <p className="caption">Provide a read-only provider-issued token. Atlas validates it and stores it encrypted on the server. This setup is not yet one-click OAuth.</p>
             <form onSubmit={e=>{e.preventDefault();void connectSource()}}>
@@ -592,8 +594,9 @@ export default function Home() {
               <button className="btn" disabled={sourceBusy} onClick={()=>void disconnectSource(sourceProvider)}>Disconnect</button></div>
               {sourceResults.map(x=><div className="connected-evidence" key={x.id}><strong>{x.title}</strong><p>{x.excerpt}</p>{x.url&&<a href={x.url} target="_blank" rel="noopener noreferrer">Open source <ArrowUpRight size={14}/></a>}</div>)}
             </>}
-          </div>
-          <p className="caption">For GitHub, use a fine-grained read-only token for selected repositories. Notion requires an integration token with access to shared pages. Slack search requires a token with the search:read permission. No connector sends or modifies content.</p>
+          </div>}
+          </div></div>}
+          <p className="caption">All connections are scoped to this workspace. Source content is accessed on demand; you can disconnect accounts at any time.</p>
         </section>}
         {wid && tab==='gmail' && <section className="gmail-page">
           <div className="crumb">Workspace<span>›</span><button type="button" className="crumb-link" onClick={()=>navigate('sources')}>Sources</button><span>›</span>Gmail</div>
