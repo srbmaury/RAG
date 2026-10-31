@@ -4,6 +4,7 @@ Personal/provider-issued access tokens are supplied by the owner and encrypted
 at rest. Never send them to AI providers or include them in responses.
 """
 import logging
+import re
 from urllib.parse import quote
 
 import httpx
@@ -41,6 +42,16 @@ def http_json(url, token, provider, params=None, method='GET'):
         log.warning('%s connector upstream HTTP %s', provider, status)
         if status in (401, 403):
             raise HTTPException(422, f'{provider.title()} denied access. Verify token permissions.') from exc
+        if provider == 'github' and status == 422:
+            # The upstream search API returns 422 for invalid qualifiers and queries.
+            # Never disclose request headers, credentials, or raw upstream responses.
+            try:
+                reason = exc.response.json().get('message', '')
+            except (ValueError, AttributeError):
+                reason = ''
+            if reason == 'Validation Failed':
+                reason = 'GitHub rejected the search syntax. Try a simpler keyword or repository filter.'
+            raise HTTPException(422, reason[:220] or 'GitHub rejected the search query.') from exc
         if status == 429:
             raise HTTPException(429, f'{provider.title()} rate limit reached.') from exc
         raise HTTPException(502, f'{provider.title()} returned HTTP {status}.') from exc
@@ -112,10 +123,24 @@ def disconnect(wid: str, provider: str, request: Request):
         db.commit()
         return {'ok': True}
 
+def github_search_query(query):
+    """Keep explicit GitHub search syntax, simplify natural-language questions."""
+    query = query.strip()
+    if not query:
+        raise HTTPException(422, 'Enter a GitHub search term.')
+    qualifiers = ('repo:', 'org:', 'user:', 'is:', 'type:', 'in:', 'label:', 'state:', 'author:', 'assignee:', 'mentions:', 'created:', 'updated:')
+    if any(term in query.lower() for term in qualifiers):
+        return query[:240]
+    words = re.findall(r"[a-zA-Z0-9_][a-zA-Z0-9_.-]*", query)
+    stopwords = {'what','which','where','when','why','how','can','you','tell','me','about','the','and','or','my','in','on','for','are','is','was','were','does','did','with','from','please','find','all','issues','pull','requests'}
+    terms = [word for word in words if word.lower() not in stopwords]
+    return ' '.join(terms[:9])[:180] or ' '.join(words[:5])[:180]
+
+
 def source_search(provider, token, query):
     if provider == 'github':
         d = http_json('https://api.github.com/search/issues', token, provider,
-                      {'q': query, 'per_page': 8})
+                      {'q': github_search_query(query), 'per_page': 8})
         return [{'provider': provider, 'id': str(x.get('id')), 'title': x.get('title', ''),
                  'excerpt': (x.get('body') or '')[:1200], 'url': x.get('html_url')}
                 for x in d.get('items', [])]
