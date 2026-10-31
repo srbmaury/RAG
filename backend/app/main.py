@@ -1,0 +1,307 @@
+import hashlib
+import hmac
+import os
+import secrets
+import threading
+import time
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import List, Optional
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, Response
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import defer
+from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Analysis, uid
+from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
+from . import config
+from .ingest import SUPPORTED
+from .worker import loop
+from .retrieval import retrieve
+from .ai import generate, enabled
+from .query_context import retrieval_query
+from . import uploads
+from starlette.concurrency import run_in_threadpool
+
+@asynccontextmanager
+async def lifespan(app):
+    init_db()
+    (DATA / 'files').mkdir(exist_ok=True)
+    stop = threading.Event()
+    thread = None
+    if os.getenv('INLINE_WORKER', 'true').lower() == 'true':
+        thread = threading.Thread(target=loop, args=(stop,), daemon=True)
+        thread.start()
+    yield
+    stop.set()
+    if thread: thread.join(timeout=5)
+
+app = FastAPI(title='Atlas Document Intelligence', lifespan=lifespan)
+
+def database():
+    with Session() as db: yield db
+
+def user(request: Request, db=Depends(database)):
+    token = request.cookies.get('atlas_session', '')
+    login = db.get(Login, hashlib.sha256(token.encode()).hexdigest()) if token else None
+    if not login or login.expires < time.time(): raise HTTPException(401, 'Sign in to continue.')
+    return db.get(User, login.user_id)
+
+def workspace(wid, actor, db):
+    item = db.query(Workspace).filter_by(id=wid, owner_id=actor.id).first()
+    if not item: raise HTTPException(404, 'Workspace not found.')
+    return item
+
+def document(wid, did, actor, db):
+    workspace(wid, actor, db)
+    item = db.query(Document).filter_by(id=did, workspace_id=wid).first()
+    if not item: raise HTTPException(404, 'Document not found.')
+    return item
+
+def public_doc(d):
+    return {key: getattr(d, key) for key in ['id','name','size','status','error','pages','chunk_count','created']}
+
+class Credentials(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=10, max_length=200)
+
+class Named(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+class Turn(BaseModel):
+    role: str = Field(pattern='^(user|assistant)$')
+    content: str = Field(max_length=6000)
+
+class Question(BaseModel):
+    question: str = Field(min_length=1, max_length=4000)
+    document_ids: List[str] = Field(default_factory=list, max_length=200)
+    history: List[Turn] = Field(default_factory=list, max_length=12)
+
+class InsightRequest(BaseModel):
+    kind: str = Field(pattern='^(summary|risks|timeline)$')
+
+class UploadRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=300)
+    size: int = Field(gt=0)
+
+def password_hash(password, salt=None):
+    salt = salt or secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 310000).hex()
+    return f'{salt}:{digest}'
+
+def issue_login(actor, response, db):
+    token = secrets.token_urlsafe(48)
+    db.add(Login(token=hashlib.sha256(token.encode()).hexdigest(), user_id=actor.id, expires=time.time() + 604800))
+    db.commit()
+    response.set_cookie('atlas_session', token, max_age=604800, httponly=True, secure=COOKIE_SECURE, samesite='strict', path='/')
+    return {'id': actor.id, 'email': actor.email}
+
+@app.get('/api/health')
+def health(): return {'status': 'ok'}
+
+@app.post('/api/auth/register')
+def register(body: Credentials, response: Response, db=Depends(database)):
+    email = body.email.strip().lower()
+    if '@' not in email: raise HTTPException(422, 'Enter a valid email address.')
+    actor = User(email=email, password=password_hash(body.password))
+    db.add(actor)
+    try: db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, 'Email already registered.')
+    db.add(Workspace(owner_id=actor.id, name='My knowledge base'))
+    db.commit()
+    return issue_login(actor, response, db)
+
+@app.post('/api/auth/login')
+def login(body: Credentials, response: Response, db=Depends(database)):
+    actor = db.query(User).filter_by(email=body.email.strip().lower()).first()
+    # Run PBKDF2 even for unknown users to reduce timing differences.
+    stored = actor.password if actor else '0' * 32 + ':' + '0' * 64
+    valid = hmac.compare_digest(password_hash(body.password, stored.split(':')[0]), stored)
+    if not actor or not valid: raise HTTPException(401, 'Invalid email or password.')
+    return issue_login(actor, response, db)
+
+@app.post('/api/auth/logout')
+def logout(request: Request, response: Response, db=Depends(database)):
+    token = request.cookies.get('atlas_session', '')
+    db.query(Login).filter_by(token=hashlib.sha256(token.encode()).hexdigest()).delete()
+    db.commit()
+    response.delete_cookie('atlas_session', path='/')
+    return {'ok': True}
+
+@app.get('/api/me')
+def me(actor=Depends(user)):
+    return {'id': actor.id, 'email': actor.email, 'mode': 'ai' if enabled() else 'local_excerpts', 'max_file_bytes':MAX_FILE_BYTES}
+
+@app.get('/api/workspaces')
+def workspaces(actor=Depends(user), db=Depends(database)):
+    return [{'id': w.id, 'name': w.name} for w in db.query(Workspace).filter_by(owner_id=actor.id).order_by(Workspace.created)]
+
+@app.post('/api/workspaces')
+def create_workspace(body: Named, actor=Depends(user), db=Depends(database)):
+    if not body.name.strip(): raise HTTPException(422, 'Workspace name is required.')
+    item = Workspace(owner_id=actor.id, name=body.name.strip())
+    db.add(item); db.commit()
+    return {'id': item.id, 'name': item.name}
+
+@app.get('/api/workspaces/{wid}/documents')
+def documents(wid: str, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    return [public_doc(d) for d in db.query(Document).filter_by(workspace_id=wid).order_by(Document.created.desc())]
+
+@app.post('/api/workspaces/{wid}/uploads')
+def start_upload(wid: str, body: UploadRequest, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    return uploads.start(wid, actor.id, body.name, body.size, MAX_FILE_BYTES, SUPPORTED)
+
+@app.get('/api/workspaces/{wid}/uploads/{upload_id}')
+def upload_status(wid: str, upload_id: str, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    return uploads.status(upload_id, wid, actor.id)
+
+@app.put('/api/workspaces/{wid}/uploads/{upload_id}')
+async def upload_part(wid: str, upload_id: str, request: Request, offset: int = 0, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    data = bytearray()
+    async for block in request.stream():
+        data.extend(block)
+        if len(data) > uploads.PART_BYTES: raise HTTPException(413, 'Upload part exceeds 8 MB.')
+    return await run_in_threadpool(uploads.append, upload_id, wid, actor.id, offset, data)
+
+@app.post('/api/workspaces/{wid}/uploads/{upload_id}/complete')
+def complete_upload(wid: str, upload_id: str, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    doc, duplicate = uploads.finish(upload_id, wid, actor.id, db)
+    return {**public_doc(doc), 'duplicate':duplicate}
+
+@app.delete('/api/workspaces/{wid}/uploads/{upload_id}')
+def cancel_upload(wid: str, upload_id: str, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    return uploads.cancel(upload_id, wid, actor.id)
+
+@app.post('/api/workspaces/{wid}/documents')
+async def upload(wid: str, files: List[UploadFile] = File(...), actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    if len(files) > 50: raise HTTPException(422, 'Upload at most 50 files per batch.')
+    results = []
+    for file in files:
+        name = Path((file.filename or 'untitled').replace('\\', '/')).name[:200]
+        if Path(name).suffix.lower() not in SUPPORTED:
+            results.append({'name': name, 'error': 'Supported formats: PDF, DOCX, TXT, MD.'}); continue
+        did, count, digest = uid(), 0, hashlib.sha256()
+        path = DATA / 'files' / did
+        try:
+            with path.open('wb') as out:
+                while True:
+                    block = await file.read(1024 * 1024)
+                    if not block: break
+                    count += len(block)
+                    if count > MAX_FILE_BYTES: raise ValueError(f'File exceeds {MAX_FILE_BYTES // 1024 // 1024} MB limit.')
+                    digest.update(block); out.write(block)
+            if not count: raise ValueError('File is empty.')
+            existing = db.query(Document).filter_by(workspace_id=wid, digest=digest.hexdigest()).first()
+            if existing:
+                path.unlink(missing_ok=True)
+                results.append({**public_doc(existing), 'duplicate': True}); continue
+            doc = Document(id=did, workspace_id=wid, name=name, size=count, digest=digest.hexdigest())
+            db.add(doc)
+            db.query(Analysis).filter_by(workspace_id=wid).delete()
+            db.commit()
+            results.append(public_doc(doc))
+        except IntegrityError:
+            db.rollback(); path.unlink(missing_ok=True)
+            existing = db.query(Document).filter_by(workspace_id=wid, digest=digest.hexdigest()).first()
+            if not existing: raise
+            results.append({**public_doc(existing), 'duplicate': True})
+        except ValueError as exc:
+            path.unlink(missing_ok=True)
+            results.append({'name': name, 'error': str(exc)})
+        except Exception:
+            db.rollback(); path.unlink(missing_ok=True)
+            raise
+        finally: await file.close()
+    return {'documents': results}
+
+@app.get('/api/workspaces/{wid}/documents/{did}/chunks')
+def chunks(wid: str, did: str, offset: int = 0, actor=Depends(user), db=Depends(database)):
+    doc = document(wid, did, actor, db)
+    if offset < 0: raise HTTPException(422, 'Offset must be non-negative.')
+    return {'document': public_doc(doc), 'chunks': [{'id': c.id, 'page': c.page, 'text': c.text} for c in db.query(Chunk).filter_by(document_id=did).order_by(Chunk.ordinal).offset(offset).limit(50)]}
+
+@app.get('/api/workspaces/{wid}/documents/{did}/original')
+def original(wid: str, did: str, actor=Depends(user), db=Depends(database)):
+    doc = document(wid, did, actor, db)
+    return FileResponse(DATA / 'files' / did, filename=doc.name, content_disposition_type='attachment')
+
+@app.post('/api/workspaces/{wid}/documents/{did}/retry')
+def retry(wid: str, did: str, actor=Depends(user), db=Depends(database)):
+    doc = document(wid, did, actor, db)
+    if doc.status not in ('failed', 'ready'): raise HTTPException(409, 'Document is already queued or processing.')
+    db.query(Chunk).filter_by(document_id=did).delete()
+    doc.status, doc.error, doc.chunk_count, doc.generation = 'queued', None, 0, doc.generation + 1
+    db.query(Analysis).filter_by(workspace_id=wid).delete()
+    db.commit()
+    return public_doc(doc)
+
+@app.delete('/api/workspaces/{wid}/documents/{did}')
+def delete(wid: str, did: str, actor=Depends(user), db=Depends(database)):
+    doc = document(wid, did, actor, db)
+    db.delete(doc)
+    # Reports can contain copied passages; invalidate them on source deletion.
+    db.query(Analysis).filter_by(workspace_id=wid).delete()
+    db.commit()
+    (DATA / 'files' / did).unlink(missing_ok=True)
+    return {'ok': True}
+
+@app.post('/api/workspaces/{wid}/chat')
+def chat(wid: str, body: Question, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    if not body.question.strip(): raise HTTPException(422, 'Enter a question.')
+    if body.document_ids:
+        found = db.query(Document).filter(Document.workspace_id == wid, Document.id.in_(body.document_ids)).count()
+        if found != len(set(body.document_ids)): raise HTTPException(404, 'Selected document not found.')
+    query = retrieval_query(body.question, body.history)
+    try:
+        sources = retrieve(wid, query, body.document_ids)
+        result = generate(body.question, sources, [t.model_dump() for t in body.history])
+    except Exception:
+        raise HTTPException(502, 'AI provider could not complete the request. Check server configuration and try again.')
+    # Do not return passages for documents deleted or reindexed during the provider call.
+    if sources:
+        current = db.query(Chunk.id).filter(Chunk.workspace_id == wid, Chunk.id.in_([s['chunk_id'] for s in sources])).count()
+        if current != len(sources): raise HTTPException(409, 'Sources changed during the answer. Ask again.')
+    return result
+
+@app.post('/api/workspaces/{wid}/analyses')
+def start_analysis(wid: str, body: InsightRequest, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    if not db.query(Document).filter_by(workspace_id=wid, status='ready').first(): raise HTTPException(409, 'Upload and process documents first.')
+    # Serialize requests for this workspace, including requests from other workers.
+    db.query(Workspace).filter_by(id=wid).update({Workspace.name: Workspace.name})
+    existing = db.query(Analysis).options(defer(Analysis.result)).filter(
+        Analysis.workspace_id == wid, Analysis.kind == body.kind,
+        Analysis.status.in_(['queued', 'processing', 'ready']),
+    ).order_by(Analysis.created.desc()).first()
+    # Source changes invalidate reports at upload, deletion, and reindex time.
+    if existing:
+        db.commit()
+        return {'id': existing.id, 'status': existing.status, 'reused': True}
+    job = Analysis(workspace_id=wid, kind=body.kind)
+    db.add(job); db.commit()
+    return {'id': job.id, 'status': job.status, 'reused': False}
+
+@app.get('/api/workspaces/{wid}/analyses')
+def analyses(wid: str, include_results: bool = True, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    # Show only the latest report per kind, including databases with older duplicates.
+    latest_ids = [db.query(Analysis.id).filter_by(workspace_id=wid, kind=kind).order_by(Analysis.created.desc()).limit(1).scalar() for kind in ('summary', 'risks', 'timeline')]
+    return [{'id': a.id, 'kind': a.kind, 'status': a.status, 'result': a.result if include_results else None, 'error': a.error, 'created': a.created} for a in db.query(Analysis).options(*([] if include_results else [defer(Analysis.result)])).filter(Analysis.id.in_([id for id in latest_ids if id])).order_by(Analysis.created.desc())]
+
+
+@app.get('/api/workspaces/{wid}/analyses/{aid}')
+def analysis_detail(wid: str, aid: str, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    report = db.query(Analysis).filter_by(id=aid, workspace_id=wid).first()
+    if not report: raise HTTPException(404, 'Report not found.')
+    return {'id': report.id, 'kind': report.kind, 'status': report.status, 'result': report.result, 'error': report.error}
