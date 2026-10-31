@@ -36,11 +36,15 @@ def extract(path, name, heartbeat=None):
                     # OCR only pages without a text layer, keeping searchable pages fast.
                     try:
                         import pytesseract
-                        bitmap = pdf[i].render(scale=2)
+                        ocr_page = pdf[i]
                         try:
-                            value = pytesseract.image_to_string(bitmap.to_pil(), timeout=30)
+                            bitmap = ocr_page.render(scale=2)
+                            try:
+                                value = pytesseract.image_to_string(bitmap.to_pil(), timeout=30)
+                            finally:
+                                bitmap.close()
                         finally:
-                            bitmap.close()
+                            ocr_page.close()
                     except (ImportError, OSError, RuntimeError, TimeoutError) as exc:
                         raise ValueError('OCR is unavailable. Install Tesseract and the Python OCR dependencies.') from exc
                     except pytesseract.TesseractError as exc:
