@@ -281,3 +281,30 @@ button.source-provider-card.selected{border-color:var(--brand);background:var(--
 .source-search-controls input{flex:1;min-width:190px}
 @media(max-width:720px){.source-connect-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:440px){.source-connect-grid{grid-template-columns:1fr}}
+
+/* Keep primary navigation and account controls accessible at normal browser zoom.
+   Only the optional recent-chat list scrolls when viewport height is constrained. */
+.sidebar{height:100dvh;max-height:100dvh;min-height:0;overflow:hidden}
+.sidebar>.brand-row,.sidebar>.workspace-btn,.sidebar>.nav,.sidebar>.bottom{flex-shrink:0}
+.sidebar>.sidebar-research{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;margin-top:12px}
+.sidebar>.bottom{margin-top:8px;padding-top:8px;background:var(--sidebar);border-top:1px solid var(--line)}
+.sidebar>.bottom .usage{display:flex;justify-content:space-between;gap:8px;align-items:center;margin:0 0 7px;padding:7px 9px;border:0;background:var(--hover);border-radius:6px;font-size:11px}
+.sidebar>.bottom .usage strong{color:var(--text);font-weight:600}
+.sidebar>.bottom .profile{padding:8px 6px 0;border-top:0;min-height:42px}
+.sidebar>.sidebar-research .section-label{margin-top:10px}
+.sidebar>.sidebar-research .workspace-stat{padding-top:7px;padding-bottom:7px}
+.topbar{min-width:0}
+.topbar>.global-search{min-width:0;flex:1}
+.topbar>.global-search span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-height:730px) and (min-width:769px){
+ .sidebar{padding-top:12px;padding-bottom:10px}
+ .sidebar>.brand-row{padding-bottom:12px}
+ .sidebar>.nav{margin-top:10px;gap:1px}
+ .sidebar>.nav button{padding-top:8px;padding-bottom:8px}
+ .sidebar>.sidebar-research{margin-top:7px}
+ .sidebar>.bottom .usage{padding:5px 8px}
+}
+@media(max-height:540px) and (min-width:769px){
+ .sidebar>.sidebar-research{display:none}
+ .sidebar>.bottom{margin-top:auto}
+}
