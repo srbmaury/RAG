@@ -1,6 +1,6 @@
 # Atlas — Document intelligence
 
-A working first release for bulk document ingestion, private workspaces, source-backed chat, and collection analysis. Built with Next.js/TypeScript, FastAPI, SQLAlchemy, and PostgreSQL/pgvector, with an API-key-free local mode.
+A working first release for bulk document ingestion, private workspaces, source-backed chat, and persistent multi-conversation history. Built with Next.js/TypeScript, FastAPI, SQLAlchemy, and PostgreSQL/pgvector, with an API-key-free local mode.
 
 ## Run locally
 
@@ -32,7 +32,7 @@ Local data is persisted under `data/`, excluded from Git. The browser calls the 
 
 ## Enable AI
 
-Set `AI_PROVIDER=openai` and add `OPENAI_API_KEY` to `.env`, then restart the API. The provided `.env.example` already defaults to `AI_PROVIDER=openai`; older `.env` files may still contain `AI_PROVIDER=none`, which disables generated answers even when a key is present. Credentials stay on the server. This enables embeddings and answers through the OpenAI Responses API. Uploaded passage text is sent to the configured AI provider during embedding, chat, and analysis; use documents you are authorized to process there. Responses use `store=False` (this does not promise zero provider-side retention).
+Set `AI_PROVIDER=openai` and add `OPENAI_API_KEY` to `.env`, then restart the API. The provided `.env.example` already defaults to `AI_PROVIDER=openai`; older `.env` files may still contain `AI_PROVIDER=none`, which disables generated answers even when a key is present. Credentials stay on the server. This enables embeddings and answers through the OpenAI Responses API. Uploaded passage text is sent to the configured AI provider during embedding and chat; use documents you are authorized to process there. Responses use `store=False` (this does not promise zero provider-side retention).
 
 Defaults are configurable with `CHAT_MODEL` and `EMBED_MODEL`. Embeddings explicitly use 1,536 dimensions. Reindex documents with the circular-arrow button after enabling embeddings or changing the embedding model. Documents indexed without a key remain keyword-searchable until reindexed.
 
@@ -80,8 +80,8 @@ Compose is a development deployment, not a hardened public service. Set a strong
 - PDF page references and text/DOCX section references, overlapping chunks, optional batched embeddings.
 - Permission-filtered retrieval, document scope selection, bounded conversation context, source previews and original downloads.
 - AI source-ID validation and refusal when no evidence is found. This is **not** automatic verification that every generated claim is entailed by its cited passage.
-- Background summaries, risk reviews, and dated-event extraction across **every** indexed passage, batched by document. Reports expose excluded documents. Current reports group findings by document; cross-document synthesis is not yet implemented. Local mode exposes all excerpts instead of derived findings.
-- Deletion removes originals and indexed chunks and invalidates reports containing copied passages. Reindexing/new uploads also invalidate prior reports. Chat history is browser-memory-only and cleared on source deletion/reindexing.
+- Persistent, workspace-scoped conversations with saved messages and source citations, rename, and delete controls.
+- Deletion removes originals and indexed chunks. Previously saved citations to deleted documents may no longer point to retrievable source chunks.
 
 ## Validation
 
@@ -92,24 +92,26 @@ npm run typecheck
 npm run build
 ```
 
-Tests use an isolated temporary database and no network/API calls. They cover ingestion, retrieval, account isolation, source scoping, duplicate detection, job leases, failed ingestion/retry, analysis coverage, report invalidation, source deletion, authentication, chunk boundaries, and mocked AI citation validation.
+Tests use an isolated temporary database and no network/API calls. They cover ingestion, retrieval, account isolation, source scoping, duplicate detection, job leases, failed ingestion/retry, source deletion, authentication, chunk boundaries, and mocked AI citation validation.
 
 ## Current limits and next milestones
+
+Insights and background collection reports have been removed. The worker now processes ingestion jobs only. Existing deployments may still have a legacy `analyses` table; it is intentionally left untouched until a database migration is available.
 
 This release has not been benchmarked for 10,000 documents/workspace. The architecture supports a separate worker and indexed PostgreSQL retrieval, but capacity, latency, accuracy, and cost targets must be established with representative documents before scaling.
 
 Scanned or partially image-only PDFs fail explicitly with an OCR message; they are never silently treated as fully indexed. OCR, vision/table-aware parsing, additional formats, and object-store integration are pending. DOCX references are logical sections, not rendered Word page numbers.
 
-Also pending: cross-document insight consolidation, cross-encoder reranking, streamed AI output, shared workspace membership/roles, password recovery/email verification, login/API rate limits and usage quotas, object-store integration, schema migrations, telemetry, backup/restore validation, antivirus/parser sandboxing, and production load/accuracy evaluation. Provider calls have bounded timeouts and retries; errors stay visible rather than falling back to fabricated answers.
+Also pending: cross-encoder reranking, streamed AI output, shared workspace membership/roles, password recovery/email verification, login/API rate limits and usage quotas, object-store integration, schema migrations, telemetry, backup/restore validation, antivirus/parser sandboxing, and production load/accuracy evaluation. Provider calls have bounded timeouts and retries; errors stay visible rather than falling back to fabricated answers.
 
 Do not expose this development release publicly until the authentication, abuse controls, document parsing isolation, and deployment hardening items are completed. Schema creation is automatic for a fresh database; use a migration system before evolving a deployed database.
 
 ## Layout
 
-- `backend/app/main.py`: API, session authentication, access checks, uploads, chat, reports.
+- `backend/app/main.py`: API, session authentication, access checks, uploads, chat, and conversations.
 - `backend/app/ingest.py`: parsing and chunking.
 - `backend/app/retrieval.py`: keyword/vector retrieval and fusion.
 - `backend/app/ai.py`: embedding and grounded answer generation.
-- `backend/app/worker.py`: durable job claiming, leases, ingestion, whole-collection analysis.
-- `frontend/app/page.tsx`: workspace, library, chat, insights, source viewer.
+- `backend/app/worker.py`: durable job claiming, leases, ingestion.
+- `frontend/app/page.tsx`: workspace, library, saved chats, source viewer.
 - `compose.yaml`: PostgreSQL development deployment.
