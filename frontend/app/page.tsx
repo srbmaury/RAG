@@ -4,6 +4,7 @@ import {Children, useEffect, useRef, useState, useCallback, type ReactNode} from
 import {ArrowUp, ArrowUpRight, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, FileText, FolderOpen, Layers3, LogOut, Plus, Search, ShieldCheck, Sparkles, Trash2, Upload, X, LoaderCircle, RotateCcw, Download, MessageSquare, Mail, Github, HardDrive, Hash, Lightbulb, Clock3, Moon, Sun, Home as HomeIcon, PanelLeftClose, PanelLeftOpen, Menu, Copy, SlidersHorizontal, CheckCircle2, AlertCircle, NotebookPen, ArrowDownToLine} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import {conversationPlan} from '../lib/conversation';
+import {useConversation} from '../hooks/useConversation';
 import {api} from '../lib/api';
 import type {User,Workspace,Doc,Source,Answer,Message,GmailMessage,GmailStatus,GmailSummary,ChatSummary,SavedChat} from '../lib/types';
 import {DocumentPassage} from '../components/DocumentPassage';
@@ -40,7 +41,7 @@ export default function Home() {
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const {messages,chatId,setMessages,setChatId,activeChat,chatMessages,chatTitle} = useConversation();
   const [driveStatus,setDriveStatus] = useState<{connected:boolean;account:string|null;configured:boolean}|null>(null);
   const [driveQuery,setDriveQuery] = useState('');
   const [driveResults,setDriveResults] = useState<{id:string;title:string;excerpt:string;url:string}[]>([]);
@@ -71,10 +72,7 @@ export default function Home() {
   const [gmailPreview,setGmailPreview] = useState<GmailMessage|null>(null);
   const gmailSummaryHeading = useRef<HTMLHeadingElement>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
-  const [chatId, setChatId] = useState<string | null>(null);
-  const activeChat = useRef<string | null>(null);
-  const chatMessages = useRef<Message[]>([]);
-  const chatTitle = useRef('New chat');
+
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
@@ -102,8 +100,6 @@ export default function Home() {
   const chatThread = useRef<HTMLDivElement>(null);
   const scope = useRef('');
   scope.current = wid;
-  activeChat.current = chatId;
-  chatMessages.current = messages;
 
   const boot = useCallback(async () => {
     try {
