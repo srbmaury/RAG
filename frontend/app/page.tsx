@@ -70,6 +70,11 @@ export default function Home() {
   const [gmailSelected,setGmailSelected] = useState<string[]>([]);
   const [gmailSummary,setGmailSummary] = useState<GmailSummary|null>(null);
   const [gmailBusy,setGmailBusy] = useState(false);
+  const [gmailSummarizing,setGmailSummarizing] = useState(false);
+  const [gmailSummaryIds,setGmailSummaryIds] = useState<string[]>([]);
+  const [gmailMobileView,setGmailMobileView] = useState<'emails'|'summary'>('emails');
+  const [gmailPreview,setGmailPreview] = useState<GmailMessage|null>(null);
+  const gmailSummaryHeading = useRef<HTMLHeadingElement>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
   const activeChat = useRef<string | null>(null);
@@ -122,7 +127,7 @@ export default function Home() {
   }, [wid]);
   useEffect(() => {
     setNotes(''); setDocs([]); setMessages([]); setChatId(null); activeChat.current=null; chatMessages.current=[]; setChats([]); setSelected([]); setPreview(null); setSource(null); setError(''); setNotice(''); setUploadSummary(null);
-    setGmailMessages([]);setGmailSelected([]);setGmailSummary(null);setGmailStatus(null);
+    setGmailMessages([]);setGmailSelected([]);setGmailSummary(null);setGmailSummaryIds([]);setGmailStatus(null);setGmailMobileView('emails');setGmailPreview(null);
     if (wid) {
       void api<GmailStatus>(`/gmail/status?wid=${encodeURIComponent(wid)}`).then(setGmailStatus).catch(()=>undefined);
       void api<ChatSummary[]>(`/workspaces/${wid}/conversations`).then(list => {if(scope.current===wid) setChats(list);}).catch(e=>setError(e.message));
@@ -317,7 +322,7 @@ export default function Home() {
     }catch(e){setError((e as Error).message);setGmailBusy(false);}
   }
   async function searchGmail(){
-    setGmailBusy(true);setError('');setGmailSummary(null);setGmailSelected([]);
+    setGmailBusy(true);setError('');setGmailSelected([]);setGmailMobileView('emails');
     try {
       const result=await api<{messages:GmailMessage[]}>(`/workspaces/${wid}/gmail/search`,
         {method:'POST',body:JSON.stringify({query:gmailQuery,limit:20})});
@@ -327,13 +332,15 @@ export default function Home() {
   }
   async function summarizeGmail(){
     if(!gmailSelected.length)return;
-    setGmailBusy(true);setError('');
+    const selectedForSummary=[...gmailSelected];
+    setGmailBusy(true);setGmailSummarizing(true);setError('');setGmailMobileView('summary');
     try{
       const result=await api<GmailSummary>(`/workspaces/${wid}/gmail/summarize`,
         {method:'POST',body:JSON.stringify({message_ids:gmailSelected})});
-      setGmailSummary(result);
+      setGmailSummary(result);setGmailSummaryIds(selectedForSummary);
+      window.requestAnimationFrame(()=>gmailSummaryHeading.current?.focus());
     }catch(e){setError((e as Error).message);}
-    finally{setGmailBusy(false);}
+    finally{setGmailBusy(false);setGmailSummarizing(false);}
   }
   async function disconnectGmail(){
     if(!window.confirm('Disconnect Gmail from this workspace?'))return;
@@ -341,7 +348,7 @@ export default function Home() {
     try{
       await api(`/workspaces/${wid}/gmail`,{method:'DELETE'});
       setGmailStatus({connected:false,email:null,configured:true});
-      setGmailMessages([]);setGmailSelected([]);setGmailSummary(null);
+      setGmailMessages([]);setGmailSelected([]);setGmailSummary(null);setGmailSummaryIds([]);
     }catch(e){setError((e as Error).message);}
     finally{setGmailBusy(false);}
   }
@@ -462,17 +469,42 @@ export default function Home() {
               <div><input id="gmail-query" value={gmailQuery} onChange={e=>setGmailQuery(e.target.value)} placeholder="in:inbox newer_than:30d"/>
                 <button className="btn primary" disabled={gmailBusy}>{gmailBusy?'Searching…':'Find emails'}</button></div>
             </form>
-            <div className="gmail-actions"><div className="gmail-selection"><span>{gmailSelected.length} selected · up to 15 emails per summary</span>
-              <button type="button" className="btn" disabled={gmailBusy||gmailMessages.length===0} onClick={()=>setGmailSelected(gmailMessages.slice(0,15).map(m=>m.id))}>Select all{gmailMessages.length>15?' (first 15)':''}</button>
-              <button type="button" className="btn" disabled={gmailBusy||!gmailSelected.length} onClick={()=>setGmailSelected([])}>Deselect all</button></div>
-              <button className="btn primary" disabled={gmailBusy||!gmailSelected.length} onClick={()=>void summarizeGmail()}>{gmailBusy?'Working…':'Summarize selected'}</button></div>
-            <div className="gmail-list">{gmailMessages.map(m=><label className="gmail-item" key={m.id}>
-              <input type="checkbox" checked={gmailSelected.includes(m.id)} onChange={e=>setGmailSelected(old=>e.target.checked?old.length<15?[...old,m.id]:old:old.filter(x=>x!==m.id))}/>
-              <span><strong>{m.subject}</strong><small>{m.sender} · {m.date}</small><span>{m.snippet}</span></span>
-              <a href={m.url} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} aria-label="Open original email"><ArrowUpRight size={15}/></a>
-            </label>)}</div>
-            {gmailSummary&&<article className="gmail-summary"><h2>Email summary</h2><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{gmailSummary.summary}</ReactMarkdown></div>
-              <h3>Original messages</h3>{gmailSummary.sources.map(item=><a key={item.id} target="_blank" rel="noopener noreferrer" href={item.url}>[{item.number}] {item.subject} <ArrowUpRight size={14}/></a>)}</article>}
+            <div className="gmail-mobile-tabs" role="group" aria-label="Gmail view">
+              <button type="button" aria-pressed={gmailMobileView==='emails'} className={gmailMobileView==='emails'?'active':''} onClick={()=>setGmailMobileView('emails')}>Emails</button>
+              <button type="button" aria-pressed={gmailMobileView==='summary'} className={gmailMobileView==='summary'?'active':''} onClick={()=>setGmailMobileView('summary')}>Summary{gmailSummary?' • Ready':''}</button>
+            </div>
+            <div className="gmail-workspace">
+              <div className={`gmail-mail-panel ${gmailMobileView==='emails'?'mobile-active':''}`}>
+                <div className="gmail-panel-head"><strong>Emails</strong><span className="caption">{gmailMessages.length} results</span></div>
+                <div className="gmail-actions"><div className="gmail-selection"><span>{gmailSelected.length} selected · maximum 15</span>
+                  <button type="button" className="btn" disabled={gmailBusy||!gmailMessages.length} onClick={()=>setGmailSelected(gmailMessages.slice(0,15).map(m=>m.id))}>Select all{gmailMessages.length>15?' (first 15)':''}</button>
+                  <button type="button" className="btn" disabled={gmailBusy||!gmailSelected.length} onClick={()=>setGmailSelected([])}>Deselect</button></div>
+                </div>
+                <div className="gmail-list">{gmailMessages.map(m=><div className="gmail-item" key={m.id}>
+                  <input aria-label={`Select ${m.subject}`} type="checkbox" checked={gmailSelected.includes(m.id)} disabled={gmailBusy} onChange={e=>setGmailSelected(old=>e.target.checked?old.length<15?[...old,m.id]:old:old.filter(x=>x!==m.id))}/>
+                  <button type="button" className="gmail-message-preview" onClick={()=>setGmailPreview(m)}><strong>{m.subject}</strong><small>{m.sender} · {m.date}</small><span>{m.snippet}</span></button>
+                  <a href={m.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${m.subject} in Gmail`}><ArrowUpRight size={15}/></a>
+                </div>)}</div>
+                <div className="gmail-mail-footer"><button className="btn primary" disabled={gmailBusy||!gmailSelected.length} onClick={()=>void summarizeGmail()}>{gmailSummarizing?'Generating summary…':'Summarize selected'}</button></div>
+              </div>
+              <section className={`gmail-summary-panel ${gmailMobileView==='summary'?'mobile-active':''}`} aria-label="Email summary" aria-busy={gmailSummarizing}>
+                <div className="gmail-panel-head"><h2 ref={gmailSummaryHeading} tabIndex={-1}>AI Summary</h2>
+                  {gmailSummary&&!gmailSummarizing&&<button type="button" className="icon-button" aria-label="Copy email summary" title="Copy summary" onClick={()=>void navigator.clipboard.writeText(gmailSummary.summary).then(()=>setNotice('Summary copied.')).catch(()=>setError('Unable to copy summary.'))}><Copy size={16}/></button>}</div>
+                {gmailSummarizing?<div className="gmail-summary-state" role="status" aria-live="polite"><LoaderCircle className="spin"/><strong>Reading selected emails…</strong><p>Atlas is preparing a cited summary for {gmailSelected.length} messages.</p></div>:
+                gmailSummary?<div className="gmail-summary-content">
+                  {gmailSelected.length!==gmailSummaryIds.length||gmailSelected.some(id=>!gmailSummaryIds.includes(id))?<p className="gmail-stale">Showing the previous summary. Your selection has changed; regenerate to summarize the current emails.</p>:<p className="gmail-ready"><CheckCircle2 size={15}/> Summary ready · {gmailSummaryIds.length} messages</p>}
+                  <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{gmailSummary.summary}</ReactMarkdown></div>
+                  <div className="gmail-summary-sources"><h3>Sources</h3>{gmailSummary.sources.map(item=><div className="gmail-source" key={item.id}><button type="button" onClick={()=>{const m=gmailMessages.find(msg=>msg.id===item.id);if(m)setGmailPreview(m);else window.open(item.url,'_blank','noopener,noreferrer');}}>[{item.number}] {item.subject}</button><a href={item.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${item.subject} in Gmail`}><ArrowUpRight size={14}/></a></div>)}</div>
+                  <div className="gmail-summary-footer"><button className="btn" disabled={gmailBusy||!gmailSelected.length} onClick={()=>void summarizeGmail()}><RotateCcw size={15}/> Regenerate</button><button className="btn" onClick={()=>{setGmailSummary(null);setGmailSummaryIds([]);setGmailMobileView('emails');}}>New summary</button></div>
+                </div>:<div className="gmail-summary-state"><FileText size={25}/><strong>Summary will appear here</strong><p>Select emails on the left, then choose Summarize selected. Original messages remain available as sources.</p></div>}
+              </section>
+            </div>
+            {gmailPreview&&<div className="gmail-preview-overlay" role="presentation" onClick={()=>setGmailPreview(null)}><aside role="dialog" aria-modal="true" aria-label="Email preview" className="gmail-preview-drawer" onClick={e=>e.stopPropagation()}>
+              <div className="gmail-preview-head"><h2>{gmailPreview.subject}</h2><button type="button" className="icon-button" aria-label="Close email preview" onClick={()=>setGmailPreview(null)}><X/></button></div>
+              <p className="caption">{gmailPreview.sender} · {gmailPreview.date}</p>
+              <div className="gmail-preview-body">{gmailPreview.body||gmailPreview.snippet||'No readable plain-text content available.'}</div>
+              <a className="btn" target="_blank" rel="noopener noreferrer" href={gmailPreview.url}>Open original in Gmail <ArrowUpRight size={15}/></a>
+            </aside></div>}
           </>}
         </section>}
       </div>
