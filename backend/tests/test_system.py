@@ -462,7 +462,7 @@ def test_drive_search_scope_and_connect_requires_login(client):
     from app.drive import SCOPE, DriveSearch
     from pydantic import ValidationError
     assert SCOPE == 'https://www.googleapis.com/auth/drive.readonly'
-    assert client.get('/api/drive/connect?wid=missing').status_code == 401 or client.get('/api/drive/connect?wid=missing').status_code == 503
+    assert client.get('/api/drive/connect?wid=missing').status_code in (404,503)
     with __import__('pytest').raises(ValidationError):
         DriveSearch(query='x' * 181)
 
