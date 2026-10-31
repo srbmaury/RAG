@@ -430,7 +430,7 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
     # Non-document evidence carries a URL so the UI opens the original record.
     sources = []
     for entry in payload:
-        original = document_evidence.get(entry['source_id']) if entry.get('provider') == 'documents' else None
+        original = document_evidence.get(entry.get('origin_id')) if entry.get('provider') == 'documents' else None
         sources.append({
             'chunk_id': original['chunk_id'] if original else str(entry['source_id']),
             'document_id': original['document_id'] if original else '',
