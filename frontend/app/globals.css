@@ -248,3 +248,9 @@ h1,h2,h3{font-family:'DM Sans',system-ui,sans-serif;font-weight:700}
 .gmail-query-controls select{border:1px solid var(--line2);border-radius:8px;background:var(--bg);color:var(--text);padding:9px;font-size:12px}
 .gmail-query-summary>.caption{line-height:1.6}
 @media(max-width:760px){.gmail-query-controls button{flex:1}.gmail-query-summary{padding:14px}}
+
+/* Chat alignment: user prompts are right-aligned; Atlas replies remain left-aligned. */
+.user-message{display:flex;justify-content:flex-end;width:100%}
+.user-message .bubble-row{flex-direction:row-reverse;justify-content:flex-start;max-width:85%;min-width:0}
+.user-message .bubble{max-width:min(100%,680px);overflow-wrap:anywhere;white-space:pre-wrap}
+@media(max-width:760px){.user-message .bubble-row{max-width:100%}.user-message .bubble{max-width:100%}}
