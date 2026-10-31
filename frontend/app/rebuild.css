@@ -158,3 +158,27 @@
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]) .atlas-v3 .sidebar{background:var(--sidebar)}:root:not([data-theme=light]) .atlas-v3 .topbar{background:var(--panel)}}
 :root[data-theme=dark] .atlas-v3 .sidebar{background:var(--sidebar)}
 :root[data-theme=dark] .atlas-v3 .topbar{background:var(--panel)}
+
+/* Neutral editorial palette: graphite, warm whites, restrained steel blue. */
+:root{
+ --canvas:#fcfcfb;--ink:#222936;--muted:#737b87;--outline:#e5e7ea;
+ --wash:#f6f7f8;--forest:#486681;--forest-dark:#344e68;--mint:#edf1f5;
+ --bg:#fcfcfb;--sidebar:#f6f7f8;--panel:#fff;--text:#222936;
+ --sub:#737b87;--faint:#98a0aa;--line:#e5e7ea;--line2:#dce0e5;
+ --hover:#f1f3f5;--pill:#f3f5f7;--active:#edf1f5;
+ --brand:#486681;--brandhover:#344e68;--brandtext:#fff;--user:#f1f3f5;--evidence:#f8f9fb;
+}
+.atlas-v3 .sidebar{background:var(--sidebar)}
+.atlas-v3 .topbar{background:var(--panel)}
+.atlas-v3 .nav button.active{background:var(--active);color:var(--brand)}
+.atlas-v3 .btn.primary,.atlas-v3 .send,.home-send{background:var(--brand);color:#fff}
+.atlas-v3 .btn.primary:hover,.atlas-v3 .send:hover,.home-send:hover{background:var(--brandhover)}
+:root[data-theme=dark]{
+ --canvas:#171c23;--ink:#edf0f5;--muted:#a8b1be;--outline:#353d48;
+ --wash:#202731;--forest:#a5bed6;--forest-dark:#c0d0e1;--mint:#2d3a48;
+ --bg:#171c23;--sidebar:#202731;--panel:#222a34;--text:#edf0f5;
+ --sub:#a8b1be;--faint:#8493a5;--line:#353d48;--line2:#414c59;
+ --hover:#2d3643;--pill:#2a3541;--active:#2d3a48;
+ --brand:#a5bed6;--brandhover:#bfd3e4;--brandtext:#16202c;--user:#2c3541;--evidence:#252f3b;
+}
+:root[data-theme=dark] .atlas-v3 .btn.primary,:root[data-theme=dark] .atlas-v3 .send,:root[data-theme=dark] .home-send{color:#16202c}
