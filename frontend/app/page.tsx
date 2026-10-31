@@ -12,6 +12,8 @@ type Doc = {id: string; name: string; size: number; status: string; error?: stri
 type Source = {chunk_id: string; document_id: string; name: string; page: number; text: string; location_type: string};
 type Answer = {answer: string; sources: Source[]; mode: string; citation_note?: string};
 type Message = {role: 'user' | 'assistant'; content: string; result?: Answer};
+type ChatSummary = {id: string; title: string; updated: number};
+type SavedChat = ChatSummary & {messages: Message[]};
 type Analysis = {id: string; kind: string; status: string; error?: string; result?: {mode: string; coverage: {total: number; analyzed: number; excluded: {name: string; status: string}[]}; documents: {document_id: string; name: string; batches: Answer[]}[]; note: string}};
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
@@ -56,11 +58,16 @@ export default function Home() {
   const [openingReport, setOpeningReport] = useState('');
   const [openReports, setOpenReports] = useState<string[]>([]);
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
-  const [tab, setTab] = useState<'overview' | 'documents' | 'chat' | 'insights'>('chat');
+  const [tab, setTab] = useState<'overview' | 'documents' | 'chat'>('chat');
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const activeChat = useRef<string | null>(null);
+  const chatMessages = useRef<Message[]>([]);
+  const chatTitle = useRef('New chat');
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
@@ -84,6 +91,8 @@ export default function Home() {
   const chatEnd = useRef<HTMLDivElement>(null);
   const scope = useRef('');
   scope.current = wid;
+  activeChat.current = chatId;
+  chatMessages.current = messages;
 
   const boot = useCallback(async () => {
     try {
@@ -96,13 +105,16 @@ export default function Home() {
   useEffect(() => {void boot();}, [boot]);
   const refresh = useCallback(async () => {
     if (!wid) return;
-    const [documents, reports] = await Promise.all([api<Doc[]>(`/workspaces/${wid}/documents`), api<Analysis[]>(`/workspaces/${wid}/analyses?include_results=false`)]);
+    const documents = await api<Doc[]>(`/workspaces/${wid}/documents`);
     if (scope.current !== wid) return;
-    setDocs(documents); setAnalyses(old => reports.map(report => ({...report, result: old.find(a => a.id === report.id)?.result})));
+    setDocs(documents);
     setSelected(old => old.filter(id => documents.some(d => d.id === id)));
   }, [wid]);
   useEffect(() => {
-    setNotes(''); setDocs([]); setAnalyses([]); setOpenReports([]); setMessages([]); setSelected([]); setPreview(null); setSource(null); setError(''); setNotice(''); setUploadSummary(null);
+    setNotes(''); setDocs([]); setAnalyses([]); setOpenReports([]); setMessages([]); setChatId(null); activeChat.current=null; chatMessages.current=[]; setChats([]); setSelected([]); setPreview(null); setSource(null); setError(''); setNotice(''); setUploadSummary(null);
+    if (wid) {
+      void api<ChatSummary[]>(`/workspaces/${wid}/conversations`).then(list => {if(scope.current===wid) setChats(list);}).catch(e=>setError(e.message));
+    }
     void refresh().catch(e => setError(e.message));
     const timer = setInterval(() => {void refresh().catch(e => setError(e.message));}, 3000);
     return () => clearInterval(timer);
@@ -176,27 +188,78 @@ export default function Home() {
     } finally {setUploading(false); setUploadProgress(''); if (input.current) input.current.value = '';}
   }
 
+  async function loadChat(id: string) {
+    if (busy) return;
+    try {
+      const item = await api<SavedChat>(`/workspaces/${wid}/conversations/${id}`);
+      if (scope.current !== wid) return;
+      activeChat.current=id; setChatId(id); chatTitle.current=item.title;
+      chatMessages.current=item.messages; setMessages(item.messages); setSource(null); setEvidenceTab('sources'); navigate('chat');
+    } catch(e) {setError((e as Error).message);}
+  }
+  function newChat() {
+    if (busy) return;
+    activeChat.current=null;setChatId(null);chatTitle.current='New chat';chatMessages.current=[];
+    setMessages([]);setNotes('');setQuery('');setSource(null);setEvidenceTab('sources');navigate('chat');
+  }
+  async function renameChat(item: ChatSummary) {
+    const name=window.prompt('Conversation name',item.title)?.trim();
+    if(!name || name===item.title) return;
+    try {
+      await api(`/workspaces/${wid}/conversations/${item.id}`,{method:'PATCH',body:JSON.stringify({title:name})});
+      setChats(old=>old.map(c=>c.id===item.id?{...c,title:name}:c));
+      if(activeChat.current===item.id) chatTitle.current=name;
+    }catch(e){setError((e as Error).message);}
+  }
+  async function deleteChat(item: ChatSummary) {
+    if(busy || !window.confirm(`Delete “${item.title}”?`))return;
+    try {
+      await api(`/workspaces/${wid}/conversations/${item.id}`,{method:'DELETE'});
+      setChats(old=>old.filter(c=>c.id!==item.id));
+      if(activeChat.current===item.id)newChat();
+    }catch(e){setError((e as Error).message);}
+  }
   async function ask(question = query) {
     if (!question.trim() || busy) return;
-    const target = wid;
-    const history = messages.slice(-12).map(m => ({role: m.role, content: m.content.slice(0,6000)}));
-    setQuery(''); setTab('chat'); setError(''); setBusy(true);
-    setMessages(old => [...old, {role:'user', content: question}]);
+    const target=wid;
+    const history=chatMessages.current.slice(-12).map(m=>({role:m.role,content:m.content.slice(0,6000)}));
+    setQuery('');setTab('chat');setError('');setBusy(true);
+    const title=chatTitle.current==='New chat'?question.trim().slice(0,100):chatTitle.current;
+    const previous=chatMessages.current;
+    const pending: Message[]=[...previous,{role:'user',content:question}];
+    chatMessages.current=pending;setMessages(pending);
+    let id=activeChat.current;
     try {
-      const result = await api<Answer>(`/workspaces/${target}/chat`, {method: 'POST', body: JSON.stringify({question, history, document_ids: selected})});
-      if (scope.current === target) {setMessages(old => [...old, {role:'assistant', content:result.answer, result}]); setEvidenceTab('sources');}
-    } catch(e) {if (scope.current === target) {setError((e as Error).message); setQuery(question);}}
-    finally {setBusy(false);}
+      if (!id) {
+        const created=await api<SavedChat>(`/workspaces/${target}/conversations`,{method:'POST',body:JSON.stringify({title,messages:pending})});
+        id=created.id;activeChat.current=id;setChatId(id);chatTitle.current=title;
+        setChats(old=>[{id:created.id,title,updated:created.updated},...old]);
+      }
+      const result=await api<Answer>(`/workspaces/${target}/chat`,{method:'POST',body:JSON.stringify({question,history,document_ids:selected})});
+      if(scope.current!==target)return;
+      const completed:Message[]=[...pending,{role:'assistant',content:result.answer,result}];
+      chatMessages.current=completed;setMessages(completed);setEvidenceTab('sources');
+      const saved=await api<SavedChat>(`/workspaces/${target}/conversations/${id}`,{method:'PUT',body:JSON.stringify({title,messages:completed})});
+      setChats(old=>[{id:saved.id,title:saved.title,updated:saved.updated},...old.filter(c=>c.id!==saved.id)]);
+    } catch(e) {
+      if(scope.current===target) {
+        setError((e as Error).message);
+        if(id) {
+          // Preserve the submitted question if generation failed.
+          await api(`/workspaces/${target}/conversations/${id}`,{method:'PUT',body:JSON.stringify({title,messages:pending})}).catch(()=>undefined);
+        }
+      }
+    } finally {setBusy(false);}
   }
   async function remove(doc: Doc) {
     if (!confirm(`Delete “${doc.name}” and its indexed content? Existing insight reports will also be removed.`)) return;
     try {
       await api(`/workspaces/${wid}/documents/${doc.id}`, {method:'DELETE'});
-      setMessages([]); setSource(null); setPreview(null); setUploadSummary(null); await refresh();
+      setSource(null); setPreview(null); setUploadSummary(null); await refresh();
     } catch(e) {setError((e as Error).message);}
   }
   async function retry(doc: Doc) {
-    try {await api(`/workspaces/${wid}/documents/${doc.id}/retry`, {method:'POST'}); setMessages([]); setSource(null); setPreview(null); await refresh();}
+    try {await api(`/workspaces/${wid}/documents/${doc.id}/retry`, {method:'POST'}); setSource(null); setPreview(null); await refresh();}
     catch(e) {setError((e as Error).message);}
   }
   async function inspect(doc: Doc) {
@@ -306,7 +369,7 @@ export default function Home() {
     <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
       <div className="brand-row"><AtlasMark/><span>Atlas</span><button className="sidebar-collapse" aria-label="Collapse sidebar" onClick={()=>{setSidebarCollapsed(true);setSidebarOpen(false);}}><PanelLeftClose/></button></div>
       <button className="workspace-btn" onClick={()=>setNewWorkspace(true)}><span className="ws-avatar">{workspace?.name[0]?.toUpperCase() || 'A'}</span><span><strong>{workspace?.name || 'Choose workspace'}</strong><small>{workspaces.length} workspace{workspaces.length===1?'':'s'}</small></span><ChevronDown/></button>
-      <nav className="nav" aria-label="Main navigation">{([{id:'overview',label:'Home',icon:HomeIcon},{id:'chat',label:'Ask Atlas',icon:Search},{id:'documents',label:'Documents',icon:FileText},{id:'insights',label:'Insights',icon:Lightbulb}] as const).map(item=><button key={item.id} className={tab===item.id?'active':''} title={item.label} aria-current={tab===item.id?'page':undefined} onClick={()=>navigate(item.id)}><item.icon/><span>{item.label}</span></button>)}</nav>
+      <nav className="nav" aria-label="Main navigation">{([{id:'overview',label:'Home',icon:HomeIcon},{id:'chat',label:'Ask Atlas',icon:Search},{id:'documents',label:'Documents',icon:FileText}] as const).map(item=><button key={item.id} className={tab===item.id?'active':''} title={item.label} aria-current={tab===item.id?'page':undefined} onClick={()=>navigate(item.id)}><item.icon/><span>{item.label}</span></button>)}</nav>
       <div className="sidebar-research"><div className="section-label">IN THIS WORKSPACE</div><button className="workspace-stat" onClick={()=>navigate('documents')}><FolderOpen/><span>{docs.length} documents</span></button><button className="workspace-stat" onClick={()=>navigate('chat')}><Layers3/><span>{totalChunks.toLocaleString()} searchable passages</span></button></div>
       <div className="bottom"><div className="usage"><div><span>Workspace storage</span><span>{storage ? prettyBytes(storage) : '0 KB'}</span></div><p>{ready.length} documents ready to explore</p></div><div className="profile"><span className="avatar">{initials}</span><div><strong>{user.email.split('@')[0]}</strong><small>{user.email}</small></div><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={()=>void signOut()}><LogOut/></button></div></div>
     </aside>
@@ -325,10 +388,10 @@ export default function Home() {
           <div className={`upload-area ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}><Upload/><div><strong>Make room for more knowledge</strong><p>Drop PDF, DOCX, TXT, or MD files · up to {Math.round(user.max_file_bytes/1024/1024)} MB each</p></div>{uploadButton}</div>
         </section>}
         {wid && tab==='chat' && <section>
-          <div className="crumb">Ask Atlas<span>›</span><span className="crumb-title">{title}</span></div><div className="heading-row"><div className="research-heading"><h1 title={title}>{title}</h1><p className="subtitle">Answers grounded in your documents, with evidence you can inspect.</p></div><div className="actions"><button className="btn hide-small" disabled={!messages.length} onClick={()=>void copyConversation()}>{copied?<Check/>:<Copy/>}{copied?'Copied':'Copy chat'}</button><button className="btn primary" disabled={busy} onClick={()=>{setMessages([]);setNotes('');setQuery('');setSource(null);setEvidenceTab('sources');}}><Plus/><span>New chat</span></button></div></div>
+          <div className="crumb">Ask Atlas<span>›</span><span className="crumb-title">{title}</span></div><div className="heading-row"><div className="research-heading"><h1 title={title}>{title}</h1><p className="subtitle">Answers grounded in your documents, with evidence you can inspect.</p></div><div className="actions"><button className="btn hide-small" disabled={!messages.length} onClick={()=>void copyConversation()}>{copied?<Check/>:<Copy/>}{copied?'Copied':'Copy chat'}</button><button className="btn primary" disabled={busy} onClick={newChat}><Plus/><span>New chat</span></button></div></div>
           <div className="filters"><button className="filter" onClick={()=>setScopeOpen(true)}><FileText/>{selected.length?`${selected.length} selected documents`:'All documents'}<ChevronDown/></button><span className="research-mode"><i/>{user.mode==='ai'?'AI research':'Source search'} · {ready.length} ready documents</span></div>
           {user.mode !== 'ai' && <div className="feedback" role="status"><CircleHelp/><span><strong>Source search only.</strong> Atlas can find relevant passages, but it cannot write synthesized answers until an AI provider is configured. Set <code>AI_PROVIDER=openai</code> with <code>OPENAI_API_KEY</code>, or use <code>AI_PROVIDER=ollama</code>, then restart the API.</span></div>}
-          <div className="research"><div className="chat-pane"><div className="thread">
+          <div className="chat-workspace"><aside className="chat-history"><div className="chat-history-header"><strong>Conversations</strong><button type="button" onClick={newChat} title="New conversation" aria-label="New conversation"><Plus size={16}/></button></div><div className="chat-history-list">{chats.map(item=><div className={`chat-history-item ${chatId===item.id?'current':''}`} key={item.id}><button className="chat-history-open" onClick={()=>void loadChat(item.id)} disabled={busy} title={item.title}><MessageSquare size={15}/><span>{item.title}</span></button><button className="chat-history-action" onClick={()=>void renameChat(item)} disabled={busy} aria-label={`Rename ${item.title}`} title="Rename">✎</button><button className="chat-history-action" onClick={()=>void deleteChat(item)} disabled={busy} aria-label={`Delete ${item.title}`} title="Delete"><Trash2 size={14}/></button></div>)}{!chats.length&&<p className="caption chat-history-empty">Your saved conversations will appear here.</p>}</div></aside><div className="research"><div className="chat-pane"><div className="thread">
             {!messages.length && <div className="research-welcome"><span className="welcome-mark"><AtlasMark/></span><span className="eyebrow">ASK YOUR KNOWLEDGE</span><h2>Ask your documents anything.</h2><p>{ready.length?'Find a specific detail, compare documents, or follow an idea back to its source.':'Add your first documents to explore them with Atlas.'}</p>{!ready.length?uploadButton:<div className="starter-questions">{prompts.map(p=><button key={p} onClick={()=>void ask(p)}>{p}<ArrowUpRight/></button>)}</div>}</div>}
             {messages.map((m,i)=>m.role==='user'?<div className="user-message" key={i}><div className="bubble-row"><span className="circle">{initials}</span><div className="bubble">{m.content}</div></div></div>:<div className="answer-row" key={i}><span className="assistant-mark">A</span><div className="answer"><div className="answer-head"><strong>Atlas</strong><span>{m.result?.mode==='ai'?'AI synthesis':m.result?.mode==='local_excerpts'?'Source excerpts':'Evidence check'}</span></div>{m.result?renderAnswer(m.result):<p>{m.content}</p>}</div></div>)}
             {busy && <div className="thinking" role="status"><LoaderCircle className="spin"/><span>Reading the relevant evidence…</span></div>}<div ref={chatEnd}/>
