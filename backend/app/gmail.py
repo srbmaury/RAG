@@ -139,9 +139,13 @@ def callback(request: Request, state: str='', code: str=''):
     if not state or not code: raise HTTPException(400,'Gmail authorization was cancelled.')
     with Session() as db:
         oauth = db.get(GmailOAuthState, hashlib.sha256(state.encode()).hexdigest())
-        user = actor(request, db)
-        if not oauth or oauth.expires < time.time() or oauth.user_id != user.id:
+        # OAuth callbacks arrive from accounts.google.com. Atlas uses Strict session
+        # cookies, so validate the single-use, short-lived server-side state instead.
+        if not oauth or oauth.expires < time.time():
             raise HTTPException(400, 'Gmail authorization expired. Start again.')
+        user = db.get(User, oauth.user_id)
+        if user is None or db.query(Workspace).filter_by(id=oauth.workspace_id,owner_id=user.id).first() is None:
+            raise HTTPException(400, 'The connected workspace is no longer available.')
         wid = oauth.workspace_id
         db.delete(oauth)
         db.commit()
