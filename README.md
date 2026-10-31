@@ -2,6 +2,10 @@
 
 A working first release for bulk document ingestion, private workspaces, source-backed chat, and persistent multi-conversation history. Built with Next.js/TypeScript, FastAPI, SQLAlchemy, and PostgreSQL/pgvector, with an API-key-free local mode.
 
+## UI design preview
+
+Open [the interactive Atlas design preview](docs/Atlas_Research_Workspace.html) locally in a browser to review the current Home, Ask Atlas, Documents, Gmail, and workspace-management layouts. This standalone HTML uses fictional sample content and does not connect to the backend. The Next.js frontend in `frontend/app/` remains the source of truth for the working app.
+
 ## Run locally
 
 Requires Python 3.9+ and Node 20.9+.
