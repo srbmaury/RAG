@@ -424,9 +424,22 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
     if not refs or any(n < 1 or n > len(payload) for n in refs):
         return {'answer': 'AI did not produce verifiable citations. Try a narrower question.',
                 'sources': [], 'mode': 'citation_check_failed'}
-    return {'answer': answer,
-            'sources': [dict(payload[n-1], number=n) for n in sorted(refs)],
-            'mode': 'connected'}
+    # Preserve positional [n] citations used by the standard chat renderer.
+    # Non-document evidence carries a URL so the UI opens the original record.
+    sources = []
+    for entry in payload:
+        i = entry['source_id']
+        sources.append({
+            'chunk_id': entry.get('source_id'),
+            'document_id': entry.get('source_id'),
+            'name': entry['title'],
+            'page': 0,
+            'text': entry['text'],
+            'location_type': entry.get('provider','source'),
+            'provider': entry.get('provider'),
+            'url': entry.get('url'),
+        })
+    return {'answer': answer, 'sources': sources, 'mode': 'connected'}
 
 
 @app.post('/api/workspaces/{wid}/chat')
