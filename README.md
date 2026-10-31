@@ -2,6 +2,18 @@
 
 A working first release for bulk document ingestion, private workspaces, source-backed chat, and persistent multi-conversation history. Built with Next.js/TypeScript, FastAPI, SQLAlchemy, and PostgreSQL/pgvector, with an API-key-free local mode.
 
+### Google Drive (read-only)
+
+1. Enable the **Google Drive API** in your Google Cloud project and configure a **Web application** OAuth client. Gmail and Drive may share the same Google client credentials.
+2. Add `http://localhost:3000/api/drive/callback` as an **Authorized redirect URI** (in addition to the Gmail callback, if used).
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_DRIVE_REDIRECT_URI`, and `GMAIL_TOKEN_ENCRYPTION_KEY` in the backend environment. Restart the API and frontend.
+4. In **Atlas → Sources → Google Drive**, select **Connect Google Drive**, authorize access, and browse or search your Drive files.
+5. Tick **Google Drive** in Connected Search to compare Google Docs and readable text files with other sources.
+
+Drive uses `drive.readonly`, a **restricted Google OAuth scope** that permits reading and downloading the user's accessible Drive files. Public deployment may require Google's verification and a security assessment depending on data handling. This connector is designed for local/development use initially. Access tokens are refreshed on demand, refresh tokens encrypted per workspace, and access revoked in Atlas by disconnecting; for full revocation, also revoke the application's access in Google Account settings.
+
+The initial search lists Drive metadata; Connected Search reads text/plain Google Docs exports and plain-text files on demand. PDF, spreadsheet, slide, and DOCX content are **not yet extracted through Drive**. Drive is not automatically indexed, and selected excerpts may be sent to the configured AI provider.
+
 ## Connect additional sources (experimental)
 
 Open **Sources** in the Atlas sidebar. Gmail is now accessed through its card in Sources (its full search and summary screen is unchanged). GitHub, Notion, and Slack support initial **read-only token-based connections** (not one-click OAuth). Choose a provider, enter a provider-issued token with the minimum permissions, and select **Connect account**. You can search it from that screen or select it in **Connected search** alongside documents and Gmail. Tokens are encrypted with `GMAIL_TOKEN_ENCRYPTION_KEY` and stored per workspace. They are not included in AI prompts. Disconnect deletes the stored token; revoke it at the provider as well if necessary.
@@ -9,7 +21,7 @@ Open **Sources** in the Atlas sidebar. Gmail is now accessed through its card in
 - **GitHub:** Use a fine-grained read-only token scoped to the repositories you want to access. The first adapter searches issues and pull requests, not source code.
 - **Notion:** Use a Notion integration token and share the intended pages with the integration. The initial search returns page/database title metadata only, not complete page bodies.
 - **Slack:** Use an appropriately authorized token with `search:read`. Slack search permissions and token type vary by app configuration; the initial adapter searches messages.
-- **Google Drive:** Not yet connectable. It needs a dedicated Google OAuth authorization and file-picker flow. The Sources UI labels it unavailable instead of offering a nonfunctional connection.
+- **Google Drive:** Connect with read-only Google OAuth from Sources. Browsing/search and on-demand text extraction are supported; a Drive file picker and rich-format extraction remain future work.
 
 This is a developer-first connector setup and has not been end-to-end tested against real providers. For a public multi-user release, replace manual token entry with OAuth/GitHub App installation, add provider-specific token rotation/revocation and audit logs, and validate policy compliance.
 
