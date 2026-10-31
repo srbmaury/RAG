@@ -477,3 +477,24 @@ def test_drive_search_builds_safe_query(monkeypatch):
     assert drive.drive_search('test-token', "client's notes") == []
     assert "client\\'s notes" in captured['q']
     assert 'trashed = false' in captured['q']
+
+
+def test_connected_chat_uses_standard_chat_citation_contract(client, monkeypatch):
+    from app import main, connected_synthesis
+    w = wid(client)
+    def fake_retrieve(*args, **kwargs):
+        return [{'chunk_id':'chunk-123','document_id':'doc-123','name':'Plan.md',
+                 'page':2,'location_type':'section','text':'Agreed milestone'}]
+    def fake_synthesize(question, evidence, *args):
+        return 'Milestone agreed [1].', [evidence[0].as_prompt(1)]
+    monkeypatch.setattr(main, 'retrieve', fake_retrieve)
+    monkeypatch.setattr(connected_synthesis, 'synthesize_connected', fake_synthesize)
+    response = client.post(f'/api/workspaces/{w}/connected-chat',
+                           json={'question':'What milestone was agreed?'})
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result['mode'] == 'connected'
+    assert result['sources'][0]['chunk_id'] == 'chunk-123'
+    assert result['sources'][0]['document_id'] == 'doc-123'
+    assert result['sources'][0]['page'] == 2
+    assert result['sources'][0]['location_type'] == 'section'
