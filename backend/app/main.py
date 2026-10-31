@@ -367,10 +367,12 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
     if any(p not in (*PROVIDERS, 'drive') for p in body.providers):
         raise HTTPException(422, 'Unknown connected provider.')
     evidence = []
+    document_evidence = {}
     try:
         for item in retrieve(wid, retrieval_query(body.question, body.history), body.document_ids)[:6]:
             evidence.append(Evidence('documents', item['chunk_id'], item['name'],
                                      item['text'][:1800], None))
+            document_evidence[item['chunk_id']] = item
         if body.include_gmail:
             entry = connection(db, actor, wid)
             token = access_token(entry, db)
@@ -428,14 +430,14 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
     # Non-document evidence carries a URL so the UI opens the original record.
     sources = []
     for entry in payload:
-        i = entry['source_id']
+        original = document_evidence.get(entry['source_id']) if entry.get('provider') == 'documents' else None
         sources.append({
-            'chunk_id': entry.get('source_id'),
-            'document_id': entry.get('source_id'),
+            'chunk_id': original['chunk_id'] if original else str(entry['source_id']),
+            'document_id': original['document_id'] if original else '',
             'name': entry['title'],
-            'page': 0,
+            'page': original['page'] if original else 0,
             'text': entry['text'],
-            'location_type': entry.get('provider','source'),
+            'location_type': original['location_type'] if original else entry.get('provider','source'),
             'provider': entry.get('provider'),
             'url': entry.get('url'),
         })
