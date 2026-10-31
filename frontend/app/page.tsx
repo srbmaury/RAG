@@ -78,6 +78,7 @@ export default function Home() {
   const [connectedGmail,setConnectedGmail] = useState(false);
   const [connectedProviders,setConnectedProviders] = useState<string[]>([]);
   const [connectedGmailQuery,setConnectedGmailQuery] = useState('newer_than:30d');
+  useEffect(()=>{setConnectedProviders([]);setConnectedGmail(false);setSourceManage(null);},[wid]);
   const [gmailStatus,setGmailStatus] = useState<GmailStatus|null>(null);
   const [gmailMessages,setGmailMessages] = useState<GmailMessage[]>([]);
   const [gmailQuery,setGmailQuery] = useState('in:inbox newer_than:30d');
@@ -550,7 +551,7 @@ export default function Home() {
           <div className="crumb">Workspace<span>›</span>Sources</div><div className="heading-row"><div><h1>Connected sources</h1><p className="subtitle">Connect external services to your research workspace. Access stays read-only.</p></div>
           <button className="btn" onClick={()=>void refreshSourceStatuses()}>Refresh connections</button></div>
           <div className="source-connect-grid"><button type="button" className="source-provider-card" onClick={()=>navigate('gmail')}><span className="source-provider-heading"><Mail size={20}/><strong>Gmail</strong></span><span>{gmailStatus?.connected?`Connected · ${gmailStatus.email}`:'Connect Gmail to search and summarize emails'}</span><span className="source-card-action">Open Gmail workspace →</span></button>
-            {(['github','notion','slack'] as const).map(p=><button type="button" key={p} className={`source-provider-card ${sourceProvider===p?'selected':''}`} onClick={()=>{setSourceProvider(p);setSourceManage(p);setSourceResults([]);}}>
+            {(['github','notion','slack'] as const).map(p=><button type="button" key={p} className={`source-provider-card ${sourceManage===p?'selected':''}`} onClick={()=>{setSourceProvider(p);setSourceManage(p);setSourceResults([]);}}>
               <span className="source-provider-heading">{p==='github'?<Github size={20}/>:p==='notion'?<NotebookPen size={20}/>:<Hash size={20}/>}<strong>{p==='github'?'GitHub':p==='notion'?'Notion':'Slack'}</strong></span>
               <span>{sourceStatuses.find(x=>x.provider===p)?.connected?'Connected · '+sourceStatuses.find(x=>x.provider===p)?.account:'Not connected'}</span>
             </button>)}
