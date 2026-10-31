@@ -4,43 +4,16 @@ import {Children, useEffect, useRef, useState, useCallback, type ReactNode} from
 import {ArrowUp, ArrowUpRight, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, FileText, FolderOpen, Layers3, LogOut, Plus, Search, ShieldCheck, Sparkles, Trash2, Upload, X, LoaderCircle, RotateCcw, Download, MessageSquare, Mail, Github, HardDrive, Hash, Lightbulb, Clock3, Moon, Sun, Home as HomeIcon, PanelLeftClose, PanelLeftOpen, Menu, Copy, SlidersHorizontal, CheckCircle2, AlertCircle, NotebookPen, ArrowDownToLine} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import {conversationPlan} from '../lib/conversation';
+import {api} from '../lib/api';
+import type {User,Workspace,Doc,Source,Answer,Message,GmailMessage,GmailStatus,GmailSummary,ChatSummary,SavedChat} from '../lib/types';
+import {DocumentPassage} from '../components/DocumentPassage';
 import './rebuild.css';
 import {IntegrationTile} from '../components/IntegrationTile';
 import {flushSync} from 'react-dom';
 import remarkGfm from 'remark-gfm';
 
-type User = {id: string; email: string; mode: string; max_file_bytes: number};
-type Workspace = {id: string; name: string};
-type Doc = {id: string; name: string; size: number; status: string; error?: string; pages: number; chunk_count: number};
-type Source = {chunk_id: string; document_id: string; name: string; page: number; text: string; location_type: string; provider?: string; url?: string};
-type Answer = {answer: string; sources: Source[]; mode: string; citation_note?: string};
-type Message = {role: 'user' | 'assistant'; content: string; result?: Answer};
-type GmailMessage = {id:string;subject:string;sender:string;date:string;snippet:string;body:string;url:string};
-type GmailStatus = {connected:boolean;email:string|null;configured:boolean};
-type GmailSummary = {summary:string;sources:{number:number;id:string;subject:string;url:string}[]};
-type ChatSummary = {id: string; title: string; updated: number};
-type SavedChat = ChatSummary & {messages: Message[]};
-
-async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {...options, headers: options?.body instanceof FormData ? options.headers : {'Content-Type': 'application/json', ...options?.headers}});
-  if (!response.ok) {
-    const value = await response.json().catch(() => ({}));
-    const detail = typeof value.detail === 'string' ? value.detail
-      : Array.isArray(value.detail) ? value.detail.map((item: {msg?:string}) => item.msg || 'Invalid request').join('; ')
-      : '';
-    throw new Error(detail || `The server returned HTTP ${response.status} for ${path}. Check the backend terminal for details.`);
-  }
-  return response.json();
-}
 const prettyBytes = (n: number) => n < 1024*1024 ? `${Math.max(1, Math.round(n/1024))} KB` : `${(n/1024/1024).toFixed(1)} MB`;
 const prompts = ['What are the key takeaways?', 'What risks should I be aware of?', 'Compare the main findings across documents', 'Which decisions still need to be made?'];
-
-function DocumentPassage({text, name}: {text: string; name: string}) {
-  if (/\.(md|docx)$/i.test(name)) {
-    return <div className="document-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown></div>;
-  }
-  return <div className="document-plain">{text}</div>;
-}
 
 export default function Home() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
