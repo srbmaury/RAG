@@ -78,11 +78,22 @@ def access_token(entry, db):
 
 def gmail_get(token, url, params=None):
     try:
-        response = httpx.get(url, params=params, headers={'Authorization': 'Bearer '+token}, timeout=20)
+        response = httpx.get(url, params=params, headers={'Authorization': 'Bearer '+token}, timeout=25)
         response.raise_for_status()
         return response.json()
-    except httpx.HTTPError:
-        raise HTTPException(502, 'Gmail request failed. Please retry or reconnect.')
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        log.warning('Gmail API returned HTTP %s for %s', status, url.split('/')[-1])
+        if status in (401, 403):
+            raise HTTPException(502, 'Gmail denied access. Reconnect the account and confirm read-only Gmail permission.') from exc
+        if status == 429:
+            raise HTTPException(429, 'Gmail rate limit reached. Retry in a moment.') from exc
+        raise HTTPException(502, f'Gmail API returned HTTP {status}. Check the backend logs.') from exc
+    except httpx.TimeoutException as exc:
+        raise HTTPException(504, 'Gmail took too long to respond. Try fewer messages.') from exc
+    except httpx.RequestError as exc:
+        log.warning('Gmail API connection failure: %s', type(exc).__name__)
+        raise HTTPException(502, 'Could not connect to Gmail. Check network access and retry.') from exc
 
 def text_body(payload):
     """Decode plaintext email only; never render untrusted HTML as application markup."""
@@ -173,15 +184,21 @@ def callback(request: Request, state: str='', code: str=''):
 
 @router.post('/workspaces/{wid}/gmail/search')
 def search(wid: str, body: SearchRequest, request: Request):
-    with Session() as db:
-        user=actor(request,db)
-        entry=connection(db,user,wid)
-        token=access_token(entry,db)
-        found=gmail_get(token,GMAIL_API+'/messages',{'q':body.query,'maxResults':body.limit})
-        ids=[m['id'] for m in found.get('messages',[])]
-        items=[email_from_json(gmail_get(token,GMAIL_API+'/messages/'+mid,
-            {'format':'full','fields':'id,threadId,snippet,payload(mimeType,headers,body,parts)'})) for mid in ids]
-        return {'messages':items,'email':entry.email}
+    try:
+        with Session() as db:
+            user=actor(request,db)
+            entry=connection(db,user,wid)
+            token=access_token(entry,db)
+            found=gmail_get(token,GMAIL_API+'/messages',{'q':body.query,'maxResults':body.limit})
+            ids=[m['id'] for m in found.get('messages',[])]
+            items=[email_from_json(gmail_get(token,GMAIL_API+'/messages/'+mid,
+                {'format':'full'})) for mid in ids]
+            return {'messages':items,'email':entry.email}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception('Unexpected Gmail search failure')
+        raise HTTPException(502, 'Gmail search failed unexpectedly. Check the backend logs.') from exc
 
 @router.post('/workspaces/{wid}/gmail/summarize')
 def summarize(wid: str, body: SummaryRequest, request: Request):
