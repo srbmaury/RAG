@@ -339,6 +339,7 @@ def delete_conversation(wid: str, cid: str, actor=Depends(user), db=Depends(data
 class ConnectedQuestion(Question):
     include_gmail: bool = False
     gmail_query: str = Field(default='newer_than:30d', max_length=400)
+    providers: List[str] = Field(default_factory=list, max_length=3)
 
 
 @app.post('/api/workspaces/{wid}/connected-chat')
@@ -356,8 +357,11 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
     from .gmail import connection, access_token, gmail_get, email_from_json, GMAIL_API
     from .ai import client, ollama_chat
     from .sources import Evidence
+    from .external_sources import read_connection, source_search, PROVIDERS
     import json
     import re
+    if any(p not in PROVIDERS for p in body.providers):
+        raise HTTPException(422, 'Unknown connected provider.')
     evidence = []
     try:
         for item in retrieve(wid, retrieval_query(body.question, body.history), body.document_ids)[:6]:
@@ -374,6 +378,11 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
                 evidence.append(Evidence('gmail', msg['id'], msg['subject'],
                                          (msg['body'] or msg['snippet'])[:1300],
                                          msg['url'], msg['date']))
+        for provider in dict.fromkeys(body.providers):
+            _, provider_token = read_connection(db, actor, wid, provider)
+            for hit in source_search(provider, provider_token, body.question)[:5]:
+                evidence.append(Evidence(provider, hit['id'], hit['title'],
+                                         hit.get('excerpt', '')[:1300], hit.get('url')))
     except HTTPException:
         raise
     except Exception as exc:
