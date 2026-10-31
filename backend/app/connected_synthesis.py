@@ -24,6 +24,7 @@ def bounded_payload(evidence, max_items=12, per_source=700, max_total=7000):
         if remaining <= 0:
             break
         data = item.as_prompt(len(payload) + 1)
+        data['origin_id'] = item.source_id
         data['text'] = data['text'][:min(per_source, remaining)]
         remaining -= len(data['text'])
         payload.append(data)
