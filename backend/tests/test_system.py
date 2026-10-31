@@ -425,3 +425,27 @@ def test_connected_source_evidence_contract():
     assert prompt['source_id'] == 4
     assert prompt['provider'] == 'gmail'
     assert prompt['title'] == 'Update'
+
+
+def test_connected_synthesis_fits_local_model_and_preserves_citations():
+    from app.connected_synthesis import synthesize_connected
+    from app.sources import Evidence
+    evidence = [Evidence('documents', 'd', 'Document', 'important fact ' * 1000)]
+    evidence += [Evidence('gmail', str(i), 'Mail', 'other fact ' * 1000) for i in range(8)]
+    calls = []
+    def fake_ollama(messages, max_tokens):
+        import json
+        payload = json.loads(messages[-1]['content'])
+        calls.append(payload)
+        if len(calls) == 1:
+            raise ValueError('Model response was truncated; try a narrower question.')
+        return 'Supported by [1] and [2].'
+    answer, payload = synthesize_connected(
+        'What changed?', evidence, 'ollama', '', 'ignored',
+        None, fake_ollama)
+    assert len(calls) == 2
+    assert len(calls[0]['sources']) <= 12
+    assert sum(len(x['text']) for x in calls[0]['sources']) <= 7000
+    assert [x['source_id'] for x in payload] == list(range(1, len(payload)+1))
+    assert {x['provider'] for x in payload} == {'documents', 'gmail'}
+    assert answer == 'Supported by [1] and [2].'
