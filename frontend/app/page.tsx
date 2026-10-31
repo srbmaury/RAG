@@ -72,6 +72,7 @@ export default function Home() {
   const [sourceBusy,setSourceBusy] = useState(false);
   const [connectedQuestion,setConnectedQuestion] = useState('');
   const [connectedGmail,setConnectedGmail] = useState(false);
+  const [connectedProviders,setConnectedProviders] = useState<string[]>([]);
   const [connectedGmailQuery,setConnectedGmailQuery] = useState('newer_than:30d');
   const [connectedBusy,setConnectedBusy] = useState(false);
   const [connectedResult,setConnectedResult] = useState<{answer:string;mode:string;sources:{number:number;provider:string;title:string;url?:string;date?:string;text:string}[]}|null>(null);
@@ -371,7 +372,7 @@ export default function Home() {
     setConnectedBusy(true);setError('');
     try {
       const result=await api<{answer:string;mode:string;sources:{number:number;provider:string;title:string;url?:string;date?:string;text:string}[]}>(`/workspaces/${wid}/connected-chat`,
-        {method:'POST',body:JSON.stringify({question:connectedQuestion,include_gmail:connectedGmail,gmail_query:connectedGmailQuery,document_ids:selected,history:[]})});
+        {method:'POST',body:JSON.stringify({question:connectedQuestion,include_gmail:connectedGmail,gmail_query:connectedGmailQuery,providers:connectedProviders,document_ids:selected,history:[]})});
       setConnectedResult(result);
     }catch(e){setError((e as Error).message);}
     finally{setConnectedBusy(false);}
@@ -555,6 +556,7 @@ export default function Home() {
           <div className="connected-card">
             <div className="connected-source-options">
               <span className="pill">Documents · enabled</span>
+              {(['github','notion','slack'] as const).map(provider=><label key={provider}><input type="checkbox" checked={connectedProviders.includes(provider)} onChange={e=>setConnectedProviders(old=>e.target.checked?[...old,provider]:old.filter(x=>x!==provider))}/>{provider==='github'?'GitHub':provider==='notion'?'Notion':'Slack'}</label>)}
               <label><input type="checkbox" checked={connectedGmail} onChange={e=>setConnectedGmail(e.target.checked)}/> Include connected Gmail</label>
             </div>
             {connectedGmail&&<input aria-label="Gmail search scope" value={connectedGmailQuery} onChange={e=>setConnectedGmailQuery(e.target.value)} placeholder="newer_than:30d" className="connected-field"/>}
