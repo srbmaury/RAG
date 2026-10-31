@@ -61,6 +61,15 @@ class Chunk(Base):
     embedding = Column(Vector(1536).with_variant(JSON(), 'sqlite'))
     embedding_model = Column(String)
 
+class Conversation(Base):
+    __tablename__ = 'conversations'
+    id = Column(String, primary_key=True, default=uid)
+    workspace_id = Column(String, ForeignKey('workspaces.id', ondelete='CASCADE'), nullable=False, index=True)
+    title = Column(String(120), nullable=False)
+    messages = Column(JSON, nullable=False, default=list)
+    created = Column(Float, default=time.time)
+    updated = Column(Float, default=time.time, index=True)
+
 class Analysis(Base):
     __tablename__ = 'analyses'
     id = Column(String, primary_key=True, default=uid)
