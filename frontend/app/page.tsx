@@ -459,7 +459,9 @@ export default function Home() {
               <div><input id="gmail-query" value={gmailQuery} onChange={e=>setGmailQuery(e.target.value)} placeholder="in:inbox newer_than:30d"/>
                 <button className="btn primary" disabled={gmailBusy}>{gmailBusy?'Searching…':'Find emails'}</button></div>
             </form>
-            <div className="gmail-actions"><span>{gmailSelected.length} selected · up to 15 emails per summary</span>
+            <div className="gmail-actions"><div className="gmail-selection"><span>{gmailSelected.length} selected · up to 15 emails per summary</span>
+              <button type="button" className="btn" disabled={gmailBusy||gmailMessages.length===0} onClick={()=>setGmailSelected(gmailMessages.slice(0,15).map(m=>m.id))}>Select all{gmailMessages.length>15?' (first 15)':''}</button>
+              <button type="button" className="btn" disabled={gmailBusy||!gmailSelected.length} onClick={()=>setGmailSelected([])}>Deselect all</button></div>
               <button className="btn primary" disabled={gmailBusy||!gmailSelected.length} onClick={()=>void summarizeGmail()}>{gmailBusy?'Working…':'Summarize selected'}</button></div>
             <div className="gmail-list">{gmailMessages.map(m=><label className="gmail-item" key={m.id}>
               <input type="checkbox" checked={gmailSelected.includes(m.id)} onChange={e=>setGmailSelected(old=>e.target.checked?old.length<15?[...old,m.id]:old:old.filter(x=>x!==m.id))}/>
