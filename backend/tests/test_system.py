@@ -353,3 +353,18 @@ def test_insights_endpoints_are_removed(client):
     w = wid(client)
     assert client.get(f'/api/workspaces/{w}/analyses').status_code == 404
     assert client.post(f'/api/workspaces/{w}/analyses',json={'kind':'summary'}).status_code == 404
+
+def test_workspace_deletion_requires_owner_and_confirmation(client):
+    w=wid(client)
+    document=upload(client,w)
+    drain()
+    created=client.post(f'/api/workspaces/{w}/conversations',json={'title':'Delete test','messages':[]}).json()
+    assert client.request('DELETE',f'/api/workspaces/{w}',json={'name':'wrong'}).status_code==422
+    with TestClient(app) as other:
+        other.post('/api/auth/register',json={'email':f'{time.time_ns()}@another.com','password':'another-long-password'})
+        assert other.request('DELETE',f'/api/workspaces/{w}',json={'name':'My knowledge base'}).status_code==404
+    result=client.request('DELETE',f'/api/workspaces/{w}',json={'name':'My knowledge base'})
+    assert result.status_code==200
+    assert not (config.DATA/'files'/document['id']).exists()
+    assert client.get(f'/api/workspaces/{w}/conversations/{created["id"]}').status_code==404
+    assert all(item['id']!=w for item in client.get('/api/workspaces').json())
