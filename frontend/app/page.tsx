@@ -59,11 +59,16 @@ export default function Home() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [wid, setWid] = useState('');
   const [docs, setDocs] = useState<Doc[]>([]);
-  const [tab, setTab] = useState<'overview' | 'documents' | 'chat' | 'gmail'>('chat');
+  const [tab, setTab] = useState<'overview' | 'documents' | 'chat' | 'gmail' | 'connected'>('chat');
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [connectedQuestion,setConnectedQuestion] = useState('');
+  const [connectedGmail,setConnectedGmail] = useState(false);
+  const [connectedGmailQuery,setConnectedGmailQuery] = useState('newer_than:30d');
+  const [connectedBusy,setConnectedBusy] = useState(false);
+  const [connectedResult,setConnectedResult] = useState<{answer:string;mode:string;sources:{number:number;provider:string;title:string;url?:string;date?:string;text:string}[]}|null>(null);
   const [gmailStatus,setGmailStatus] = useState<GmailStatus|null>(null);
   const [gmailMessages,setGmailMessages] = useState<GmailMessage[]>([]);
   const [gmailQuery,setGmailQuery] = useState('in:inbox newer_than:30d');
@@ -324,6 +329,16 @@ export default function Home() {
       window.location.assign(value.authorization_url);
     }catch(e){setError((e as Error).message);setGmailBusy(false);}
   }
+  async function askConnected(){
+    if(!wid||!connectedQuestion.trim()||connectedBusy)return;
+    setConnectedBusy(true);setError('');
+    try {
+      const result=await api<{answer:string;mode:string;sources:{number:number;provider:string;title:string;url?:string;date?:string;text:string}[]}>(`/workspaces/${wid}/connected-chat`,
+        {method:'POST',body:JSON.stringify({question:connectedQuestion,include_gmail:connectedGmail,gmail_query:connectedGmailQuery,document_ids:selected,history:[]})});
+      setConnectedResult(result);
+    }catch(e){setError((e as Error).message);}
+    finally{setConnectedBusy(false);}
+  }
   async function searchGmail(){
     setGmailBusy(true);setError('');setGmailSelected([]);setGmailMobileView('emails');
     try {
@@ -432,7 +447,7 @@ export default function Home() {
     <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
       <div className="brand-row"><AtlasMark/><span>Atlas</span><button className="sidebar-collapse" aria-label="Collapse sidebar" onClick={()=>{setSidebarCollapsed(true);setSidebarOpen(false);}}><PanelLeftClose/></button></div>
       <button className="workspace-btn" onClick={()=>setNewWorkspace(true)}><span className="ws-avatar">{workspace?.name[0]?.toUpperCase() || 'A'}</span><span><strong>{workspace?.name || 'Choose workspace'}</strong><small>{workspaces.length} workspace{workspaces.length===1?'':'s'}</small></span><ChevronDown/></button>
-      <nav className="nav" aria-label="Main navigation">{([{id:'overview',label:'Home',icon:HomeIcon},{id:'chat',label:'Ask Atlas',icon:Search},{id:'documents',label:'Documents',icon:FileText},{id:'gmail',label:'Gmail',icon:MessageSquare}] as const).map(item=><button key={item.id} className={tab===item.id?'active':''} title={item.label} aria-current={tab===item.id?'page':undefined} onClick={()=>navigate(item.id)}><item.icon/><span>{item.label}</span></button>)}</nav>
+      <nav className="nav" aria-label="Main navigation">{([{id:'overview',label:'Home',icon:HomeIcon},{id:'chat',label:'Ask Atlas',icon:Search},{id:'documents',label:'Documents',icon:FileText},{id:'gmail',label:'Gmail',icon:MessageSquare},{id:'connected',label:'Connected search',icon:Layers3}] as const).map(item=><button key={item.id} className={tab===item.id?'active':''} title={item.label} aria-current={tab===item.id?'page':undefined} onClick={()=>navigate(item.id)}><item.icon/><span>{item.label}</span></button>)}</nav>
       <div className="sidebar-research"><div className="section-label">RECENT CHATS</div><button className="workspace-stat" onClick={()=>{newChat();}}><Plus/><span>New conversation</span></button>{chats.slice(0,6).map(item=><button key={item.id} className="workspace-stat" onClick={()=>void loadChat(item.id)} title={item.title}><MessageSquare/><span>{item.title}</span></button>)}<button className="workspace-stat" onClick={()=>{navigate('chat');void refreshChats();}}><Clock3/><span>All conversations ({chats.length})</span></button><div className="section-label">IN THIS WORKSPACE</div><button className="workspace-stat" onClick={()=>navigate('documents')}><FolderOpen/><span>{docs.length} documents</span></button><button className="workspace-stat" onClick={()=>navigate('chat')}><Layers3/><span>{totalChunks.toLocaleString()} searchable passages</span></button></div>
       <div className="bottom"><div className="usage"><div><span>Workspace storage</span><span>{storage ? prettyBytes(storage) : '0 KB'}</span></div><p>{ready.length} documents ready to explore</p></div><div className="profile"><span className="avatar">{initials}</span><div><strong>{user.email.split('@')[0]}</strong><small>{user.email}</small></div><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={()=>void signOut()}><LogOut/></button></div></div>
     </aside>
@@ -468,6 +483,25 @@ export default function Home() {
         </section>}
         {wid && tab==='documents' && <section><div className="crumb">Workspace<span>›</span>Documents</div><div className="heading-row"><div><h1>Documents</h1><p className="subtitle">The files behind your answers.</p></div>{uploadButton}</div><div className="library-bar"><label className="document-search"><Search/><input type="search" aria-label="Search documents" placeholder="Search documents…" value={filter} onChange={e=>setFilter(e.target.value)}/></label><span className="caption">{filtered.length} of {docs.length} documents</span></div>{renderDocuments(filtered)}<div className={`upload-area ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}><Upload/><div><strong>Drop your documents here</strong><p>PDF, DOCX, TXT, MD · up to {Math.round(user.max_file_bytes/1024/1024)} MB per file</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Browse files</button></div></section>}
 
+        {wid && tab==='connected' && <section className="connected-page">
+          <div className="crumb">Workspace<span>›</span>Connected search</div>
+          <h1>Ask across your sources</h1>
+          <p className="subtitle">Compare workspace documents with your connected Gmail messages. Original sources are cited.</p>
+          <div className="connected-card">
+            <div className="connected-source-options">
+              <span className="pill">Documents · enabled</span>
+              <label><input type="checkbox" checked={connectedGmail} onChange={e=>setConnectedGmail(e.target.checked)}/> Include connected Gmail</label>
+            </div>
+            {connectedGmail&&<input aria-label="Gmail search scope" value={connectedGmailQuery} onChange={e=>setConnectedGmailQuery(e.target.value)} placeholder="newer_than:30d" className="connected-field"/>}
+            <form onSubmit={e=>{e.preventDefault();void askConnected()}}>
+              <textarea aria-label="Ask across sources" rows={3} value={connectedQuestion} onChange={e=>setConnectedQuestion(e.target.value)} placeholder="What changed between my project proposal and recent emails?"/>
+              <button className="btn primary" disabled={connectedBusy||!connectedQuestion.trim()} type="submit">{connectedBusy?'Searching and synthesizing…':'Ask connected sources'}</button>
+            </form>
+          </div>
+          {connectedResult&&<article className="connected-answer"><h2>Answer</h2><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{connectedResult.answer}</ReactMarkdown></div><h3>Evidence</h3>
+            {connectedResult.sources.map(src=><div className="connected-evidence" key={src.number}><strong>[{src.number}] {src.title}</strong><span className="caption">{src.provider}{src.date?' · '+src.date:''}</span><p>{src.text}</p>{src.url&&<a href={src.url} target="_blank" rel="noopener noreferrer">Open original <ArrowUpRight size={14}/></a>}</div>)}
+          </article>}
+        </section>}
         {wid && tab==='gmail' && <section className="gmail-page">
           <div className="crumb">Workspace<span>›</span>Gmail</div>
           <div className="heading-row"><div><h1>Gmail</h1><p className="subtitle">Find messages and summarize only the emails you select.</p></div>
