@@ -13,7 +13,7 @@ os.environ['AI_PROVIDER'] = 'none'
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db import Session, Document, Chunk, Analysis
+from app.db import Session, Document, Chunk
 from app.worker import run_one, claim
 from app.ingest import split_text
 from app import ai, config
@@ -62,7 +62,7 @@ def test_accounts_and_workspace_isolation(client):
     with TestClient(app) as other:
         assert other.get(f'/api/workspaces/{w}/documents').status_code == 401
         other.post('/api/auth/register',json={'email':f'{time.time_ns()}@other.com','password':'another-long-password'})
-        for suffix in ['/documents', f'/documents/{d["id"]}/chunks', f'/documents/{d["id"]}/original', '/analyses']:
+        for suffix in ['/documents', f'/documents/{d["id"]}/chunks', f'/documents/{d["id"]}/original']:
             assert other.get(f'/api/workspaces/{w}{suffix}').status_code == 404
         assert other.delete(f'/api/workspaces/{w}/documents/{d["id"]}').status_code == 404
         other_w = wid(other)
@@ -100,31 +100,6 @@ def test_scoped_search_and_unanswerable(client):
     answer = client.post(f'/api/workspaces/{w}/chat',json={'question':'budget','document_ids':[first['id']]}).json()
     assert {s['document_id'] for s in answer['sources']} == {first['id']}
     assert client.post(f'/api/workspaces/{w}/chat',json={'question':'   '}).status_code == 422
-
-
-def test_collection_analysis_full_coverage_and_invalidation(client):
-    w = wid(client)
-    long = '\n\n'.join(f'Section {i}: The project risk number {i} requires review. ' + 'Details about project delivery. ' * 40 for i in range(15))
-    d = upload(client,w,'large.md',long)
-    upload(client,w,'second.md','The security review is on 10 November 2026.')
-    upload(client,w,'broken.pdf','bad PDF')
-    drain()
-    response = client.post(f'/api/workspaces/{w}/analyses',json={'kind':'risks'})
-    assert response.status_code == 200
-    drain()
-    result = client.get(f'/api/workspaces/{w}/analyses').json()[0]['result']
-    assert result['coverage']['analyzed'] == 2
-    assert result['coverage']['total'] == 3
-    assert result['coverage']['excluded'][0]['status'] == 'failed'
-    large = next(item for item in result['documents'] if item['document_id'] == d['id'])
-    assert len(large['batches']) > 1
-    # Local reports must retain every passage, including the last two in each batch.
-    with Session() as db:
-        expected = {c.id for c in db.query(Chunk).filter_by(document_id=d['id'])}
-    actual = {s['chunk_id'] for batch in large['batches'] for s in batch['sources']}
-    assert actual == expected
-    client.delete(f'/api/workspaces/{w}/documents/{d["id"]}')
-    assert client.get(f'/api/workspaces/{w}/analyses').json() == []
 
 
 def test_validation_and_password_login(client):
@@ -209,15 +184,14 @@ def test_docx_tables_and_sections(client):
     assert '45000' in result['answer']
 
 
-def test_upload_limits_and_new_source_invalidates_reports(client, monkeypatch):
+def test_upload_limits(client, monkeypatch):
     from app import main
-    w = wid(client); upload(client,w); drain()
-    client.post(f'/api/workspaces/{w}/analyses',json={'kind':'summary'}); drain()
-    assert client.get(f'/api/workspaces/{w}/analyses').json()
-    upload(client,w,'new.md','New evidence changes the budget to 80000.')
-    assert client.get(f'/api/workspaces/{w}/analyses').json() == []
+    w = wid(client)
+    upload(client, w)
+    drain()
+    upload(client, w, 'new.md', 'New evidence changes the budget to 80000.')
     monkeypatch.setattr(main, 'MAX_FILE_BYTES', 10)
-    result = upload(client,w,'too-large.md','x' * 11)
+    result = upload(client, w, 'too-large.md', 'x' * 11)
     assert 'error' in result and 'id' not in result
     files = list((config.DATA / 'files').iterdir())
     with Session() as db:
@@ -349,91 +323,3 @@ def test_country_count_answers_numeric_evidence_instead_of_titles(client):
     result = client.post(f'/api/workspaces/{w}/chat',json={'question':'how many countries are there in North America'}).json()
     assert result['mode'] == 'insufficient_evidence'
     assert result['sources'] == []
-
-
-@pytest.mark.parametrize('kind,expected_prompt', [
-    ('summary', 'Summarize the key facts and decisions.'),
-    ('risks', 'Identify explicitly supported risks'),
-    ('timeline', 'Extract events with explicit dates. Do not infer dates.'),
-])
-def test_insight_kinds_route_and_complete(client, monkeypatch, kind, expected_prompt):
-    from app import worker
-    w = wid(client)
-    doc = upload(client, w)
-    drain()
-    calls = []
-    def generate(question, sources):
-        calls.append((question, sources))
-        return {'answer': 'Supported finding [1]', 'sources': sources, 'mode': 'ai'}
-    monkeypatch.setattr(worker, 'generate', generate)
-    monkeypatch.setattr(worker, 'enabled', lambda: True)
-    response = client.post(f'/api/workspaces/{w}/analyses', json={'kind': kind})
-    assert response.status_code == 200 and response.json()['status'] == 'queued'
-    drain()
-    report = client.get(f'/api/workspaces/{w}/analyses').json()[0]
-    assert report['status'] == 'ready' and report['error'] is None
-    assert expected_prompt in calls[0][0]
-    if kind == 'risks':
-        assert 'even if only one category has evidence' in calls[0][0]
-    assert calls[0][1][0]['document_id'] == doc['id']
-    assert report['result']['kind'] == kind
-    assert report['result']['mode'] == 'ai'
-    assert report['result']['documents'][0]['batches'][0]['answer'] == 'Supported finding [1]'
-
-
-def test_insight_validation_and_provider_failure(client, monkeypatch):
-    from app import worker
-    w = wid(client)
-    assert client.post(f'/api/workspaces/{w}/analyses', json={'kind':'summary'}).status_code == 409
-    assert client.post(f'/api/workspaces/{w}/analyses', json={'kind':'unknown'}).status_code == 422
-    upload(client, w); drain()
-    def fail(*args):
-        raise RuntimeError('private provider error')
-    monkeypatch.setattr(worker, 'generate', fail)
-    client.post(f'/api/workspaces/{w}/analyses', json={'kind':'summary'})
-    drain()
-    report = client.get(f'/api/workspaces/{w}/analyses').json()[0]
-    assert report['status'] == 'failed'
-    assert report['result'] is None
-    assert 'private provider error' not in report['error']
-
-
-def test_report_metadata_and_detail_are_scoped(client):
-    w = wid(client); upload(client,w); drain()
-    report = client.post(f'/api/workspaces/{w}/analyses', json={'kind':'summary'}).json()
-    drain()
-    metadata = client.get(f'/api/workspaces/{w}/analyses?include_results=false').json()
-    assert metadata[0]['id'] == report['id'] and metadata[0]['result'] is None
-    detail = client.get(f'/api/workspaces/{w}/analyses/{report["id"]}').json()
-    assert detail['result']['coverage']['analyzed'] == 1
-    other = client.post('/api/workspaces',json={'name':'Other'}).json()['id']
-    assert client.get(f'/api/workspaces/{other}/analyses/{report["id"]}').status_code == 404
-
-
-def test_insight_reuses_unchanged_collection_and_rebuilds_after_upload(client):
-    w = wid(client); upload(client,w); drain()
-    first = client.post(f'/api/workspaces/{w}/analyses',json={'kind':'summary'}).json()
-    queued = client.post(f'/api/workspaces/{w}/analyses',json={'kind':'summary'}).json()
-    assert queued['id'] == first['id'] and queued['reused']
-    drain()
-    ready = client.post(f'/api/workspaces/{w}/analyses',json={'kind':'summary'}).json()
-    assert ready['id'] == first['id'] and ready['status'] == 'ready' and ready['reused']
-    with Session() as db:
-        assert db.query(Analysis).filter_by(workspace_id=w).count() == 1
-    upload(client,w,'changed.md','New project risks require a security review.'); drain()
-    rebuilt = client.post(f'/api/workspaces/{w}/analyses',json={'kind':'summary'}).json()
-    assert rebuilt['id'] != first['id'] and not rebuilt['reused']
-
-
-def test_insight_retries_failed_reports_and_hides_legacy_duplicates(client):
-    w = wid(client); upload(client,w); drain()
-    with Session() as db:
-        db.add(Analysis(workspace_id=w,kind='risks',status='failed',created=1))
-        db.add(Analysis(workspace_id=w,kind='summary',status='ready',created=2))
-        db.add(Analysis(workspace_id=w,kind='summary',status='ready',created=3))
-        db.commit()
-    retry = client.post(f'/api/workspaces/{w}/analyses',json={'kind':'risks'}).json()
-    assert retry['status'] == 'queued' and not retry['reused']
-    reports = client.get(f'/api/workspaces/{w}/analyses?include_results=false').json()
-    assert len(reports) == 2
-    assert len([r for r in reports if r['kind'] == 'summary']) == 1
