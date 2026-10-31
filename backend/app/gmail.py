@@ -206,13 +206,19 @@ def summarize(wid: str, body: SummaryRequest, request: Request):
         raise HTTPException(409, 'Configure an AI provider to summarize emails.')
     if any(not mid.isalnum() for mid in body.message_ids):
         raise HTTPException(422, 'Invalid Gmail message ID.')
-    with Session() as db:
-        user=actor(request,db)
-        entry=connection(db,user,wid)
-        token=access_token(entry,db)
-        messages=[email_from_json(gmail_get(token,GMAIL_API+'/messages/'+mid,
-            {'format':'full','fields':'id,threadId,snippet,payload(mimeType,headers,body,parts)'}))
-            for mid in dict.fromkeys(body.message_ids)]
+    try:
+        with Session() as db:
+            user = actor(request, db)
+            entry = connection(db, user, wid)
+            token = access_token(entry, db)
+            messages = [email_from_json(gmail_get(
+                token, GMAIL_API + '/messages/' + mid, {'format': 'full'}
+            )) for mid in dict.fromkeys(body.message_ids)]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception('Gmail summary failed while retrieving selected email messages')
+        raise HTTPException(502, 'Could not load the selected Gmail messages. Check backend logs for details.') from exc
     # Keep context bounded even when users select many long email threads.
     # Large requests previously sent up to 135k characters, often beyond model limits.
     max_total = 18000
