@@ -449,3 +449,10 @@ def test_connected_synthesis_fits_local_model_and_preserves_citations():
     assert [x['source_id'] for x in payload] == list(range(1, len(payload)+1))
     assert {x['provider'] for x in payload} == {'documents', 'gmail'}
     assert answer == 'Supported by [1] and [2].'
+
+
+def test_github_search_query_preserves_filters_and_simplifies_questions():
+    from app.external_sources import github_search_query
+    assert github_search_query('repo:owner/project is:issue bug') == 'repo:owner/project is:issue bug'
+    assert github_search_query('What issues and pull requests discuss a payment timeout?') == 'discuss a payment timeout'
+    assert len(github_search_query('what ' * 100 + 'bug')) <= 180
