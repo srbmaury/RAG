@@ -14,7 +14,6 @@ type Answer = {answer: string; sources: Source[]; mode: string; citation_note?: 
 type Message = {role: 'user' | 'assistant'; content: string; result?: Answer};
 type ChatSummary = {id: string; title: string; updated: number};
 type SavedChat = ChatSummary & {messages: Message[]};
-type Analysis = {id: string; kind: string; status: string; error?: string; result?: {mode: string; coverage: {total: number; analyzed: number; excluded: {name: string; status: string}[]}; documents: {document_id: string; name: string; batches: Answer[]}[]; note: string}};
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {...options, headers: options?.body instanceof FormData ? options.headers : {'Content-Type': 'application/json', ...options?.headers}});
@@ -54,10 +53,6 @@ export default function Home() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [wid, setWid] = useState('');
   const [docs, setDocs] = useState<Doc[]>([]);
-  const [startingInsight, setStartingInsight] = useState('');
-  const [openingReport, setOpeningReport] = useState('');
-  const [openReports, setOpenReports] = useState<string[]>([]);
-  const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [tab, setTab] = useState<'overview' | 'documents' | 'chat'>('chat');
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState('');
@@ -252,7 +247,7 @@ export default function Home() {
     } finally {setBusy(false);}
   }
   async function remove(doc: Doc) {
-    if (!confirm(`Delete “${doc.name}” and its indexed content? Existing insight reports will also be removed.`)) return;
+    if (!confirm(`Delete “${doc.name}” and its indexed content?`)) return;
     try {
       await api(`/workspaces/${wid}/documents/${doc.id}`, {method:'DELETE'});
       setSource(null); setPreview(null); setUploadSummary(null); await refresh();
@@ -268,37 +263,10 @@ export default function Home() {
   }
   function navigate(next: typeof tab) {
     flushSync(() => {
-      if (next !== tab) setOpenReports([]);
       setTab(next); setSidebarOpen(false);
     });
   }
 
-  async function openReport(id: string) {
-    if (openingReport) return;
-    if (openReports.includes(id)) {setOpenReports(old => old.filter(value => value !== id)); return;}
-    const target = wid;
-    if (analyses.find(a => a.id === id)?.result) {setOpenReports(old => [...old, id]); return;}
-    flushSync(() => setOpeningReport(id));
-    try {
-      const report = await api<Analysis>(`/workspaces/${target}/analyses/${id}`);
-      if (scope.current !== target) return;
-      setAnalyses(old => old.map(a => a.id === id ? report : a));
-      setOpenReports(old => [...old, id]);
-    } catch(e) {if (scope.current === target) setError((e as Error).message);}
-    finally {setOpeningReport('');}
-  }
-  async function insight(kind: string) {
-    if (startingInsight) return;
-    const target = wid;
-    flushSync(() => {setTab('insights'); setStartingInsight(kind); setError('');});
-    try {
-      const job = await api<{id: string; status: string; reused: boolean}>(`/workspaces/${target}/analyses`, {method:'POST', body:JSON.stringify({kind})});
-      if (scope.current !== target) return;
-      setNotice(job.reused ? (job.status === 'ready' ? 'Your documents have not changed. The existing report is ready to open.' : 'This report is already queued or processing.') : 'Report queued. You can keep using Atlas while it processes your documents.');
-      await refresh();
-    } catch(e) {if (scope.current === target) setError((e as Error).message);}
-    finally {setStartingInsight('');}
-  }
   async function addWorkspace(e: React.FormEvent) {
     e.preventDefault();
     try {const value = await api<Workspace>('/workspaces', {method:'POST', body:JSON.stringify({name:workspaceName})}); setWorkspaces(old => [...old, value]); setWid(value.id); setNewWorkspace(false); setWorkspaceName('');}
@@ -427,8 +395,4 @@ function Dialog({title,onClose,children,className=''}: {title:string;onClose:()=
   const ref=useRef<HTMLDialogElement>(null);
   useEffect(()=>{ref.current?.showModal();const dialog=ref.current;return()=>dialog?.close();},[]);
   return <dialog ref={ref} className={`dialog ${className}`} aria-label={title} onCancel={onClose} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div className="dialog-heading"><h2>{title}</h2><button className="icon-button" aria-label="Close dialog" onClick={onClose}><X/></button></div>{children}</dialog>;
-}
-function ReportDocument({name,batches,renderAnswer}: {name:string;batches:Answer[];renderAnswer:(answer:Answer)=>ReactNode}) {
-  const [open,setOpen]=useState(false);const [limit,setLimit]=useState(6);
-  return <details onToggle={e=>setOpen(e.currentTarget.open)}><summary><FileText/><span>{name}</span><ChevronDown/></summary>{open&&<>{batches.slice(0,limit).map((batch,i)=><div className="report-batch" key={i}><span className="caption">Passage group {i+1}</span>{renderAnswer(batch)}</div>)}{limit<batches.length&&<button className="btn" onClick={()=>setLimit(old=>old+6)}>Show more passages ({batches.length-limit} remaining)</button>}</>}</details>;
 }
