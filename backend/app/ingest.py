@@ -1,4 +1,5 @@
 import re
+import os
 from pathlib import Path
 import pypdfium2 as pdfium
 from docx import Document as WordDocument
@@ -31,8 +32,21 @@ def extract(path, name, heartbeat=None):
                     try: value = textpage.get_text_bounded()
                     finally: textpage.close()
                 finally: page.close()
+                if not value.strip() and os.getenv('OCR_ENABLED', 'true').lower() == 'true':
+                    # OCR only pages without a text layer, keeping searchable pages fast.
+                    try:
+                        import pytesseract
+                        bitmap = pdf[i].render(scale=2)
+                        try:
+                            value = pytesseract.image_to_string(bitmap.to_pil(), timeout=30)
+                        finally:
+                            bitmap.close()
+                    except (ImportError, OSError, RuntimeError, TimeoutError) as exc:
+                        raise ValueError('OCR is unavailable. Install Tesseract and the Python OCR dependencies.') from exc
+                    except pytesseract.TesseractError as exc:
+                        raise ValueError(f'OCR failed for PDF page {i + 1}.') from exc
                 if not value.strip():
-                    raise ValueError(f'PDF page {i + 1} has no extractable text. OCR the document before uploading; partial indexing is disabled.')
+                    raise ValueError(f'PDF page {i + 1} has no readable text, including OCR.')
                 pages.append((i + 1, value.replace('\r\n', '\n')))
             return pages
         finally: pdf.close()
