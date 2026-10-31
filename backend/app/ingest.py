@@ -8,8 +8,9 @@ from .config import DATA
 from .db import Session, Document, Chunk
 from .ai import embed, embedding_model_id
 from . import config
+from .structured_text import extract_structured
 
-SUPPORTED = {'.pdf', '.docx', '.txt', '.md'}
+SUPPORTED = {'.pdf', '.docx', '.txt', '.md', '.csv', '.json', '.html', '.htm'}
 
 def extract(path, name, heartbeat=None):
     ext = Path(name).suffix.lower()
@@ -67,6 +68,8 @@ def extract(path, name, heartbeat=None):
                     table.extend('| ' + ' | '.join(row) + ' |' for row in rows[1:])
                     blocks.append('\n'.join(table))
         return [(1, '\n\n'.join(blocks))]
+    if ext in {'.csv', '.json', '.html', '.htm'}:
+        return [(1, extract_structured(path, ext))]
     return [(1, Path(path).read_text(encoding='utf-8-sig'))]
 
 def split_text(text, size=1800, overlap=240):
