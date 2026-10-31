@@ -157,7 +157,7 @@ export default function Home() {
     const timer = setInterval(() => {void refresh().catch(e => setError(e.message));}, 3000);
     return () => clearInterval(timer);
   }, [refresh]);
-  useEffect(() => {chatEnd.current?.scrollIntoView({behavior: 'smooth'});}, [messages, busy]);
+  useEffect(() => {if (tab==='chat' && messages.length > 0) chatEnd.current?.scrollIntoView({behavior:'smooth',block:'nearest'});}, [messages.length,busy,tab]);
 
   async function authenticate(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError('');
@@ -577,18 +577,20 @@ export default function Home() {
           <div className={`home-dropzone ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}><span className="home-drop-icon"><Upload size={20}/></span><div><strong>Add documents to your library</strong><p>Drag in PDFs, Word files, plain text, or Markdown · max {Math.round(user.max_file_bytes/1024/1024)} MB each.</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Browse files</button></div>
         </section>}
         {wid && tab==='sources' && <section className="connected-page">
+          {sourceManage!=='gmail' && <div className="sources-overview">
           <div className="crumb">Workspace<span>›</span>Sources</div><div className="heading-row"><div><span className="eyebrow">YOUR INTEGRATIONS</span><h1>Connected sources</h1><p className="subtitle">Connect external services to your research workspace. Access stays read-only.</p></div>
           <button className="btn" onClick={()=>void refreshSourceStatuses()}>Refresh connections</button></div>
           <div className="integration-overview"><div><h2>Your integrations</h2><p>Choose a service to connect or manage its access.</p></div><span>{[gmailStatus?.connected,driveStatus?.connected,...sourceStatuses.map(x=>x.connected)].filter(Boolean).length} connected</span></div>
           <div className="integrations-grid">
-            <IntegrationTile name="Gmail" description="Search conversations and summarize email." icon={<Mail size={23}/>} connected={!!gmailStatus?.connected} account={gmailStatus?.email} onClick={()=>setSourceManage('gmail')}/>
+            <IntegrationTile name="Gmail" description="Search conversations and summarize email." icon={<Mail size={23}/>} connected={!!gmailStatus?.connected} account={gmailStatus?.email} onClick={()=>{setSourceManage('gmail');window.scrollTo({top:0,behavior:'instant'});}}/>
             <IntegrationTile name="Google Drive" description="Explore documents and cloud files." icon={<HardDrive size={23}/>} connected={!!driveStatus?.connected} account={driveStatus?.account} onClick={()=>setSourceManage('drive')}/>
             <IntegrationTile name="GitHub" description="Find issues, pull requests and decisions." icon={<Github size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='github')?.connected} account={sourceStatuses.find(x=>x.provider==='github')?.account} onClick={()=>{setSourceProvider('github');setSourceManage('github');setSourceResults([]);}}/>
             <IntegrationTile name="Notion" description="Search shared pages and knowledge." icon={<NotebookPen size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='notion')?.connected} account={sourceStatuses.find(x=>x.provider==='notion')?.account} onClick={()=>{setSourceProvider('notion');setSourceManage('notion');setSourceResults([]);}}/>
             <IntegrationTile name="Slack" description="Find team conversations and updates." icon={<Hash size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='slack')?.connected} account={sourceStatuses.find(x=>x.provider==='slack')?.account} onClick={()=>{setSourceProvider('slack');setSourceManage('slack');setSourceResults([]);}}/>
           </div>
+          </div>}
         {sourceManage==='gmail' && <section className="gmail-page gmail-integrated">
-          <div className="gmail-integrated-back"><button className="btn" type="button" onClick={()=>setSourceManage(null)}>← All sources</button></div>
+          <div className="gmail-integrated-back"><button className="btn" type="button" onClick={()=>{setSourceManage(null);window.scrollTo({top:0,behavior:'instant'});}}>← All sources</button></div>
           <div className="heading-row"><div><h1>Gmail</h1><p className="subtitle">Find messages and summarize only the emails you select.</p></div>
             {gmailStatus?.connected && <button className="btn" disabled={gmailBusy} onClick={()=>void disconnectGmail()}>Disconnect</button>}
           </div>
