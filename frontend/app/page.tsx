@@ -266,7 +266,7 @@ export default function Home() {
   // Preserve original retrieval indices so [3] always opens source 3.
   const visibleEvidence = (result: Answer | undefined) => {
     if (!result || !['ai', 'local_excerpts'].includes(result.mode)) return [];
-    const cited = new Set(Array.from(result.answer.matchAll(/\\[(\\d+)\\]/g), m => Number(m[1])));
+    const cited = new Set(Array.from(result.answer.matchAll(/\[(\d+)\]/g), m => Number(m[1])));
     return result.sources.flatMap((source, index) => cited.has(index + 1) ? [{source, number: index + 1}] : []);
   };
   const evidenceItems = visibleEvidence(latestAnswer);
