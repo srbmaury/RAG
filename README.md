@@ -8,15 +8,15 @@ A working first release for bulk document ingestion, private workspaces, source-
 2. Add `http://localhost:3000/api/drive/callback` as an **Authorized redirect URI** (in addition to the Gmail callback, if used).
 3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_DRIVE_REDIRECT_URI`, and `GMAIL_TOKEN_ENCRYPTION_KEY` in the backend environment. Restart the API and frontend.
 4. In **Atlas → Sources → Google Drive**, select **Connect Google Drive**, authorize access, and browse or search your Drive files.
-5. Tick **Google Drive** in Connected Search to compare Google Docs and readable text files with other sources.
+5. Tick **Google Drive** in Ask Atlas to compare Google Docs and readable text files with other sources.
 
 Drive uses `drive.readonly`, a **restricted Google OAuth scope** that permits reading and downloading the user's accessible Drive files. Public deployment may require Google's verification and a security assessment depending on data handling. This connector is designed for local/development use initially. Access tokens are refreshed on demand, refresh tokens encrypted per workspace, and access revoked in Atlas by disconnecting; for full revocation, also revoke the application's access in Google Account settings.
 
-The initial search lists Drive metadata; Connected Search reads text/plain Google Docs exports and plain-text files on demand. PDF, spreadsheet, slide, and DOCX content are **not yet extracted through Drive**. Drive is not automatically indexed, and selected excerpts may be sent to the configured AI provider.
+The initial search lists Drive metadata; Ask Atlas reads text/plain Google Docs exports and plain-text files on demand. PDF, spreadsheet, slide, and DOCX content are **not yet extracted through Drive**. Drive is not automatically indexed, and selected excerpts may be sent to the configured AI provider.
 
 ## Connect additional sources (experimental)
 
-Open **Sources** in the Atlas sidebar. Gmail is now accessed through its card in Sources (its full search and summary screen is unchanged). GitHub, Notion, and Slack support initial **read-only token-based connections** (not one-click OAuth). Choose a provider, enter a provider-issued token with the minimum permissions, and select **Connect account**. You can search it from that screen or select it in **Connected search** alongside documents and Gmail. Tokens are encrypted with `GMAIL_TOKEN_ENCRYPTION_KEY` and stored per workspace. They are not included in AI prompts. Disconnect deletes the stored token; revoke it at the provider as well if necessary.
+Open **Sources** in the Atlas sidebar. Gmail is now accessed through its card in Sources (its full search and summary screen is unchanged). GitHub, Notion, and Slack support initial **read-only token-based connections** (not one-click OAuth). Choose a provider, enter a provider-issued token with the minimum permissions, and select **Connect account**. You can search it from that screen or select it in **Ask Atlas** alongside documents and Gmail. Tokens are encrypted with `GMAIL_TOKEN_ENCRYPTION_KEY` and stored per workspace. They are not included in AI prompts. Disconnect deletes the stored token; revoke it at the provider as well if necessary.
 
 - **GitHub:** Use a fine-grained read-only token scoped to the repositories you want to access. The first adapter searches issues and pull requests, not source code.
 - **Notion:** Use a Notion integration token and share the intended pages with the integration. The initial search returns page/database title metadata only, not complete page bodies.
@@ -27,11 +27,11 @@ This is a developer-first connector setup and has not been end-to-end tested aga
 
 ## Connected-source research (experimental)
 
-The **Connected search** navigation entry can combine workspace document passages and live Gmail results in one AI answer. Gmail is opt-in for each question, with a user-specified Gmail search scope (default: last 30 days). The backend verifies workspace ownership and Gmail connection before retrieving mail. It fetches up to eight matching messages on demand, and up to six document excerpts. Generated answers require citation references; the interface displays source passages and original Gmail URLs.
+**Ask Atlas** now combines workspace documents and selected live connectors in one persistent conversation. Choose sources directly above the chat; there is no separate Connected Search page. Gmail is opt-in for each question, with a user-specified Gmail search scope (default: last 30 days). The backend verifies workspace ownership and Gmail connection before retrieving mail. It fetches up to eight matching messages on demand, and up to six document excerpts. Generated answers require citation references; the interface displays source passages and original Gmail URLs.
 
 Google Drive and full production-ready provider OAuth flows remain pending. Those require separate per-user OAuth installation, permission scoping, encrypted connection storage, refresh/revocation handling, and provider-specific adapters. Do not enter provider access tokens in the UI. Future adapters should use the evidence contract in `backend/app/sources.py`, avoid bulk ingestion by default, and maintain the original source's permission boundary.
 
-The current connected questions are one-shot, not saved in chat history. Read-only retrieval does not send, edit, or delete Gmail messages. This feature is not yet covered by an end-to-end integration test.
+Connected questions are saved to normal workspace conversation history, using the same answer and citation contract as document-only chat. Read-only retrieval does not send, edit, or delete Gmail messages. This feature is not yet covered by an end-to-end integration test.
 
 ## UI design preview
 
