@@ -11,7 +11,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, 
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
-from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, uid
+from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, uid
 from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
 from . import config
 from .ingest import SUPPORTED
@@ -21,6 +21,7 @@ from .ai import generate, enabled
 from .query_context import retrieval_query
 from . import uploads
 from .gmail import router as gmail_router
+from .external_sources import router as external_router
 from starlette.concurrency import run_in_threadpool
 
 @asynccontextmanager
@@ -38,6 +39,7 @@ async def lifespan(app):
 
 app = FastAPI(title='Atlas Document Intelligence', lifespan=lifespan)
 app.include_router(gmail_router)
+app.include_router(external_router)
 
 def database():
     with Session() as db: yield db
@@ -158,6 +160,7 @@ def delete_workspace(wid: str, body: DeleteWorkspaceRequest, actor=Depends(user)
     # Use explicit deletes for SQLite and PostgreSQL; no reliance on ORM cascades.
     db.query(GmailOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(GmailConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(ExternalConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(Conversation).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(Chunk).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(Document).filter_by(workspace_id=wid).delete(synchronize_session=False)
