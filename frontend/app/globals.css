@@ -270,3 +270,14 @@ h1,h2,h3{font-family:'DM Sans',system-ui,sans-serif;font-weight:700}
 .connected-evidence strong{display:block;font-size:13px}
 .connected-evidence p{font-size:12px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--sub);max-height:160px;overflow:hidden}
 .connected-evidence a{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--brand)}
+
+.source-connect-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:19px 0}
+.source-provider-card{background:var(--panel);border:1px solid var(--line2);border-radius:10px;text-align:left;display:flex;flex-direction:column;gap:8px;padding:17px;color:var(--text);min-width:0}
+.source-provider-card strong{font-size:13px}
+.source-provider-card span{font-size:11px;line-height:1.5;color:var(--sub);overflow-wrap:anywhere}
+button.source-provider-card.selected{border-color:var(--brand);background:var(--active)}
+.source-provider-card.disabled{opacity:.65}
+.source-search-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:17px}
+.source-search-controls input{flex:1;min-width:190px}
+@media(max-width:720px){.source-connect-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:440px){.source-connect-grid{grid-template-columns:1fr}}
