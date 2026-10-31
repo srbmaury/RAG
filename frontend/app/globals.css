@@ -139,3 +139,26 @@ h1,h2,h3{font-family:'DM Sans',system-ui,sans-serif;font-weight:700}
 .btn.danger{background:#9d3430;border-color:#9d3430;color:white}
 .btn.danger:hover{background:#822b28}
 .sidebar-research .workspace-stat span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+
+/* Gmail connector */
+.gmail-page{max-width:1150px}
+.gmail-intro{margin:24px 0;padding:21px 23px;border:1px solid var(--line);background:var(--panel);border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:22px}
+.gmail-intro strong{font-size:15px}.gmail-intro p{margin-top:6px;line-height:1.65}
+.gmail-search{margin:24px 0 14px}.gmail-search>label{display:block;font-size:12px;font-weight:700;margin-bottom:8px}
+.gmail-search>div{display:flex;gap:10px}.gmail-search input{background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:11px 13px;min-width:0;flex:1}
+.gmail-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;color:var(--sub);font-size:12px}
+.gmail-list{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.gmail-item{display:flex;gap:14px;align-items:flex-start;padding:16px 17px;border-bottom:1px solid var(--line)}
+.gmail-item:last-child{border-bottom:0}.gmail-item:hover{background:var(--hover)}
+.gmail-item>input{margin-top:5px;accent-color:var(--brand)}
+.gmail-item>span{flex:1;min-width:0}
+.gmail-item strong,.gmail-item small,.gmail-item span span{display:block}
+.gmail-item strong{font-size:13px}.gmail-item small{font-size:11px;color:var(--sub);margin:4px 0}
+.gmail-item span span{font-size:12px;color:var(--sub);line-height:1.55}
+.gmail-item a{color:var(--sub);padding:5px}
+.gmail-summary{border:1px solid var(--line);border-radius:10px;padding:24px;margin-top:24px;max-width:860px}
+.gmail-summary h2{font-size:19px;margin-bottom:15px}
+.gmail-summary h3{font-size:13px;margin:20px 0 8px}
+.gmail-summary>a{display:flex;align-items:center;gap:7px;padding:7px 0;font-size:12px;color:var(--brand)}
+@media(max-width:600px){.gmail-intro{align-items:flex-start;flex-direction:column;padding:17px}.gmail-search>div{flex-direction:column}.gmail-item{padding:13px 10px}.gmail-actions{align-items:flex-start}}
