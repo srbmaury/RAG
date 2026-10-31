@@ -11,7 +11,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, 
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
-from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, uid
+from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, DriveOAuthState, uid
 from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
 from . import config
 from .ingest import SUPPORTED
@@ -22,6 +22,7 @@ from .query_context import retrieval_query
 from . import uploads
 from .gmail import router as gmail_router
 from .external_sources import router as external_router
+from .drive import router as drive_router
 from starlette.concurrency import run_in_threadpool
 
 @asynccontextmanager
@@ -40,6 +41,7 @@ async def lifespan(app):
 app = FastAPI(title='Atlas Document Intelligence', lifespan=lifespan)
 app.include_router(gmail_router)
 app.include_router(external_router)
+app.include_router(drive_router)
 
 def database():
     with Session() as db: yield db
@@ -159,6 +161,7 @@ def delete_workspace(wid: str, body: DeleteWorkspaceRequest, actor=Depends(user)
     ids = [d.id for d in documents]
     # Use explicit deletes for SQLite and PostgreSQL; no reliance on ORM cascades.
     db.query(GmailOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(DriveOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(GmailConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(ExternalConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(Conversation).filter_by(workspace_id=wid).delete(synchronize_session=False)
@@ -339,7 +342,7 @@ def delete_conversation(wid: str, cid: str, actor=Depends(user), db=Depends(data
 class ConnectedQuestion(Question):
     include_gmail: bool = False
     gmail_query: str = Field(default='newer_than:30d', max_length=400)
-    providers: List[str] = Field(default_factory=list, max_length=3)
+    providers: List[str] = Field(default_factory=list, max_length=4)
 
 
 @app.post('/api/workspaces/{wid}/connected-chat')
@@ -358,9 +361,10 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
     from .ai import client, ollama_chat
     from .sources import Evidence
     from .external_sources import read_connection, source_search, PROVIDERS
+    from .drive import access_token as drive_access_token, drive_search, drive_evidence
     import json
     import re
-    if any(p not in PROVIDERS for p in body.providers):
+    if any(p not in (*PROVIDERS, 'drive') for p in body.providers):
         raise HTTPException(422, 'Unknown connected provider.')
     evidence = []
     try:
@@ -378,7 +382,13 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
                 evidence.append(Evidence('gmail', msg['id'], msg['subject'],
                                          (msg['body'] or msg['snippet'])[:1300],
                                          msg['url'], msg['date']))
-        for provider in dict.fromkeys(body.providers):
+        if 'drive' in body.providers:
+            drive_token=drive_access_token(db,actor,wid)
+            drive_items=drive_evidence(drive_token,drive_search(drive_token,body.question))
+            for hit in drive_items:
+                evidence.append(Evidence('drive',hit['id'],hit['title'],
+                                         hit['excerpt'],hit.get('url')))
+        for provider in dict.fromkeys(p for p in body.providers if p != 'drive'):
             _, provider_token = read_connection(db, actor, wid, provider)
             for hit in source_search(provider, provider_token, body.question)[:5]:
                 evidence.append(Evidence(provider, hit['id'], hit['title'],
