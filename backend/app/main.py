@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import defer
-from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Analysis, uid
+from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Analysis, Conversation, uid
 from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
 from . import config
 from .ingest import SUPPORTED
@@ -252,6 +252,66 @@ def delete(wid: str, did: str, actor=Depends(user), db=Depends(database)):
     db.query(Analysis).filter_by(workspace_id=wid).delete()
     db.commit()
     (DATA / 'files' / did).unlink(missing_ok=True)
+    return {'ok': True}
+
+
+class ConversationPayload(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    messages: list[dict] = Field(default_factory=list, max_length=300)
+
+class ConversationRename(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+
+def owned_conversation(wid, cid, actor, db):
+    workspace(wid, actor, db)
+    item = db.query(Conversation).filter_by(id=cid, workspace_id=wid).first()
+    if item is None:
+        raise HTTPException(404, 'Conversation not found.')
+    return item
+
+def conversation_data(item):
+    return {'id': item.id, 'title': item.title, 'messages': item.messages or [],
+            'created': item.created, 'updated': item.updated}
+
+@app.get('/api/workspaces/{wid}/conversations')
+def list_conversations(wid: str, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    items = db.query(Conversation).filter_by(workspace_id=wid).order_by(Conversation.updated.desc()).all()
+    return [{'id': c.id, 'title': c.title, 'updated': c.updated} for c in items]
+
+@app.post('/api/workspaces/{wid}/conversations')
+def create_conversation(wid: str, body: ConversationPayload, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    item = Conversation(workspace_id=wid, title=body.title.strip(), messages=body.messages)
+    db.add(item)
+    db.commit()
+    return conversation_data(item)
+
+@app.get('/api/workspaces/{wid}/conversations/{cid}')
+def get_conversation(wid: str, cid: str, actor=Depends(user), db=Depends(database)):
+    return conversation_data(owned_conversation(wid, cid, actor, db))
+
+@app.put('/api/workspaces/{wid}/conversations/{cid}')
+def update_conversation(wid: str, cid: str, body: ConversationPayload, actor=Depends(user), db=Depends(database)):
+    item = owned_conversation(wid, cid, actor, db)
+    item.title = body.title.strip()
+    item.messages = body.messages
+    item.updated = time.time()
+    db.commit()
+    return conversation_data(item)
+
+@app.patch('/api/workspaces/{wid}/conversations/{cid}')
+def rename_conversation(wid: str, cid: str, body: ConversationRename, actor=Depends(user), db=Depends(database)):
+    item = owned_conversation(wid, cid, actor, db)
+    item.title = body.title.strip()
+    item.updated = time.time()
+    db.commit()
+    return conversation_data(item)
+
+@app.delete('/api/workspaces/{wid}/conversations/{cid}')
+def delete_conversation(wid: str, cid: str, actor=Depends(user), db=Depends(database)):
+    db.delete(owned_conversation(wid, cid, actor, db))
+    db.commit()
     return {'ok': True}
 
 @app.post('/api/workspaces/{wid}/chat')
