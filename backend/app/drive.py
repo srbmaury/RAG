@@ -33,8 +33,22 @@ def request_google(url, access_token, params=None, *, json_response=True):
         response.raise_for_status()
         return response.json() if json_response else response.text
     except httpx.HTTPStatusError as exc:
-        if exc.response.status_code in (401,403):
-            raise HTTPException(403,'Google Drive access denied. Reconnect or verify Drive permissions.') from exc
+        status = exc.response.status_code
+        reason = ''
+        try:
+            payload = exc.response.json().get('error', {})
+            reason = next((item.get('reason', '') for item in payload.get('errors', []) if item.get('reason')), '')
+        except (ValueError, TypeError, AttributeError):
+            pass
+        log.warning('Google Drive request rejected: HTTP %s, reason %s', status, reason)
+        if status == 401:
+            raise HTTPException(401, 'Drive authorization expired or was revoked. Reconnect Google Drive.') from exc
+        if status == 403:
+            if reason in ('accessNotConfigured', 'SERVICE_DISABLED'):
+                raise HTTPException(503, 'Enable Google Drive API in the OAuth client Google Cloud project.') from exc
+            if reason in ('insufficientPermissions', 'ACCESS_TOKEN_SCOPE_INSUFFICIENT'):
+                raise HTTPException(403, 'Drive read permission was not granted. Disconnect and reconnect Google Drive.') from exc
+            raise HTTPException(403, 'Google Drive denied access. Confirm its API is enabled and inspect the backend log reason.') from exc
         if exc.response.status_code == 429:
             raise HTTPException(429,'Google Drive quota exceeded. Retry later.') from exc
         raise HTTPException(502, 'Google Drive returned an error.') from exc
