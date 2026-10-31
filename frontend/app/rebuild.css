@@ -158,64 +158,35 @@
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]) .atlas-v3 .sidebar{background:var(--sidebar)}:root:not([data-theme=light]) .atlas-v3 .topbar{background:var(--panel)}}
 :root[data-theme=dark] .atlas-v3 .sidebar{background:var(--sidebar)}
 :root[data-theme=dark] .atlas-v3 .topbar{background:var(--panel)}
-
-/* Neutral editorial palette: graphite, warm whites, restrained steel blue. */
+/* Atlas design tokens — pure white, cool slate, restrained blue. */
 :root{
- --canvas:#fcfcfb;--ink:#222936;--muted:#737b87;--outline:#e5e7ea;
- --wash:#f6f7f8;--forest:#486681;--forest-dark:#344e68;--mint:#edf1f5;
- --bg:#fcfcfb;--sidebar:#f6f7f8;--panel:#fff;--text:#222936;
- --sub:#737b87;--faint:#98a0aa;--line:#e5e7ea;--line2:#dce0e5;
- --hover:#f1f3f5;--pill:#f3f5f7;--active:#edf1f5;
- --brand:#486681;--brandhover:#344e68;--brandtext:#fff;--user:#f1f3f5;--evidence:#f8f9fb;
+ --canvas:#FFFFFF;--ink:#111827;--muted:#64748B;--outline:#E2E8F0;
+ --wash:#F8FAFC;--forest:#2563EB;--forest-dark:#1D4ED8;--mint:#EFF6FF;
+ --bg:#FFFFFF;--sidebar:#F8FAFC;--panel:#FFFFFF;--text:#111827;
+ --sub:#64748B;--faint:#94A3B8;--line:#E2E8F0;--line2:#CBD5E1;
+ --hover:#F1F5F9;--pill:#F1F5F9;--active:#EFF6FF;
+ --brand:#2563EB;--brandhover:#1D4ED8;--brandtext:#FFFFFF;
+ --user:#F1F5F9;--evidence:#F8FAFC;
+}
+:root[data-theme=dark]{
+ --canvas:#0F172A;--ink:#F8FAFC;--muted:#94A3B8;--outline:#334155;
+ --wash:#1E293B;--forest:#60A5FA;--forest-dark:#3B82F6;--mint:#172B4B;
+ --bg:#0F172A;--sidebar:#111C2E;--panel:#1E293B;--text:#F8FAFC;
+ --sub:#94A3B8;--faint:#64748B;--line:#334155;--line2:#475569;
+ --hover:#29384D;--pill:#24344A;--active:#172B4B;
+ --brand:#60A5FA;--brandhover:#93C5FD;--brandtext:#0F172A;
+ --user:#24344A;--evidence:#1E293B;
 }
 .atlas-v3 .sidebar{background:var(--sidebar)}
 .atlas-v3 .topbar{background:var(--panel)}
 .atlas-v3 .nav button.active{background:var(--active);color:var(--brand)}
-.atlas-v3 .btn.primary,.atlas-v3 .send,.home-send{background:var(--brand);color:#fff}
-.atlas-v3 .btn.primary:hover,.atlas-v3 .send:hover,.home-send:hover{background:var(--brandhover)}
-:root[data-theme=dark]{
- --canvas:#171c23;--ink:#edf0f5;--muted:#a8b1be;--outline:#353d48;
- --wash:#202731;--forest:#a5bed6;--forest-dark:#c0d0e1;--mint:#2d3a48;
- --bg:#171c23;--sidebar:#202731;--panel:#222a34;--text:#edf0f5;
- --sub:#a8b1be;--faint:#8493a5;--line:#353d48;--line2:#414c59;
- --hover:#2d3643;--pill:#2a3541;--active:#2d3a48;
- --brand:#a5bed6;--brandhover:#bfd3e4;--brandtext:#16202c;--user:#2c3541;--evidence:#252f3b;
-}
-:root[data-theme=dark] .atlas-v3 .btn.primary,:root[data-theme=dark] .atlas-v3 .send,:root[data-theme=dark] .home-send{color:#16202c}
-
-/* Interface refresh: quiet monochrome with a single black action treatment.
-   Inspired by Vercel's restrained surfaces and Linear's muted hierarchy. */
-:root{
-  --canvas:#fafafa;--ink:#171717;--muted:#666666;--outline:#e5e5e5;
-  --wash:#f5f5f5;--forest:#171717;--forest-dark:#000000;--mint:#ebebeb;
-  --bg:#fafafa;--sidebar:#f5f5f5;--panel:#ffffff;--text:#171717;
-  --sub:#666666;--faint:#858585;--line:#e5e5e5;--line2:#dedede;
-  --hover:#efefef;--pill:#f3f3f3;--active:#eaeaea;
-  --brand:#171717;--brandhover:#000000;--brandtext:#ffffff;
-  --user:#f3f3f3;--evidence:#f9f9f9;
-}
-:root[data-theme=dark]{
-  --canvas:#121212;--ink:#ededed;--muted:#a7a7a7;--outline:#303030;
-  --wash:#1b1b1b;--forest:#efefef;--forest-dark:#ffffff;--mint:#292929;
-  --bg:#121212;--sidebar:#1b1b1b;--panel:#202020;--text:#ededed;
-  --sub:#a7a7a7;--faint:#828282;--line:#303030;--line2:#383838;
-  --hover:#292929;--pill:#252525;--active:#303030;
-  --brand:#ededed;--brandhover:#ffffff;--brandtext:#121212;
-  --user:#282828;--evidence:#262626;
-}
-.atlas-v3 .sidebar{background:var(--sidebar)}
-.atlas-v3 .topbar{background:var(--panel)}
-.atlas-v3 .nav button.active{background:var(--active);color:var(--ink)}
 .atlas-v3 .btn.primary,.atlas-v3 .send,.home-send{background:var(--brand);color:var(--brandtext)}
 .atlas-v3 .btn.primary:hover,.atlas-v3 .send:hover,.home-send:hover{background:var(--brandhover)}
-.atlas-v3 .home-prompt-panel:focus-within{outline:none;box-shadow:0 13px 50px #00000008;border-color:var(--outline)}
+.atlas-v3 .home-prompt-panel:focus-within{outline:none;box-shadow:0 13px 50px #0F172A08;border-color:var(--outline)}
 .atlas-v3 .home-prompt-panel textarea:focus,.atlas-v3 .home-prompt-panel textarea:focus-visible{outline:none;box-shadow:none;border:0}
-.atlas-v3 .home-prompt-panel:has(textarea:focus-visible){border-color:#b0b0b0}
+.atlas-v3 .home-prompt-panel:has(textarea:focus-visible){border-color:#94A3B8}
 .atlas-v3 .chat-workspace .thread:has(.research-welcome):not(:has(.user-message)):not(:has(.answer-row)){overflow:visible;max-height:none;min-height:360px}
 .atlas-v3 .chat-workspace .thread:has(.research-welcome) .research-welcome{min-height:310px;justify-content:center;padding:35px 20px}
 .atlas-v3 .gmail-integrated{margin-top:0;padding-top:0;border-top:0}
 .atlas-v3 .gmail-integrated-back{margin-bottom:20px}
 .atlas-v3 .sources-overview{min-height:0}
-:root[data-theme=dark] .atlas-v3 .btn.primary,
-:root[data-theme=dark] .atlas-v3 .send,
-:root[data-theme=dark] .home-send{color:var(--brandtext)}
