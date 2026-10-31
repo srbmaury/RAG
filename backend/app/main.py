@@ -11,8 +11,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, 
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import defer
-from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Analysis, Conversation, uid
+from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, uid
 from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
 from . import config
 from .ingest import SUPPORTED
@@ -76,9 +75,6 @@ class Question(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     document_ids: List[str] = Field(default_factory=list, max_length=200)
     history: List[Turn] = Field(default_factory=list, max_length=12)
-
-class InsightRequest(BaseModel):
-    kind: str = Field(pattern='^(summary|risks|timeline)$')
 
 class UploadRequest(BaseModel):
     name: str = Field(min_length=1, max_length=300)
@@ -206,7 +202,6 @@ async def upload(wid: str, files: List[UploadFile] = File(...), actor=Depends(us
                 results.append({**public_doc(existing), 'duplicate': True}); continue
             doc = Document(id=did, workspace_id=wid, name=name, size=count, digest=digest.hexdigest())
             db.add(doc)
-            db.query(Analysis).filter_by(workspace_id=wid).delete()
             db.commit()
             results.append(public_doc(doc))
         except IntegrityError:
@@ -240,7 +235,6 @@ def retry(wid: str, did: str, actor=Depends(user), db=Depends(database)):
     if doc.status not in ('failed', 'ready'): raise HTTPException(409, 'Document is already queued or processing.')
     db.query(Chunk).filter_by(document_id=did).delete()
     doc.status, doc.error, doc.chunk_count, doc.generation = 'queued', None, 0, doc.generation + 1
-    db.query(Analysis).filter_by(workspace_id=wid).delete()
     db.commit()
     return public_doc(doc)
 
@@ -249,7 +243,6 @@ def delete(wid: str, did: str, actor=Depends(user), db=Depends(database)):
     doc = document(wid, did, actor, db)
     db.delete(doc)
     # Reports can contain copied passages; invalidate them on source deletion.
-    db.query(Analysis).filter_by(workspace_id=wid).delete()
     db.commit()
     (DATA / 'files' / did).unlink(missing_ok=True)
     return {'ok': True}
@@ -338,36 +331,3 @@ def chat(wid: str, body: Question, actor=Depends(user), db=Depends(database)):
         current = db.query(Chunk.id).filter(Chunk.workspace_id == wid, Chunk.id.in_([s['chunk_id'] for s in sources])).count()
         if current != len(sources): raise HTTPException(409, 'Sources changed during the answer. Ask again.')
     return result
-
-@app.post('/api/workspaces/{wid}/analyses')
-def start_analysis(wid: str, body: InsightRequest, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
-    if not db.query(Document).filter_by(workspace_id=wid, status='ready').first(): raise HTTPException(409, 'Upload and process documents first.')
-    # Serialize requests for this workspace, including requests from other workers.
-    db.query(Workspace).filter_by(id=wid).update({Workspace.name: Workspace.name})
-    existing = db.query(Analysis).options(defer(Analysis.result)).filter(
-        Analysis.workspace_id == wid, Analysis.kind == body.kind,
-        Analysis.status.in_(['queued', 'processing', 'ready']),
-    ).order_by(Analysis.created.desc()).first()
-    # Source changes invalidate reports at upload, deletion, and reindex time.
-    if existing:
-        db.commit()
-        return {'id': existing.id, 'status': existing.status, 'reused': True}
-    job = Analysis(workspace_id=wid, kind=body.kind)
-    db.add(job); db.commit()
-    return {'id': job.id, 'status': job.status, 'reused': False}
-
-@app.get('/api/workspaces/{wid}/analyses')
-def analyses(wid: str, include_results: bool = True, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
-    # Show only the latest report per kind, including databases with older duplicates.
-    latest_ids = [db.query(Analysis.id).filter_by(workspace_id=wid, kind=kind).order_by(Analysis.created.desc()).limit(1).scalar() for kind in ('summary', 'risks', 'timeline')]
-    return [{'id': a.id, 'kind': a.kind, 'status': a.status, 'result': a.result if include_results else None, 'error': a.error, 'created': a.created} for a in db.query(Analysis).options(*([] if include_results else [defer(Analysis.result)])).filter(Analysis.id.in_([id for id in latest_ids if id])).order_by(Analysis.created.desc())]
-
-
-@app.get('/api/workspaces/{wid}/analyses/{aid}')
-def analysis_detail(wid: str, aid: str, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
-    report = db.query(Analysis).filter_by(id=aid, workspace_id=wid).first()
-    if not report: raise HTTPException(404, 'Report not found.')
-    return {'id': report.id, 'kind': report.kind, 'status': report.status, 'result': report.result, 'error': report.error}
