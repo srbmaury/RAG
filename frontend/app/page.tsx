@@ -335,6 +335,7 @@ export default function Home() {
       window.location.assign(value.authorization_url);
     }catch(e){setError((e as Error).message);setGmailBusy(false);}
   }
+  useEffect(()=>{if(tab==='sources'&&wid){void api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`).then(setSourceStatuses).catch(e=>setError((e as Error).message));}},[tab,wid]);
   async function refreshSourceStatuses(){
     if(!wid)return;
     try {setSourceStatuses(await api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`));}
