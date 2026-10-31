@@ -64,3 +64,12 @@ jobs:
       - name: Run interaction tests
         working-directory: frontend
         run: npx playwright test
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -f backend/Dockerfile -t atlas-backend-test .
+      - name: Apply migrations inside image
+        run: docker run --rm -e DATABASE_URL=sqlite:////tmp/atlas-test.db -e DATA_DIR=/tmp atlas-backend-test python -c "from app.db import init_db; init_db()"
