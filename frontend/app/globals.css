@@ -315,3 +315,15 @@ button.source-provider-card.selected{border-color:var(--brand);background:var(--
 .crumb-link{border:0;background:none;color:var(--sub);padding:0;font:inherit;cursor:pointer}
 .crumb-link:hover{text-decoration:underline;color:var(--brand)}
 .sidebar-research{scrollbar-gutter:stable}
+
+/* Unified research experience */
+.unified-sources{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 0 13px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.unified-sources-label{font-size:11px;font-weight:700;color:var(--sub);margin-right:3px}
+.unified-sources label{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid var(--line2);border-radius:7px;background:var(--panel);font-size:11px;cursor:pointer}
+.unified-sources input{accent-color:var(--brand)}
+.unified-source-manage{display:inline-flex;align-items:center;gap:4px;border:0;background:none;color:var(--brand);font-size:11px;font-weight:650;padding:7px;cursor:pointer}
+.unified-gmail-scope{margin:0 0 14px;color:var(--sub);font-size:11px}
+.unified-gmail-scope label{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.unified-gmail-scope input{background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:7px;padding:8px 10px;width:min(100%,350px);font:inherit}
+.source-chip small{overflow-wrap:anywhere}
+@media(max-width:760px){.unified-sources{gap:6px}.unified-sources label{padding:7px 8px}}
