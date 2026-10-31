@@ -64,6 +64,10 @@ export default function Home() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [driveStatus,setDriveStatus] = useState<{connected:boolean;account:string|null;configured:boolean}|null>(null);
+  const [driveQuery,setDriveQuery] = useState('');
+  const [driveResults,setDriveResults] = useState<{id:string;title:string;excerpt:string;url:string}[]>([]);
+  const [driveBusy,setDriveBusy] = useState(false);
   const [sourceStatuses,setSourceStatuses] = useState<{provider:string;connected:boolean;account:string|null}[]>([]);
   const [sourceProvider,setSourceProvider] = useState<'github'|'notion'|'slack'>('github');
   const [sourceCredential,setSourceCredential] = useState('');
@@ -336,7 +340,30 @@ export default function Home() {
       window.location.assign(value.authorization_url);
     }catch(e){setError((e as Error).message);setGmailBusy(false);}
   }
-  useEffect(()=>{if(tab==='sources'&&wid){void api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`).then(setSourceStatuses).catch(e=>setError((e as Error).message));}},[tab,wid]);
+  useEffect(()=>{if(tab==='sources'&&wid){void refreshDrive();void api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`).then(setSourceStatuses).catch(e=>setError((e as Error).message));}},[tab,wid]);
+  async function refreshDrive(){
+    if(!wid)return;
+    try{setDriveStatus(await api<{connected:boolean;account:string|null;configured:boolean}>(`/workspaces/${wid}/drive/status`));}
+    catch(e){setError((e as Error).message);}
+  }
+  async function connectDrive(){
+    setDriveBusy(true);setError('');
+    try{const result=await api<{authorization_url:string}>(`/drive/connect?wid=${encodeURIComponent(wid)}`);window.location.assign(result.authorization_url);}
+    catch(e){setError((e as Error).message);setDriveBusy(false);}
+  }
+  async function disconnectDrive(){
+    if(!window.confirm('Disconnect Google Drive from this workspace?'))return;
+    setDriveBusy(true);setError('');
+    try{await api(`/workspaces/${wid}/drive`,{method:'DELETE'});await refreshDrive();setDriveResults([]);}
+    catch(e){setError((e as Error).message);}
+    finally{setDriveBusy(false);}
+  }
+  async function searchDrive(){
+    setDriveBusy(true);setError('');
+    try{const data=await api<{results:{id:string;title:string;excerpt:string;url:string}[]}>(`/workspaces/${wid}/drive/search`,{method:'POST',body:JSON.stringify({query:driveQuery})});setDriveResults(data.results);}
+    catch(e){setError((e as Error).message);}
+    finally{setDriveBusy(false);}
+  }
   async function refreshSourceStatuses(){
     if(!wid)return;
     try {setSourceStatuses(await api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`));}
@@ -529,9 +556,18 @@ export default function Home() {
               <strong>{p==='github'?'GitHub':p==='notion'?'Notion':'Slack'}</strong>
               <span>{sourceStatuses.find(x=>x.provider===p)?.connected?'Connected · '+sourceStatuses.find(x=>x.provider===p)?.account:'Not connected'}</span>
             </button>)}
-            <div className="source-provider-card disabled"><strong>Google Drive</strong><span>OAuth connection not yet implemented</span></div>
+            <button type="button" className="source-provider-card" onClick={()=>document.getElementById('drive-connection')?.scrollIntoView({behavior:'smooth',block:'center'})}><strong>Google Drive</strong><span>{driveStatus?.connected?`Connected · ${driveStatus.account}`:driveStatus?.configured?'Not connected':'Google OAuth setup required'}</span><span className="source-card-action">Manage Drive →</span></button>
             
             <div className="source-provider-card disabled"><strong>Documents</strong><span>Use the Documents page to upload files</span></div>
+          </div>
+          <div className="connected-card" id="drive-connection">
+            <h2>Google Drive</h2>
+            <p className="caption">Authorize read-only access to browse and search Drive. Atlas fetches selected content on demand.</p>
+            {driveStatus?.connected?<><p className="caption">Connected: {driveStatus.account}</p>
+              <div className="source-search-controls"><input className="connected-field" value={driveQuery} onChange={e=>setDriveQuery(e.target.value)} placeholder="Search Drive file names or text" aria-label="Search Drive"/><button className="btn" disabled={driveBusy} onClick={()=>void searchDrive()}>Search Drive</button><button className="btn" disabled={driveBusy} onClick={()=>void disconnectDrive()}>Disconnect</button></div>
+              {driveResults.map(x=><div className="connected-evidence" key={x.id}><strong>{x.title}</strong><p>{x.excerpt}</p><a href={x.url} target="_blank" rel="noopener noreferrer">Open in Drive <ArrowUpRight size={14}/></a></div>)}
+            </>:<button className="btn primary" disabled={driveBusy||!driveStatus?.configured} onClick={()=>void connectDrive()}>Connect Google Drive</button>}
+            {!driveStatus?.configured&&<p className="caption">Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_DRIVE_REDIRECT_URI on the server to enable Drive.</p>}
           </div>
           <div className="connected-card">
             <h2>{sourceProvider==='github'?'GitHub':sourceProvider==='notion'?'Notion':'Slack'} connection</h2>
@@ -556,7 +592,7 @@ export default function Home() {
           <div className="connected-card">
             <div className="connected-source-options">
               <span className="pill">Documents · enabled</span>
-              {(['github','notion','slack'] as const).map(provider=><label key={provider}><input type="checkbox" checked={connectedProviders.includes(provider)} onChange={e=>setConnectedProviders(old=>e.target.checked?[...old,provider]:old.filter(x=>x!==provider))}/>{provider==='github'?'GitHub':provider==='notion'?'Notion':'Slack'}</label>)}
+              {(['github','notion','slack','drive'] as const).map(provider=><label key={provider}><input type="checkbox" checked={connectedProviders.includes(provider)} onChange={e=>setConnectedProviders(old=>e.target.checked?[...old,provider]:old.filter(x=>x!==provider))}/>{provider==='github'?'GitHub':provider==='notion'?'Notion':provider==='drive'?'Google Drive':'Slack'}</label>)}
               <label><input type="checkbox" checked={connectedGmail} onChange={e=>setConnectedGmail(e.target.checked)}/> Include connected Gmail</label>
             </div>
             {connectedGmail&&<input aria-label="Gmail search scope" value={connectedGmailQuery} onChange={e=>setConnectedGmailQuery(e.target.value)} placeholder="newer_than:30d" className="connected-field"/>}
