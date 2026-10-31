@@ -4,7 +4,7 @@ A working first release for bulk document ingestion, private workspaces, source-
 
 ## Connect additional sources (experimental)
 
-Open **Sources** in the Atlas sidebar. GitHub, Notion, and Slack support initial **read-only token-based connections** (not one-click OAuth). Choose a provider, enter a provider-issued token with the minimum permissions, and select **Connect account**. You can search it from that screen or select it in **Connected search** alongside documents and Gmail. Tokens are encrypted with `GMAIL_TOKEN_ENCRYPTION_KEY` and stored per workspace. They are not included in AI prompts. Disconnect deletes the stored token; revoke it at the provider as well if necessary.
+Open **Sources** in the Atlas sidebar. Gmail is now accessed through its card in Sources (its full search and summary screen is unchanged). GitHub, Notion, and Slack support initial **read-only token-based connections** (not one-click OAuth). Choose a provider, enter a provider-issued token with the minimum permissions, and select **Connect account**. You can search it from that screen or select it in **Connected search** alongside documents and Gmail. Tokens are encrypted with `GMAIL_TOKEN_ENCRYPTION_KEY` and stored per workspace. They are not included in AI prompts. Disconnect deletes the stored token; revoke it at the provider as well if necessary.
 
 - **GitHub:** Use a fine-grained read-only token scoped to the repositories you want to access. The first adapter searches issues and pull requests, not source code.
 - **Notion:** Use a Notion integration token and share the intended pages with the integration. The initial search returns page/database title metadata only, not complete page bodies.
