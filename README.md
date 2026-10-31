@@ -2,11 +2,22 @@
 
 A working first release for bulk document ingestion, private workspaces, source-backed chat, and persistent multi-conversation history. Built with Next.js/TypeScript, FastAPI, SQLAlchemy, and PostgreSQL/pgvector, with an API-key-free local mode.
 
+## Connect additional sources (experimental)
+
+Open **Sources** in the Atlas sidebar. GitHub, Notion, and Slack support initial **read-only token-based connections** (not one-click OAuth). Choose a provider, enter a provider-issued token with the minimum permissions, and select **Connect account**. You can search it from that screen or select it in **Connected search** alongside documents and Gmail. Tokens are encrypted with `GMAIL_TOKEN_ENCRYPTION_KEY` and stored per workspace. They are not included in AI prompts. Disconnect deletes the stored token; revoke it at the provider as well if necessary.
+
+- **GitHub:** Use a fine-grained read-only token scoped to the repositories you want to access. The first adapter searches issues and pull requests, not source code.
+- **Notion:** Use a Notion integration token and share the intended pages with the integration. The initial search returns page/database title metadata only, not complete page bodies.
+- **Slack:** Use an appropriately authorized token with `search:read`. Slack search permissions and token type vary by app configuration; the initial adapter searches messages.
+- **Google Drive:** Not yet connectable. It needs a dedicated Google OAuth authorization and file-picker flow. The Sources UI labels it unavailable instead of offering a nonfunctional connection.
+
+This is a developer-first connector setup and has not been end-to-end tested against real providers. For a public multi-user release, replace manual token entry with OAuth/GitHub App installation, add provider-specific token rotation/revocation and audit logs, and validate policy compliance.
+
 ## Connected-source research (experimental)
 
 The **Connected search** navigation entry can combine workspace document passages and live Gmail results in one AI answer. Gmail is opt-in for each question, with a user-specified Gmail search scope (default: last 30 days). The backend verifies workspace ownership and Gmail connection before retrieving mail. It fetches up to eight matching messages on demand, and up to six document excerpts. Generated answers require citation references; the interface displays source passages and original Gmail URLs.
 
-This initial endpoint **does not yet include production-ready Google Drive, GitHub, Notion, or Slack connectors**. Those require separate per-user OAuth installation, permission scoping, encrypted connection storage, refresh/revocation handling, and provider-specific adapters. Do not enter provider access tokens in the UI. Future adapters should use the evidence contract in `backend/app/sources.py`, avoid bulk ingestion by default, and maintain the original source's permission boundary.
+Google Drive and full production-ready provider OAuth flows remain pending. Those require separate per-user OAuth installation, permission scoping, encrypted connection storage, refresh/revocation handling, and provider-specific adapters. Do not enter provider access tokens in the UI. Future adapters should use the evidence contract in `backend/app/sources.py`, avoid bulk ingestion by default, and maintain the original source's permission boundary.
 
 The current connected questions are one-shot, not saved in chat history. Read-only retrieval does not send, edit, or delete Gmail messages. This feature is not yet covered by an end-to-end integration test.
 
