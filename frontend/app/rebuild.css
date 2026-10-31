@@ -1,6 +1,6 @@
 
 /* Atlas rebuild — page layouts and component tokens */
-:root{--canvas:#ffffff;--ink:#1e2923;--muted:#78837b;--outline:#e4eae5;--wash:#f7f9f7;--forest:#216e49;--forest-dark:#164a31;--mint:#e8f3ea}
+:root{--canvas:#fff;--ink:#24312c;--muted:#77817b;--outline:#e2e7e3;--wash:#f8f9f8;--forest:#287b53;--forest-dark:#206343;--mint:#eaf3ed}
 :root[data-theme=dark]{--canvas:#171e19;--ink:#ecf4ed;--muted:#a4b3a8;--outline:#33463a;--wash:#1f2a22;--forest:#7fcb9a;--forest-dark:#5bab7c;--mint:#284435}
 .atlas-v3{background:var(--canvas);font-family:'DM Sans',system-ui,sans-serif;color:var(--ink)}
 .atlas-v3 .sidebar{background:var(--wash);border-color:var(--outline);width:246px;padding:24px 14px 17px}
@@ -144,3 +144,17 @@
 .atlas-v3 .gmail-item:hover{background:var(--wash)}
 .atlas-v3 .gmail-summary-panel .markdown{line-height:1.8}
 @media(max-width:640px){.library-intro{align-items:start;flex-direction:column}.library-workspace{padding:14px}.library-stat-strip{gap:7px;margin:18px 0}.library-stat-strip span{padding:7px 10px}.atlas-v3 .gmail-search,.atlas-v3 .gmail-query-summary{padding:15px}}
+
+/* Exact light-theme palette from the Atlas design reference */
+:root{--bg:#fff;--sidebar:#f8f9f8;--panel:#fff;--text:#24312c;--sub:#77817b;--faint:#98a69b;--line:#e2e7e3;--line2:#d9e2db;--hover:#f3f6f4;--pill:#f3f5f4;--active:#eaf3ed;--brand:#287b53;--brandhover:#206343;--brandtext:#fff;--user:#f3f5f4;--evidence:#f9fbf8}
+.atlas-v3 .sidebar{background:#f8f9f8}
+.atlas-v3 .topbar{background:#fff}
+.atlas-v3 .nav button.active{background:#eaf3ed;color:#287b53}
+.atlas-v3 .btn.primary,.atlas-v3 .send,.home-send{background:#287b53;color:#fff}
+.atlas-v3 .btn.primary:hover,.atlas-v3 .send:hover,.home-send:hover{background:#206343}
+.gmail-integrated{margin-top:26px;padding-top:22px;border-top:1px solid var(--outline)}
+.gmail-integrated-back{display:flex;justify-content:flex-start;margin-bottom:16px}
+.gmail-integrated .gmail-workspace{margin-bottom:12px}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .atlas-v3 .sidebar{background:var(--sidebar)}:root:not([data-theme=light]) .atlas-v3 .topbar{background:var(--panel)}}
+:root[data-theme=dark] .atlas-v3 .sidebar{background:var(--sidebar)}
+:root[data-theme=dark] .atlas-v3 .topbar{background:var(--panel)}
