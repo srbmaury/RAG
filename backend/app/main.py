@@ -23,6 +23,7 @@ from . import uploads
 from .gmail import router as gmail_router
 from .external_sources import router as external_router
 from .drive import router as drive_router
+from .health import router as health_router
 from starlette.concurrency import run_in_threadpool
 
 @asynccontextmanager
@@ -42,6 +43,7 @@ app = FastAPI(title='Atlas Document Intelligence', lifespan=lifespan)
 app.include_router(gmail_router)
 app.include_router(external_router)
 app.include_router(drive_router)
+app.include_router(health_router)
 
 def database():
     with Session() as db: yield db
@@ -216,7 +218,7 @@ async def upload(wid: str, files: List[UploadFile] = File(...), actor=Depends(us
     for file in files:
         name = Path((file.filename or 'untitled').replace('\\', '/')).name[:200]
         if Path(name).suffix.lower() not in SUPPORTED:
-            results.append({'name': name, 'error': 'Supported formats: PDF, DOCX, TXT, MD.'}); continue
+            results.append({'name': name, 'error': 'Supported formats: PDF, DOCX, TXT, MD, CSV, JSON, HTML.'}); continue
         did, count, digest = uid(), 0, hashlib.sha256()
         path = DATA / 'files' / did
         try:
