@@ -26,6 +26,7 @@ jobs:
           PYTHONPATH: backend
         run: |
           python evals/answer_quality.py evals/answer_quality_cases.json
+          python evals/research_quality_suite.py evals/research_quality_suite.json
           python evals/connected_retrieval_eval.py evals/connected_cases.json
           python evals/citation_eval.py evals/citation_cases.json
   frontend:
