@@ -1,0 +1,32 @@
+name: Temporary consolidation formatter
+on:
+  push:
+    branches: [integration/consolidate-unmerged-branches]
+    paths: ['.github/workflows/temporary-consolidation-format.yml']
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: integration/consolidate-unmerged-branches
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run format && npm run format:check
+        working-directory: frontend
+      - name: Commit formatting to consolidation branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend
+          if ! git diff --cached --quiet; then
+            git commit -m "style(frontend): format consolidated modules"
+            git push origin HEAD:integration/consolidate-unmerged-branches
+          fi
