@@ -164,3 +164,27 @@ test('mobile navigation closes after choosing a destination',async({page})=>{
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);
   expect(overflow).toBe(false);
 });
+
+test('Home keeps the primary research entry accessible on mobile',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.getByRole('button',{name:'Open menu',exact:true}).click();
+ await page.getByRole('button',{name:'Home',exact:true}).click();
+ await expect(page.getByRole('heading',{name:/What would you like/})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Ask Atlas'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth)).toBe(false);
+});
+
+test('cited source opens inspectable passage with accessible close control',async({page})=>{
+ await page.getByRole('textbox',{name:'Your question'}).fill('Summarize the sources');
+ await page.getByRole('button',{name:'Send question'}).click();
+ await expect(page.locator('.answer-row')).toBeVisible();
+ const citation=page.locator('.source-chip').first();
+ if(await citation.count()){
+   await citation.click();
+   const drawer=page.getByRole('dialog',{name:'Source passage'});
+   await expect(drawer).toBeVisible();
+   await expect(drawer.getByRole('button',{name:'Close preview'})).toBeVisible();
+   await drawer.getByRole('button',{name:'Close preview'}).click();
+   await expect(drawer).toHaveCount(0);
+ }
+});
