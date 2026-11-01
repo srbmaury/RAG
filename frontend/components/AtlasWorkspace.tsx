@@ -62,6 +62,8 @@ export function AtlasWorkspace() {
   const [answerProgress,setAnswerProgress] = useState('');
   const askController = useRef<AbortController|null>(null);
   const [uploading, setUploading] = useState(false);
+  const [webUrl, setWebUrl] = useState('');
+  const [webBusy, setWebBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -119,6 +121,23 @@ export function AtlasWorkspace() {
     e.preventDefault(); setBusy(true); setError('');
     try {await api(`/auth/${register ? 'register' : 'login'}`, {method: 'POST', body: JSON.stringify({email, password})}); await boot();}
     catch (e) {setError((e as Error).message);} finally {setBusy(false);}
+  }
+  async function importWebPage(event: React.FormEvent) {
+    event.preventDefault();
+    if (!wid || webBusy || !webUrl.trim()) return;
+    const target = wid;
+    setWebBusy(true); setError(''); setNotice('');
+    try {
+      const result = await api<{name:string;duplicate:boolean}>(`/workspaces/${target}/web-pages`, {
+        method: 'POST', body: JSON.stringify({url:webUrl.trim()})
+      });
+      if (scope.current === target) {
+        setWebUrl('');
+        setNotice(result.duplicate ? 'Web page already exists in this workspace.' : `Added ${result.name} to your library for indexing.`);
+        await refresh();
+      }
+    } catch (e) {setError((e as Error).message);}
+    finally {setWebBusy(false);}
   }
   async function upload(files: FileList | File[]) {
     if (!files.length || uploading) return;
@@ -410,7 +429,7 @@ export function AtlasWorkspace() {
           <ResearchComposer query={query} onChange={setQuery} onSubmit={()=>void ask()} onUpload={()=>input.current?.click()} uploading={uploading} busy={busy} hasAskSources={hasAskSources} hasMessages={messages.length>0}/><p id="research-composer-help" className="caption composer-caption">{messages.length?'Follow-ups use this conversation’s context. ':''}Review supporting passages before relying on an answer.</p></div>
           </div></div>
         </section>}
-        {wid && tab==='documents' && <DocumentsView uploadButton={uploadButton} totalDocuments={docs.length} readyDocuments={ready.length} storageLabel={storage?prettyBytes(storage):'0 KB'} filteredCount={filtered.length} filter={filter} onFilter={setFilter} documentTable={<DocumentTable items={filtered} filter={filter} onClearFilter={()=>setFilter('')} uploadButton={uploadButton} onInspect={d=>void inspect(d)} onRetry={d=>void retry(d)} onRemove={d=>void remove(d)} downloadUrl={d=>`/api/workspaces/${wid}/documents/${d.id}/original`} formatSize={prettyBytes}/>} dragging={dragging} onDragging={setDragging} onDrop={files=>void upload(files)} maxSizeMB={Math.round(user.max_file_bytes/1024/1024)} uploading={uploading} onBrowse={()=>input.current?.click()}/>}
+        {wid && tab==='documents' && <DocumentsView uploadButton={uploadButton} webImport={<form onSubmit={e=>void importWebPage(e)} style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',margin:'18px 0'}}><label htmlFor="atlas-web-url">Save public web page</label><input id="atlas-web-url" type="url" required value={webUrl} onChange={e=>setWebUrl(e.target.value)} placeholder="https://example.com/article" style={{minWidth:260,flex:1,padding:10,borderRadius:8,border:'1px solid var(--border, #999)'}}/><button className="btn" type="submit" disabled={webBusy}>{webBusy?'Importing…':'Add URL'}</button></form>} totalDocuments={docs.length} readyDocuments={ready.length} storageLabel={storage?prettyBytes(storage):'0 KB'} filteredCount={filtered.length} filter={filter} onFilter={setFilter} documentTable={<DocumentTable items={filtered} filter={filter} onClearFilter={()=>setFilter('')} uploadButton={uploadButton} onInspect={d=>void inspect(d)} onRetry={d=>void retry(d)} onRemove={d=>void remove(d)} downloadUrl={d=>`/api/workspaces/${wid}/documents/${d.id}/original`} formatSize={prettyBytes}/>} dragging={dragging} onDragging={setDragging} onDrop={files=>void upload(files)} maxSizeMB={Math.round(user.max_file_bytes/1024/1024)} uploading={uploading} onBrowse={()=>input.current?.click()}/>}
         {wid && tab==='sources' && <section className="connected-page">
           {sourceManage!=='gmail' && <div className="sources-overview">
           <div className="crumb">Workspace<span>›</span>Sources</div><div className="heading-row"><div><span className="eyebrow">YOUR INTEGRATIONS</span><h1>Connected sources</h1><p className="subtitle">Connect external services to your research workspace. Access stays read-only.</p></div>
