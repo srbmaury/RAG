@@ -301,7 +301,7 @@ class DriveSearch(BaseModel):
 
 
 @router.get('/workspaces/{workspaceId}/drive/status')
-def status(workspaceId: Annotated[str, Query(alias='wid')], request: Request):
+def status(workspaceId: str, request: Request):
     with Session() as db:
         who = actor(request, db)
         allowed_workspace(db, who, workspaceId)
