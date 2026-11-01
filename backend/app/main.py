@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, DriveOAuthState, SourceHealthCheck, uid
+from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, DriveOAuthState, ConnectedOAuthState, SourceHealthCheck, uid
 from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
 from . import config
 from .ingest import SUPPORTED
@@ -28,6 +28,7 @@ from .external_sources import router as external_router
 from .drive import router as drive_router
 from .health import router as health_router
 from .web_sources import router as web_router
+from .connected_oauth import router as connected_oauth_router
 from starlette.concurrency import run_in_threadpool
 
 @asynccontextmanager
@@ -49,6 +50,7 @@ app.include_router(external_router)
 app.include_router(drive_router)
 app.include_router(health_router)
 app.include_router(web_router)
+app.include_router(connected_oauth_router)
 log = logging.getLogger('atlas.requests')
 
 @app.middleware('http')
@@ -201,6 +203,7 @@ def delete_workspace(wid: str, body: DeleteWorkspaceRequest, actor=Depends(user)
     # Use explicit deletes for SQLite and PostgreSQL; no reliance on ORM cascades.
     db.query(GmailOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(DriveOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(ConnectedOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(GmailConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(ExternalConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(Conversation).filter_by(workspace_id=wid).delete(synchronize_session=False)
