@@ -582,10 +582,8 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
         raise HTTPException(502, 'Connected answer generation failed. Check the AI provider logs.') from exc
     refs = {int(x) for x in re.findall(r'\[(\d+)\]', answer or '')}
     if not refs or any(n < 1 or n > len(payload) for n in refs):
-        payload = payload[:12]
-        return {'answer': source_results_answer(payload),
-                'sources': connected_sources_for_payload(payload, document_evidence),
-                'mode': 'source_results', 'scope': connected_scope(body)}
+        return {'answer': 'The model returned an answer without usable source citations. Please retry; no unverified answer is shown.',
+                'sources': [], 'mode': 'citation_check_failed', 'scope': connected_scope(body)}
     # Preserve positional [n] citations used by the standard chat renderer.
     # Non-document evidence carries a URL so the UI opens the original record.
     sources = connected_sources_for_payload(payload, document_evidence)
