@@ -1,4 +1,5 @@
 """Isolate configuration before any test module imports the application."""
+
 import os
 import tempfile
 

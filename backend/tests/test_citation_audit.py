@@ -2,25 +2,32 @@ from app.citation_audit import audit_citations
 
 
 def test_citation_audit_detects_missing_and_wrong_refs():
-    sources = [{"text": "The launch deadline is October 12."}]
-    report = audit_citations("The launch deadline is October 12 [1].\nThe budget is approved [9].\nNo citation here.", sources)
-    assert report["claims"][0]["status"] == "lexically_supported"
-    assert report["claims"][1]["status"] == "invalid_citation"
-    assert report["claims"][2]["status"] == "missing_citation"
+    sources = [{'text': 'The launch deadline is October 12.'}]
+    report = audit_citations(
+        'The launch deadline is October 12 [1].\nThe budget is approved [9].\nNo citation here.',
+        sources,
+    )
+    assert report['claims'][0]['status'] == 'lexically_supported'
+    assert report['claims'][1]['status'] == 'invalid_citation'
+    assert report['claims'][2]['status'] == 'missing_citation'
 
 
 def test_citation_audit_flags_unrelated_evidence():
-    result = audit_citations("The production system runs on Mars [1].",
-                             [{"text": "Launch dates are tentative."}])
-    assert result["needs_review"] == 1
+    result = audit_citations(
+        'The production system runs on Mars [1].', [{'text': 'Launch dates are tentative.'}]
+    )
+    assert result['needs_review'] == 1
+
 
 def test_numeric_claim_requires_matching_number():
-    result = audit_citations("The release is scheduled for 2027 [1].",
-                             [{"text": "The release is scheduled for 2026."}])
-    assert result["claims"][0]["status"] == "number_mismatch"
+    result = audit_citations(
+        'The release is scheduled for 2027 [1].', [{'text': 'The release is scheduled for 2026.'}]
+    )
+    assert result['claims'][0]['status'] == 'number_mismatch'
 
 
 def test_negated_claim_needs_review():
-    result = audit_citations("The feature is not available [1].",
-                             [{"text": "The feature is available."}])
-    assert result["claims"][0]["status"] == "possible_negation_mismatch"
+    result = audit_citations(
+        'The feature is not available [1].', [{'text': 'The feature is available.'}]
+    )
+    assert result['claims'][0]['status'] == 'possible_negation_mismatch'

@@ -1,17 +1,26 @@
 import math
 import re
-from difflib import SequenceMatcher
 from collections import Counter
-from sqlalchemy import text
-from .db import Session, Chunk, Document, engine
-from .ai import embed, enabled, embedding_model_id
+from difflib import SequenceMatcher
 
-STOP = set('a an the is are was were of to in and or for on with what which how does do did can could would should please tell me about it this that from many there my documents document uploaded upload source sources file files any have write wrote lines line sentences sentence paragraph paragraphs words word short brief describe description give ten five three two one overview'.split())
-GENERIC_FILENAME_TERMS = set('readme improved improvement improvements document documents project projects file files pdf docx txt md guide note notes review brief product summary overview gateway payment option'.split())
+from sqlalchemy import text
+
+from .ai import embed, embedding_model_id, enabled
+from .db import Chunk, Document, Session, engine
+
+STOP = set(
+    'a an the is are was were of to in and or for on with what which how does do did can could would should please tell me about it this that from many there my documents document uploaded upload source sources file files any have write wrote lines line sentences sentence paragraph paragraphs words word short brief describe description give ten five three two one overview'.split()
+)
+GENERIC_FILENAME_TERMS = set(
+    'readme improved improvement improvements document documents project projects file files pdf docx txt md guide note notes review brief product summary overview gateway payment option'.split()
+)
+
+
 def tokens(value):
     result = []
     for term in re.findall(r'\w+', value.lower()):
-        if term in STOP or len(term) <= 1 or term.isdigit(): continue
+        if term in STOP or len(term) <= 1 or term.isdigit():
+            continue
         if len(term) > 4 and term.endswith('ies'):
             term = term[:-3] + 'y'
         elif len(term) > 4 and re.search(r'(ches|shes|sses|xes|zes)$', term):
@@ -21,9 +30,11 @@ def tokens(value):
         result.append(term)
     return result
 
+
 def bm25(query, chunks):
     terms = tokens(query)
-    if not terms or not chunks: return []
+    if not terms or not chunks:
+        return []
     docs = [Counter(tokens(c.text)) for c in chunks]
     lengths = [sum(d.values()) for d in docs]
     average = sum(lengths) / max(len(docs), 1) or 1
@@ -33,9 +44,10 @@ def bm25(query, chunks):
         score = 0
         for t in set(terms):
             count = d[t]
-            idf = math.log(1 + (len(docs) - frequency[t] + .5) / (frequency[t] + .5))
-            score += idf * count * 2.5 / (count + 1.5 * (.25 + .75 * length / average))
-        if score > 0: scored.append((c, score))
+            idf = math.log(1 + (len(docs) - frequency[t] + 0.5) / (frequency[t] + 0.5))
+            score += idf * count * 2.5 / (count + 1.5 * (0.25 + 0.75 * length / average))
+        if score > 0:
+            scored.append((c, score))
     return sorted(scored, key=lambda x: x[1], reverse=True)[:60]
 
 
@@ -44,7 +56,7 @@ def minimum_query_overlap(query):
     count = len(set(tokens(query)))
     if count <= 2:
         return 1
-    return min(3, math.ceil(count * .5))
+    return min(3, math.ceil(count * 0.5))
 
 
 def has_query_support(query, text, title=''):
@@ -59,6 +71,7 @@ def cosine_similarity(left, right):
     norm_left = math.sqrt(sum(value * value for value in left)) or 1
     norm_right = math.sqrt(sum(value * value for value in right)) or 1
     return sum(a * b for a, b in zip(left, right)) / (norm_left * norm_right)
+
 
 def diversify_ranked_chunks(ranked, limit, per_document=3):
     """Preserve diverse evidence while retaining high-scoring results.
@@ -85,23 +98,48 @@ def diversify_ranked_chunks(ranked, limit, per_document=3):
                 break
     return chosen
 
+
 def source(chunk, name):
-    return {'chunk_id': chunk.id, 'document_id': chunk.document_id, 'name': name, 'page': chunk.page, 'text': chunk.text, 'location_type': 'page' if name.lower().endswith('.pdf') else 'section', 'provider': 'documents', 'source_id': chunk.id}
+    return {
+        'chunk_id': chunk.id,
+        'document_id': chunk.document_id,
+        'name': name,
+        'page': chunk.page,
+        'text': chunk.text,
+        'location_type': 'page' if name.lower().endswith('.pdf') else 'section',
+        'provider': 'documents',
+        'source_id': chunk.id,
+    }
+
 
 def retrieve(workspace_id, query, document_ids=None, limit=8):
     with Session() as db:
-        base = db.query(Chunk).join(Document).filter(Chunk.workspace_id == workspace_id, Document.status == 'ready')
-        if document_ids: base = base.filter(Chunk.document_id.in_(document_ids))
+        base = (
+            db.query(Chunk)
+            .join(Document)
+            .filter(Chunk.workspace_id == workspace_id, Document.status == 'ready')
+        )
+        if document_ids:
+            base = base.filter(Chunk.document_id.in_(document_ids))
         else:
             # When the question names an uploaded file, keep retrieval within that file.
             # This works for arbitrary document names and also supports comparisons by
             # retaining each explicitly named document.
             query_terms = set(tokens(query))
             named = []
-            for document_id, name in db.query(Document.id, Document.name).filter_by(workspace_id=workspace_id):
+            for document_id, name in db.query(Document.id, Document.name).filter_by(
+                workspace_id=workspace_id
+            ):
                 stem = re.sub(r'[_-]+', ' ', name.rsplit('.', 1)[0])
                 terms = set(tokens(stem)) - GENERIC_FILENAME_TERMS
-                if any(term in query_terms or any(len(term) > 4 and SequenceMatcher(None, term, q).ratio() >= .9 for q in query_terms) for term in terms):
+                if any(
+                    term in query_terms
+                    or any(
+                        len(term) > 4 and SequenceMatcher(None, term, q).ratio() >= 0.9
+                        for q in query_terms
+                    )
+                    for term in terms
+                ):
                     named.append(document_id)
             if named:
                 base = base.filter(Chunk.document_id.in_(named))
@@ -109,10 +147,25 @@ def retrieve(workspace_id, query, document_ids=None, limit=8):
         semantic_scores = {}
         if engine.dialect.name == 'postgresql':
             search = "plainto_tsquery('english', :query)"
-            lexical = base.filter(text(f"to_tsvector('english', chunks.text) @@ {search}")).order_by(text(f"ts_rank_cd(to_tsvector('english', chunks.text), {search}) DESC")).params(query=query).limit(60).all()
+            lexical = (
+                base.filter(text(f"to_tsvector('english', chunks.text) @@ {search}"))
+                .order_by(text(f"ts_rank_cd(to_tsvector('english', chunks.text), {search}) DESC"))
+                .params(query=query)
+                .limit(60)
+                .all()
+            )
             if enabled():
                 vector = embed([query])[0]
-                semantic = base.filter(Chunk.embedding_model == embedding_model_id(), Chunk.embedding.isnot(None), Chunk.embedding.cosine_distance(vector) < .8).order_by(Chunk.embedding.cosine_distance(vector)).limit(60).all()
+                semantic = (
+                    base.filter(
+                        Chunk.embedding_model == embedding_model_id(),
+                        Chunk.embedding.isnot(None),
+                        Chunk.embedding.cosine_distance(vector) < 0.8,
+                    )
+                    .order_by(Chunk.embedding.cosine_distance(vector))
+                    .limit(60)
+                    .all()
+                )
                 semantic_scores = {c.id: cosine_similarity(vector, c.embedding) for c in semantic}
         else:
             chunks = base.all()
@@ -123,8 +176,9 @@ def retrieve(workspace_id, query, document_ids=None, limit=8):
                 for c in chunks:
                     if c.embedding is not None and c.embedding_model == embedding_model_id():
                         similarity = cosine_similarity(vector, c.embedding)
-                        if similarity > .2: ranked.append((c, similarity))
-                semantic = [c for c, _ in sorted(ranked, key=lambda x:x[1], reverse=True)[:60]]
+                        if similarity > 0.2:
+                            ranked.append((c, similarity))
+                semantic = [c for c, _ in sorted(ranked, key=lambda x: x[1], reverse=True)[:60]]
                 semantic_scores = {c.id: score for c, score in ranked}
         # Weight exact lexical matches more strongly for precise facts; semantic ranks
         # still recover paraphrases and vocabulary that does not overlap the query.
@@ -134,10 +188,19 @@ def retrieve(workspace_id, query, document_ids=None, limit=8):
                 scores[c.id] = scores.get(c.id, 0) + weight / (60 + rank + 1)
                 candidates[c.id] = c
         terms = set(tokens(query))
-        names = {d.id: d.name for d in db.query(Document).filter(Document.workspace_id == workspace_id)}
-        ranked = [c for c in candidates.values()
-                  if has_query_support(query, c.text, names.get(c.document_id, ''))
-                  or (len(terms) > 1 and semantic_scores.get(c.id, 0) >= .68)]
-        ranked.sort(key=lambda c: scores[c.id] + .001 * len(terms & set(tokens(c.text))) / max(len(terms), 1), reverse=True)
+        names = {
+            d.id: d.name for d in db.query(Document).filter(Document.workspace_id == workspace_id)
+        }
+        ranked = [
+            c
+            for c in candidates.values()
+            if has_query_support(query, c.text, names.get(c.document_id, ''))
+            or (len(terms) > 1 and semantic_scores.get(c.id, 0) >= 0.68)
+        ]
+        ranked.sort(
+            key=lambda c: scores[c.id]
+            + 0.001 * len(terms & set(tokens(c.text))) / max(len(terms), 1),
+            reverse=True,
+        )
         selected = diversify_ranked_chunks(ranked, limit)
         return [source(c, names[c.document_id]) for c in selected]

@@ -3,36 +3,64 @@
 Never infer a relationship just because two records share a keyword.
 These utilities preserve original source IDs and URLs for citation integrity.
 """
+
 import re
 from urllib.parse import urlsplit, urlunsplit
 
-STOP = {"the", "and", "for", "with", "from", "what", "which", "this", "that", "about",
-        "show", "find", "where", "when", "does", "have", "were", "are", "our", "please"}
+STOP = {
+    'the',
+    'and',
+    'for',
+    'with',
+    'from',
+    'what',
+    'which',
+    'this',
+    'that',
+    'about',
+    'show',
+    'find',
+    'where',
+    'when',
+    'does',
+    'have',
+    'were',
+    'are',
+    'our',
+    'please',
+}
 
 
 def keywords(text):
-    return {word for word in re.findall(r"[a-z0-9]{3,}", (text or "").lower()) if word not in STOP}
+    return {word for word in re.findall(r'[a-z0-9]{3,}', (text or '').lower()) if word not in STOP}
 
 
 def canonical_url(url):
     if not url:
-        return ""
+        return ''
     try:
         parsed = urlsplit(url)
-        if parsed.scheme not in ("https", "http") or not parsed.hostname:
-            return ""
+        if parsed.scheme not in ('https', 'http') or not parsed.hostname:
+            return ''
         # Drop marketing fragments/parameters but keep query parameters necessary
         # to identify provider records.
-        return urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(),
-                           parsed.path.rstrip("/") or "/", parsed.query, ""))
+        return urlunsplit(
+            (
+                parsed.scheme.lower(),
+                parsed.netloc.lower(),
+                parsed.path.rstrip('/') or '/',
+                parsed.query,
+                '',
+            )
+        )
     except ValueError:
-        return ""
+        return ''
 
 
 def fingerprint(item):
     url = canonical_url(item.url)
     if url:
-        return ("url", url)
+        return ('url', url)
     # Never deduplicate records from different providers solely on similar prose.
     return (item.provider, str(item.source_id))
 
@@ -68,4 +96,3 @@ def prepare_evidence(question, items, *, limit=60, per_provider=20):
         if len(selected) >= limit:
             break
     return selected
-

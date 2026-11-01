@@ -1,7 +1,9 @@
 """Bounded, citation-preserving synthesis for mixed connected evidence."""
+
 import json
 import re
 import time
+
 import httpx
 from fastapi import HTTPException
 
@@ -16,7 +18,8 @@ SYSTEM = (
 _META_LEAD = re.compile(
     r'^(?:okay[,!:. ]+)?(?:let me\b|i need to\b|i should\b|first[, :]\b|'
     r'the user is asking\b|the question asks\b|looking at the sources\b|'
-    r'let.s analyze\b|we need to\b)', re.I
+    r'let.s analyze\b|we need to\b)',
+    re.I,
 )
 
 
@@ -44,13 +47,58 @@ def source_list_answer(sources, total, limit=12):
         lines.append(f'Showing the first {len(shown)} of {total} matches.')
     return '\n'.join(lines)
 
+
 def _query_terms(question):
-    stopwords = {'what','which','where','when','why','how','can','could','would','should',
-                 'please','find','list','show','tell','me','about','the','and','or','from',
-                 'my','their','in','on','for','are','is','was','were','does','did','with',
-                 'give','summarize','summary','source','sources','slack','github','notion'}
-    return list(dict.fromkeys(term for term in re.findall(r'[a-z0-9]{3,}', (question or '').lower())
-                              if term not in stopwords))
+    stopwords = {
+        'what',
+        'which',
+        'where',
+        'when',
+        'why',
+        'how',
+        'can',
+        'could',
+        'would',
+        'should',
+        'please',
+        'find',
+        'list',
+        'show',
+        'tell',
+        'me',
+        'about',
+        'the',
+        'and',
+        'or',
+        'from',
+        'my',
+        'their',
+        'in',
+        'on',
+        'for',
+        'are',
+        'is',
+        'was',
+        'were',
+        'does',
+        'did',
+        'with',
+        'give',
+        'summarize',
+        'summary',
+        'source',
+        'sources',
+        'slack',
+        'github',
+        'notion',
+    }
+    return list(
+        dict.fromkeys(
+            term
+            for term in re.findall(r'[a-z0-9]{3,}', (question or '').lower())
+            if term not in stopwords
+        )
+    )
 
 
 def _trim_excerpt(text, question, limit):
@@ -64,14 +112,17 @@ def _trim_excerpt(text, question, limit):
         for match in re.finditer(re.escape(term), text, re.I):
             candidates.add(max(0, match.start() - limit // 3))
     lowered = text.lower()
+
     def window_score(pos):
-        window = lowered[pos:pos + limit]
+        window = lowered[pos : pos + limit]
         # Earlier non-stopword terms usually state the requested detail (e.g.
         # "causes" in "causes of deforestation"); weight them above topic words.
-        return sum((len(terms) - index) * min(window.count(term), 5)
-                   for index, term in enumerate(terms))
+        return sum(
+            (len(terms) - index) * min(window.count(term), 5) for index, term in enumerate(terms)
+        )
+
     start = max(candidates, key=window_score)
-    return text[start:start + limit]
+    return text[start : start + limit]
 
 
 def bounded_payload(evidence, max_items=50, per_source=3000, max_total=16000, question=''):
@@ -80,12 +131,16 @@ def bounded_payload(evidence, max_items=50, per_source=3000, max_total=16000, qu
     for item in evidence:
         groups.setdefault(item.provider, []).append(item)
     terms = _query_terms(question)
+
     def score(item):
         text = (str(item.title) + '\n' + str(item.excerpt)).lower()
         return sum(text.count(term) for term in terms)
+
     for group in groups.values():
         group.sort(key=score, reverse=True)
-    providers = sorted(groups, key=lambda provider: max(map(score, groups[provider]), default=0), reverse=True)
+    providers = sorted(
+        groups, key=lambda provider: max(map(score, groups[provider]), default=0), reverse=True
+    )
     ordered = []
     while len(ordered) < max_items and any(groups.values()):
         for provider in providers:
@@ -103,22 +158,36 @@ def bounded_payload(evidence, max_items=50, per_source=3000, max_total=16000, qu
         payload.append(data)
     return payload
 
+
 def synthesize_connected(question, evidence, provider, api_key, model, client_factory, ollama_chat):
     if provider != 'ollama' and not (provider == 'openai' and api_key):
         raise HTTPException(409, 'Configure an AI provider for connected answers.')
-    attempts = ((50, 3000, 16000), (25, 1800, 8000), (12, 900, 3600)) if provider == 'ollama' else ((50, 1600, 18000),)
+    attempts = (
+        ((50, 3000, 16000), (25, 1800, 8000), (12, 900, 3600))
+        if provider == 'ollama'
+        else ((50, 1600, 18000),)
+    )
     last_error = None
     for count, chars_each, total_chars in attempts:
         sources = bounded_payload(evidence, count, chars_each, total_chars, question)
         prompt = json.dumps({'question': question[:2000], 'sources': sources}, ensure_ascii=False)
         try:
             if provider == 'ollama':
-                output = ollama_chat([{'role': 'system', 'content': SYSTEM},
-                                     {'role': 'user', 'content': prompt}])
+                output = ollama_chat(
+                    [{'role': 'system', 'content': SYSTEM}, {'role': 'user', 'content': prompt}]
+                )
             else:
-                output = client_factory().responses.create(
-                    model=model, instructions=SYSTEM, input=prompt,
-                    store=False, max_output_tokens=1400).output_text
+                output = (
+                    client_factory()
+                    .responses.create(
+                        model=model,
+                        instructions=SYSTEM,
+                        input=prompt,
+                        store=False,
+                        max_output_tokens=1400,
+                    )
+                    .output_text
+                )
             if not output or not output.strip():
                 raise ValueError('Empty AI response')
             return output, sources
@@ -130,7 +199,9 @@ def synthesize_connected(question, evidence, provider, api_key, model, client_fa
     raise ValueError('Model response was truncated after bounded retries') from last_error
 
 
-def stream_connected(question, evidence, provider, api_key, model, client_factory, ollama_url, chat_model):
+def stream_connected(
+    question, evidence, provider, api_key, model, client_factory, ollama_url, chat_model
+):
     """Buffer model output and expose only the finished, citation-checked answer."""
     if provider != 'ollama' and not (provider == 'openai' and api_key):
         raise HTTPException(409, 'Configure an AI provider for connected answers.')
@@ -139,15 +210,26 @@ def stream_connected(question, evidence, provider, api_key, model, client_factor
     answer_parts = []
     timed_out = False
     if provider == 'ollama':
-        messages = [{'role': 'system', 'content': SYSTEM},
-                    {'role': 'user', 'content': prompt + '\n/no_think'}]
-        payload = {'model': chat_model, 'messages': messages, 'stream': True,
-                   'think': False, 'keep_alive': '30m',
-                   'options': {'num_ctx': 8192, 'temperature': 0, 'num_predict': -1}}
+        messages = [
+            {'role': 'system', 'content': SYSTEM},
+            {'role': 'user', 'content': prompt + '\n/no_think'},
+        ]
+        payload = {
+            'model': chat_model,
+            'messages': messages,
+            'stream': True,
+            'think': False,
+            'keep_alive': '30m',
+            'options': {'num_ctx': 8192, 'temperature': 0, 'num_predict': -1},
+        }
         deadline = time.monotonic() + 45
         try:
-            with httpx.stream('POST', ollama_url.rstrip('/') + '/api/chat',
-                              json=payload, timeout=httpx.Timeout(10, connect=5)) as response:
+            with httpx.stream(
+                'POST',
+                ollama_url.rstrip('/') + '/api/chat',
+                json=payload,
+                timeout=httpx.Timeout(10, connect=5),
+            ) as response:
                 response.raise_for_status()
                 for line in response.iter_lines():
                     if time.monotonic() >= deadline:
@@ -160,13 +242,15 @@ def stream_connected(question, evidence, provider, api_key, model, client_factor
                     if delta:
                         answer_parts.append(delta)
                     if item.get('done') and item.get('done_reason') == 'length':
-                        raise ValueError('The local model reached its context limit before finishing.')
+                        raise ValueError(
+                            'The local model reached its context limit before finishing.'
+                        )
         except httpx.TimeoutException:
             timed_out = True
     else:
         stream = client_factory().responses.create(
-            model=model, instructions=SYSTEM, input=prompt,
-            store=False, stream=True)
+            model=model, instructions=SYSTEM, input=prompt, store=False, stream=True
+        )
         for event in stream:
             if getattr(event, 'type', '') == 'response.output_text.delta':
                 delta = getattr(event, 'delta', '')
@@ -176,8 +260,11 @@ def stream_connected(question, evidence, provider, api_key, model, client_factor
                 raise RuntimeError('The answer provider could not finish the response.')
     answer = '' if timed_out else final_answer_text(''.join(answer_parts))
     if not answer:
-        answer = ('The local AI model timed out before it could write an answer. Try again or select fewer sources.'
-                  if timed_out else 'The AI model did not return an answer. Please retry or check the configured model.')
+        answer = (
+            'The local AI model timed out before it could write an answer. Try again or select fewer sources.'
+            if timed_out
+            else 'The AI model did not return an answer. Please retry or check the configured model.'
+        )
         sources = []
         mode = 'generation_failed'
     else:
@@ -191,6 +278,12 @@ def stream_connected(question, evidence, provider, api_key, model, client_factor
     if mode == 'connected':
         yield {'type': 'delta', 'text': answer}
     from .citation_audit import audit_citations
+
     audit = audit_citations(answer, sources) if mode == 'connected' else None
-    yield {'type': 'complete', 'answer': answer, 'sources': sources, 'mode': mode,
-           'citation_audit': audit}
+    yield {
+        'type': 'complete',
+        'answer': answer,
+        'sources': sources,
+        'mode': mode,
+        'citation_audit': audit,
+    }

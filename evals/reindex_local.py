@@ -1,11 +1,12 @@
 """Re-embed every ready document using the configured local Ollama model."""
+
 import os
 import sys
 
 os.environ['AI_PROVIDER'] = 'ollama'
 sys.path.insert(0, 'backend')
 
-from app.db import Session, Document
+from app.db import Document, Session
 from app.ingest import ingest
 
 
@@ -20,17 +21,21 @@ def main():
         db.commit()
 
     for index, (document_id, generation, name) in enumerate(jobs, 1):
+
         def heartbeat():
             with Session() as db:
                 doc = db.get(Document, document_id)
                 db.commit()
                 return bool(doc and doc.generation == generation and doc.status == 'processing')
+
         try:
             ingest(document_id, generation, heartbeat)
             with Session() as db:
                 doc = db.get(Document, document_id)
                 if doc and doc.generation == generation and doc.status == 'ready':
-                    print(f'{index}/{len(jobs)} ready: {name} ({doc.chunk_count} chunks)', flush=True)
+                    print(
+                        f'{index}/{len(jobs)} ready: {name} ({doc.chunk_count} chunks)', flush=True
+                    )
                 else:
                     raise RuntimeError(f'Ingestion did not finish for {name}')
         except Exception as exc:

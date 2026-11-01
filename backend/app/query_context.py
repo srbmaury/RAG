@@ -1,4 +1,5 @@
 """Resolve explicit conversational references before the shared RAG search path."""
+
 import re
 
 
