@@ -60,7 +60,7 @@ import { AtlasMark, FileBadge, EmptyState, Dialog } from './ui/WorkspacePrimitiv
 import { flushSync } from 'react-dom';
 
 import { prettyBytes, prompts } from '../utils/utils';
-import { RESEARCH_PROVIDERS } from '../lib/providers';
+import { PROVIDER_LABELS, RESEARCH_PROVIDERS } from '../lib/providers';
 
 export function AtlasWorkspace() {
     const { theme, toggleTheme } = useAtlasTheme();
@@ -198,7 +198,7 @@ export function AtlasWorkspace() {
         if (tab === 'chat' && messages.length > 0 && chatThread.current) chatThread.current.scrollTo({ top: chatThread.current.scrollHeight, behavior: 'smooth' });
     }, [messages.length, busy, tab]);
 
-    function newChat() {
+    function newChat(preserveSourceSelection = false) {
         if (busy) return;
         activeChat.current = null;
         setChatId(null);
@@ -207,9 +207,11 @@ export function AtlasWorkspace() {
         setMessages([]);
         setQuery('');
         setSource(null);
-        setIncludeDocuments(true);
-        setConnectedGmail(false);
-        setConnectedProviders([]);
+        if (!preserveSourceSelection) {
+            setIncludeDocuments(true);
+            setConnectedGmail(false);
+            setConnectedProviders([]);
+        }
         navigate('chat');
     }
 
@@ -269,6 +271,11 @@ export function AtlasWorkspace() {
 
     const ready = docs.filter((d) => d.status === 'ready');
     const hasAskSources = (includeDocuments && ready.length > 0) || connectedGmail || connectedProviders.length > 0;
+    const homeSourceLabels = [
+        ...(includeDocuments ? [selected.length ? `Documents (${selected.length} selected)` : `Documents (all ${ready.length} ready)`] : []),
+        ...(connectedGmail ? ['Gmail'] : []),
+        ...connectedProviders.map((provider) => PROVIDER_LABELS[provider]),
+    ];
     const filtered = docs.filter((d) => d.name.toLowerCase().includes(filter.toLowerCase()));
     const workspace = workspaces.find((w) => w.id === workspaceId);
 
@@ -292,8 +299,8 @@ export function AtlasWorkspace() {
               .join(' · ')
         : '';
 
-    function renderAnswer(result: Answer) {
-        return <ResearchAnswer result={result} onOpenSource={setSource} />;
+    function renderAnswer(result: Answer, onPrompt: (prompt: string) => void) {
+        return <ResearchAnswer result={result} onOpenSource={setSource} onPrompt={onPrompt} />;
     }
 
     const { authenticate, addWorkspace, removeWorkspace, signOut } = createSessionActions({
@@ -530,11 +537,11 @@ export function AtlasWorkspace() {
                             onQueryChange={setQuery}
                             onAsk={() => void ask(query, true)}
                             hasAskSources={hasAskSources}
-                            includeDocuments={includeDocuments}
-                            readyCount={ready.length}
+                            sourceLabels={homeSourceLabels}
                             busy={busy}
                             chats={chats}
                             docs={docs}
+                            onChooseSources={() => newChat(true)}
                             onOpenSources={() => navigate('sources')}
                             onOpenConversations={() => {
                                 navigate('chat');
@@ -579,7 +586,7 @@ export function AtlasWorkspace() {
                                         {copied ? <Check /> : <Copy />}
                                         {copied ? 'Copied' : 'Copy chat'}
                                     </button>
-                                    <button className="btn primary" disabled={busy} onClick={newChat}>
+                                    <button className="btn primary" disabled={busy} onClick={() => newChat()}>
                                         <Plus />
                                         <span>New chat</span>
                                     </button>

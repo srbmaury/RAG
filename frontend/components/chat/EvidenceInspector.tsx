@@ -1,10 +1,10 @@
 'use client';
 import { ArrowUpRight, Download } from 'lucide-react';
 import { api } from '../../lib/api';
-import { sourceLocation } from '../../lib/evidence';
+import { sourceDisplayName, sourceLocation } from '../../lib/evidence';
 import type { DocumentPreview, Source } from '../../lib/types';
 import { DocumentPassage } from '../DocumentPassage';
-import { Dialog } from '../ui/WorkspacePrimitives';
+import { Dialog, FileBadge } from '../ui/WorkspacePrimitives';
 
 export type { DocumentPreview } from '../../lib/types';
 
@@ -34,17 +34,21 @@ export function EvidenceInspector({
             }}
         >
             <div className="drawer-header">
-                <div>
-                    <div className="caption">{source ? 'Source excerpt' : 'Document preview'}</div>
-                    <h2>{source?.name || preview?.document.name}</h2>
-                    <div className="caption">{source ? sourceLocation(source) : `${preview?.document.chunk_count} passages · ${preview?.document.status}`}</div>
+                {source && <FileBadge name={sourceDisplayName(source)} />}
+                <div className="evidence-inspector-heading">
+                    <div className="caption">{source ? 'Evidence excerpt' : 'Document preview'}</div>
+                    <h2>{source ? sourceDisplayName(source) : preview?.document.name}</h2>
+                    <div className="evidence-source-meta">
+                        <span>{source ? sourceLocation(source) : `${preview?.document.chunk_count} passages · ${preview?.document.status}`}</span>
+                        {source?.date && <time dateTime={source.date}>{new Date(source.date).toLocaleString()}</time>}
+                    </div>
                 </div>
             </div>
             <div className="drawer-body">
                 {source ? (
                     <div className="evidence-inspector-passage">
-                        <p className="caption evidence-disclaimer">Retrieved excerpt. Check the original source to confirm context.</p>
-                        <DocumentPassage name={source.name} text={source.text} />
+                        <p className="caption evidence-disclaimer">Retrieved passage · Check the original source for surrounding context.</p>
+                        <DocumentPassage name={sourceDisplayName(source)} text={source.text} />
                     </div>
                 ) : (
                     preview && (

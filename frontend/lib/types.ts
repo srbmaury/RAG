@@ -43,6 +43,23 @@ export type Answer = {
     mode: string;
     citation_note?: string;
     scope?: string[];
+    retrieval?: {
+        passages_considered: number;
+        passages_used: number;
+        sources: {
+            provider: string;
+            status: 'searched' | 'failed';
+            found: number;
+            considered: number;
+            used: number;
+        }[];
+    };
+    citation_audit?: {
+        claims: { claim: string; citations: number[]; overlap: number; status: string }[];
+        needs_review: number;
+        note: string;
+    };
+    coverage_note?: string | null;
 };
 export type Message = { role: 'user' | 'assistant'; content: string; result?: Answer };
 export type GmailMessage = {

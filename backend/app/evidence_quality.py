@@ -4,6 +4,8 @@ Never infer a relationship just because two records share a keyword.
 These utilities preserve original source IDs and URLs for citation integrity.
 """
 
+import re
+from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 
 from .research_queries import natural_search_terms
@@ -53,10 +55,39 @@ def score(item, question):
     return 3 * len(query & title) + len(query & body)
 
 
+def is_repository_activity_question(question):
+    return bool(
+        re.search(r'\b(?:repos?|repositories)\b', question, re.I)
+        and re.search(r'\b(?:active|activity|recent|latest|pushed|push|updated)\b', question, re.I)
+    )
+
+
+def is_repository_listing_question(question):
+    return bool(
+        re.search(r'\b(?:projects?|repos?|repositories)\b', question, re.I)
+        and re.search(r'\b(?:list|show|find|get|name|at\s+least)\b', question, re.I)
+    )
+
+
+def activity_timestamp(item):
+    value = getattr(item, 'date', None)
+    if not value:
+        return float('-inf')
+    try:
+        parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
+    except ValueError:
+        return float('-inf')
+
+
 def prepare_evidence(question, items, *, limit=60, per_provider=20):
     """Deduplicate exact references and rank by topical relevance with source diversity."""
     query_terms = set(tokens(' '.join(natural_search_terms(question))))
     required_overlap = minimum_query_overlap(' '.join(query_terms)) if query_terms else 0
+    repository_activity = is_repository_activity_question(question)
+    repository_listing = is_repository_listing_question(question)
     unique = []
     seen = set()
     for item in items:
@@ -64,12 +95,24 @@ def prepare_evidence(question, items, *, limit=60, per_provider=20):
         if key in seen:
             continue
         seen.add(key)
-        if query_terms:
+        if query_terms and not (
+            (repository_activity or repository_listing) and item.provider == 'github'
+        ):
             item_terms = set(tokens(f'{item.title}\n{item.excerpt}'))
             if len(query_terms & item_terms) < required_overlap:
                 continue
         unique.append(item)
-    ranked = sorted(enumerate(unique), key=lambda row: (-score(row[1], question), row[0]))
+    if repository_activity:
+        ranked = sorted(
+            enumerate(unique),
+            key=lambda row: (
+                -activity_timestamp(row[1]) if row[1].provider == 'github' else 0,
+                -score(row[1], question),
+                row[0],
+            ),
+        )
+    else:
+        ranked = sorted(enumerate(unique), key=lambda row: (-score(row[1], question), row[0]))
     by_provider = {}
     selected = []
     for _, item in ranked:

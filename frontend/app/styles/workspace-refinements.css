@@ -137,11 +137,23 @@
     padding-top: 12px;
 }
 .atlas-v3 .research-composer-v2 {
+    position: relative;
     min-height: 64px;
     border-radius: 15px;
     transition:
         border-color 0.15s ease,
         box-shadow 0.15s ease;
+}
+.atlas-v3 .research-composer-v2 .voice-input-status {
+    position: absolute;
+    right: 12px;
+    bottom: calc(100% + 7px);
+    max-width: min(360px, calc(100vw - 32px));
+    padding: 6px 10px;
+    border: 1px solid var(--outline);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
 }
 .atlas-v3 .research-composer-v2 textarea {
     min-height: 38px;
@@ -155,6 +167,76 @@
     font-size: 14px;
     line-height: 1.8;
     overflow-wrap: anywhere;
+}
+.atlas-v3 .evidence-inspector .drawer-header {
+    align-items: center;
+    justify-content: flex-start;
+    gap: 14px;
+}
+.atlas-v3 .evidence-inspector-heading {
+    min-width: 0;
+}
+.atlas-v3 .evidence-inspector-heading h2 {
+    margin: 4px 0 8px;
+    overflow-wrap: anywhere;
+}
+.atlas-v3 .evidence-source-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    color: var(--sub);
+    font-size: 12px;
+}
+.atlas-v3 .evidence-source-meta > * {
+    border: 1px solid var(--outline);
+    border-radius: 999px;
+    padding: 3px 8px;
+}
+.atlas-v3 .evidence-inspector-passage .document-plain p {
+    margin: 0 0 16px;
+}
+.atlas-v3 .evidence-inspector-passage .document-plain p:last-child {
+    margin-bottom: 0;
+}
+.atlas-v3 .evidence-inspector-passage .document-kicker {
+    margin: 18px 0 5px;
+    color: var(--sub);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    line-height: 1.4;
+}
+.atlas-v3 .evidence-inspector-passage .document-section-heading {
+    margin: 0 0 10px;
+    color: var(--ink);
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.35;
+}
+.atlas-v3 .evidence-inspector-passage .document-field {
+    display: grid;
+    grid-template-columns: minmax(105px, 0.55fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--outline);
+    font-size: 13px;
+    line-height: 1.5;
+}
+.atlas-v3 .evidence-inspector-passage .document-field strong {
+    color: var(--sub);
+    font-weight: 600;
+}
+.atlas-v3 .evidence-inspector-passage .document-field span {
+    overflow-wrap: anywhere;
+}
+.atlas-v3 .evidence-inspector-passage .document-plain ul {
+    margin: 6px 0 16px;
+    padding-left: 22px;
+}
+.atlas-v3 .evidence-inspector-passage .document-plain li {
+    padding-left: 3px;
+    margin: 5px 0;
 }
 .atlas-v3 .document-table tbody tr:hover {
     background: var(--hover);

@@ -238,6 +238,53 @@ def test_connected_source_listing_cites_drive_and_gmail_titles():
     assert '[1]' in result['answer'] and '[2]' in result['answer']
 
 
+def test_retrieval_trace_uses_narrowed_result_scope_for_source_listings():
+    from types import SimpleNamespace
+
+    from app.main import attach_retrieval_trace
+    from app.sources import Evidence
+
+    body = SimpleNamespace(include_documents=True, include_gmail=False, providers=['slack'])
+    evidence = [
+        Evidence('documents', 'doc-1', 'Notes', 'Document match'),
+        Evidence('slack', 'slack-1', '#research', 'Slack match'),
+    ]
+    result = {
+        'answer': 'Found a matching Slack item [1].',
+        'sources': [{'provider': 'slack', 'name': '#research'}],
+        'mode': 'source_results',
+        'scope': ['slack'],
+    }
+
+    attach_retrieval_trace(
+        result,
+        body,
+        evidence,
+        {'found': {'documents': 1, 'slack': 1}, 'failed': []},
+    )
+
+    assert result['retrieval']['passages_considered'] == 1
+    assert result['retrieval']['passages_used'] == 1
+    assert result['retrieval']['sources'] == [
+        {'provider': 'slack', 'status': 'searched', 'found': 1, 'considered': 1, 'used': 1}
+    ]
+
+
+def test_deforestation_questions_are_not_reduced_to_source_title_listings():
+    from types import SimpleNamespace
+
+    from app.main import connected_source_listing_result
+    from app.sources import Evidence
+
+    body = SimpleNamespace(include_documents=False, include_gmail=False, providers=['slack'])
+    evidence = [
+        Evidence('slack', 'slack-1', '#research', 'Agriculture and logging cause forest loss.')
+    ]
+
+    for question in ('causes of deforestation', 'List 3 to 5 causes of deforestation'):
+        assert connected_source_listing_result(question, body, evidence, {}) is None
+
+
 def test_outlook_search_normalizes_mail(monkeypatch):
     monkeypatch.setattr(
         batch_connectors,

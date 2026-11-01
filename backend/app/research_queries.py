@@ -115,6 +115,34 @@ QUERY_STOPWORDS = {
     'documents',
     'uploaded',
     'upload',
+    # Writing and answer-format instructions should not become source-search
+    # terms. Keep the topic words (for example, "deforestation") and drop the
+    # request wrapper ("write a concise paragraph using selected sources").
+    'write',
+    'writes',
+    'writing',
+    'wrote',
+    'create',
+    'draft',
+    'compose',
+    'generate',
+    'answer',
+    'response',
+    'explain',
+    'describe',
+    'using',
+    'use',
+    'only',
+    'selected',
+    'concise',
+    'brief',
+    'short',
+    'paragraph',
+    'paragraphs',
+    'sentence',
+    'sentences',
+    'words',
+    'lines',
 }
 
 GITHUB_QUERY_STOPWORDS = {

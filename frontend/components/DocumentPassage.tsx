@@ -1,6 +1,7 @@
-import { Fragment, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { parseExtractedText } from '../lib/documentText';
 
 function linkedLine(line: string, keyPrefix: string) {
     const pieces: ReactNode[] = [];
@@ -61,16 +62,36 @@ export function DocumentPassage({ text, name }: { text: string; name: string }) 
         );
     return (
         <div className="document-plain">
-            {text.split(/\n{2,}/).map((paragraph, paragraphIndex) => (
-                <p key={paragraphIndex}>
-                    {paragraph.split('\n').map((line, lineIndex) => (
-                        <Fragment key={`${paragraphIndex}-${lineIndex}`}>
-                            {lineIndex > 0 && <br />}
-                            {linkedLine(line, `${paragraphIndex}-${lineIndex}`)}
-                        </Fragment>
-                    ))}
-                </p>
-            ))}
+            {parseExtractedText(text).map((block, index) => {
+                if (block.type === 'kicker')
+                    return (
+                        <div className="document-kicker" key={index}>
+                            {block.text}
+                        </div>
+                    );
+                if (block.type === 'heading')
+                    return (
+                        <h3 className="document-section-heading" key={index}>
+                            {block.text}
+                        </h3>
+                    );
+                if (block.type === 'field')
+                    return (
+                        <div className="document-field" key={index}>
+                            <strong>{block.label}</strong>
+                            <span>{linkedLine(block.value, `field-${index}`)}</span>
+                        </div>
+                    );
+                if (block.type === 'list')
+                    return (
+                        <ul key={index}>
+                            {block.items.map((item, itemIndex) => (
+                                <li key={itemIndex}>{linkedLine(item, `list-${index}-${itemIndex}`)}</li>
+                            ))}
+                        </ul>
+                    );
+                return <p key={index}>{linkedLine(block.text, `paragraph-${index}`)}</p>;
+            })}
         </div>
     );
 }

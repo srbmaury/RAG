@@ -50,7 +50,6 @@ from .research_queries import (
     drive_query_for_question,
     filter_credit_card_offer_evidence,
     gmail_query_for_question,
-    provider_query_terms,
 )
 from .retrieval import retrieve
 from .web_sources import router as web_router
@@ -99,7 +98,7 @@ async def request_diagnostics(request: Request, call_next):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(self), geolocation=()'
     response.headers['X-Request-ID'] = request_id
     response.headers['Server-Timing'] = f'api;dur={elapsed_ms}'
     log.info(
@@ -588,7 +587,7 @@ class ConnectedQuestion(Question):
     providers: List[str] = Field(default_factory=list, max_length=12)
 
 
-def collect_connected_evidence(workspaceId, body, actor, db):
+def collect_connected_evidence(workspaceId, body, actor, db, retrieval_stats=None):
     workspace(workspaceId, actor, db)
     if not body.question.strip():
         raise HTTPException(422, 'Enter a question.')
@@ -609,12 +608,16 @@ def collect_connected_evidence(workspaceId, body, actor, db):
     if any(p not in (*PROVIDERS, 'drive') for p in body.providers):
         raise HTTPException(422, 'Unknown connected provider.')
     evidence, document_evidence = [], {}
+    stats = retrieval_stats if retrieval_stats is not None else {}
+    stats.update({'found': {provider: 0 for provider in connected_scope(body)}, 'failed': []})
     tasks = []
     try:
         if body.include_documents:
-            for item in retrieve(
+            retrieved_documents = retrieve(
                 workspaceId, retrieval_query(body.question, body.history), body.document_ids
-            )[:6]:
+            )[:6]
+            stats['found']['documents'] = len(retrieved_documents)
+            for item in retrieved_documents:
                 evidence.append(
                     Evidence('documents', item['chunk_id'], item['name'], item['text'][:1800], None)
                 )
@@ -664,6 +667,7 @@ def collect_connected_evidence(workspaceId, body, actor, db):
                     provider = futures[future]
                     try:
                         hits = future.result()
+                        stats['found'][provider] = len(hits)
                         if provider == 'gmail':
                             evidence.extend(hits)
                         elif provider == 'drive':
@@ -690,6 +694,7 @@ def collect_connected_evidence(workspaceId, body, actor, db):
                         # A slow optional source should not discard results
                         # already returned by the other selected sources.
                         failures.append((provider, exc))
+                        stats['failed'].append(provider)
                         log.warning(
                             'Connected retrieval failed for %s: %s',
                             provider,
@@ -706,6 +711,45 @@ def collect_connected_evidence(workspaceId, body, actor, db):
 
     filtered = filter_credit_card_offer_evidence(body.question, evidence)
     return prepare_evidence(body.question, filtered), document_evidence
+
+
+def retrieval_trace(body, evidence, stats, used_sources, scope=None):
+    """Describe source retrieval and which passages reached the rendered result."""
+    from collections import Counter
+
+    providers = connected_scope(body) if scope is None else scope
+    considered = Counter(item.provider for item in evidence if item.provider in providers)
+    used = Counter((item.get('provider') or 'documents') for item in used_sources)
+    found = stats.get('found', {}) if stats else {}
+    failed = set(stats.get('failed', [])) if stats else set()
+    rows = [
+        {
+            'provider': provider,
+            'status': 'failed' if provider in failed else 'searched',
+            'found': found.get(provider, 0),
+            'considered': considered[provider],
+            'used': used[provider],
+        }
+        for provider in providers
+    ]
+    passages_considered = sum(considered.values())
+    passages_used = sum(used[provider] for provider in providers)
+    return {
+        'passages_considered': passages_considered,
+        'passages_used': passages_used,
+        'sources': rows,
+    }
+
+
+def attach_retrieval_trace(result, body, evidence, stats, used_sources=None):
+    result['retrieval'] = retrieval_trace(
+        body,
+        evidence,
+        stats,
+        result.get('sources', []) if used_sources is None else used_sources,
+        result.get('scope'),
+    )
+    return result
 
 
 def _search_gmail(token, body, gmail_api, gmail_get, email_from_json, gmail_query_for_question):
@@ -778,7 +822,7 @@ def connected_scope(body):
     return scope
 
 
-def no_evidence_result(body):
+def no_evidence_result(body, retrieval_stats=None):
     labels = {
         'documents': 'uploaded documents',
         'gmail': 'Gmail',
@@ -799,7 +843,9 @@ def no_evidence_result(body):
     else:
         names = ', '.join(labels.get(item, item) for item in scope)
         answer = f'No matching results were found in {names} for this question. Try different keywords or check the source connection.'
-    return {'answer': answer, 'sources': [], 'mode': 'insufficient_evidence', 'scope': scope}
+    result = {'answer': answer, 'sources': [], 'mode': 'insufficient_evidence', 'scope': scope}
+    result['retrieval'] = retrieval_trace(body, [], retrieval_stats or {}, [])
+    return result
 
 
 def github_pull_request_listing(question, providers):
@@ -832,6 +878,67 @@ def github_pull_request_list_result(question, body, evidence, document_evidence)
     ]
     return {
         'answer': source_list_answer(payload, len(matches), limit),
+        'sources': connected_sources_for_payload(payload, document_evidence),
+        'mode': 'source_results',
+        'scope': ['github'],
+    }
+
+
+def github_repository_activity_result(question, body, evidence, document_evidence):
+    """Rank personal repositories by their actual latest push timestamp."""
+    from .evidence_quality import activity_timestamp, is_repository_activity_question
+
+    if 'github' not in body.providers or not is_repository_activity_question(question):
+        return None
+    if re.search(r'\b(?:pull\s*requests?|prs?)\b', question, re.I):
+        return None
+    matches = [item for item in evidence if item.provider == 'github']
+    dated = [item for item in matches if activity_timestamp(item) != float('-inf')]
+    if not dated:
+        return None
+    ranked = sorted(dated, key=activity_timestamp, reverse=True)
+    shown = ranked[:5]
+    payload = [
+        item.as_prompt(index) | {'origin_id': item.source_id} for index, item in enumerate(shown, 1)
+    ]
+    lines = ['Repositories ranked by latest push (most recent first):']
+    for index, item in enumerate(shown, 1):
+        pushed = str(item.date).replace('Z', '+00:00')[:10]
+        lines.append(f'{index}. **{item.title}** — last push {pushed} [{index}]')
+    answer = '\n'.join(lines)
+    sources = connected_sources_for_payload(payload, document_evidence)
+    return {
+        'answer': answer,
+        'sources': sources,
+        'mode': 'source_results',
+        'scope': ['github'],
+    }
+
+
+def github_repository_listing_result(question, body, evidence, document_evidence):
+    """Return a bounded personal repository list directly, without model synthesis."""
+    from .external_sources import github_wants_repositories, requested_result_limit
+
+    if 'github' not in body.providers or not github_wants_repositories(question):
+        return None
+    if not re.search(r'\b(?:list|show|find|get|name)\b', question, re.I):
+        return None
+    if re.search(r'\b(?:active|activity|recent|latest|pushed|push|updated)\b', question, re.I):
+        return None
+    matches = [item for item in evidence if item.provider == 'github']
+    if not matches:
+        return None
+    limit = requested_result_limit(question, default=10, max_limit=100)
+    shown = matches[:limit]
+    payload = [
+        item.as_prompt(index) | {'origin_id': item.source_id} for index, item in enumerate(shown, 1)
+    ]
+    lines = [f'Here are {len(shown)} of your GitHub projects:']
+    for index, item in enumerate(shown, 1):
+        summary = item.excerpt.split(' · Last push:', 1)[0].strip()
+        lines.append(f'{index}. **{item.title}**' + (f' — {summary}' if summary else '') + f' [{index}]')
+    return {
+        'answer': '\n'.join(lines),
         'sources': connected_sources_for_payload(payload, document_evidence),
         'mode': 'source_results',
         'scope': ['github'],
@@ -901,15 +1008,10 @@ def connected_source_listing_result(question, body, evidence, document_evidence)
             re.I,
         )
     )
-    simple_search = bool(
-        len(provider_query_terms(question)) <= 2
-        and not re.search(
-            r'\b(?:what|why|how|who|where|when|is|are|does|did|can|could|should|would|explain|summarize|compare)\b',
-            question,
-            re.I,
-        )
-    )
-    if not asks_to_list and not simple_search:
+    # Search phrases such as "causes of deforestation" still ask for an
+    # explanation. Only bypass synthesis when the user explicitly asks to list
+    # source records (files, emails, tickets, and similar items).
+    if not asks_to_list:
         return None
     scope = [provider for provider in connected_scope(body) if provider != 'documents']
     searchable_scopes = {
@@ -982,24 +1084,41 @@ def connected_chat(
 
     from .ai import client, ollama_chat
 
-    evidence, document_evidence = collect_connected_evidence(workspaceId, body, actor, db)
+    retrieval_stats = {}
+    evidence, document_evidence = collect_connected_evidence(
+        workspaceId, body, actor, db, retrieval_stats
+    )
     if not evidence:
-        return no_evidence_result(body)
+        return no_evidence_result(body, retrieval_stats)
     # A local 8k-context model cannot accept all retrieved source bodies at once.
     # Keep source IDs stable across retries so citations always refer to real evidence.
     from .connected_synthesis import synthesize_connected
 
     listed = github_pull_request_list_result(body.question, body, evidence, document_evidence)
     if listed:
-        return listed
+        return attach_retrieval_trace(listed, body, evidence, retrieval_stats)
+    repository_activity = github_repository_activity_result(
+        body.question, body, evidence, document_evidence
+    )
+    if repository_activity:
+        return attach_retrieval_trace(
+            repository_activity, body, evidence, retrieval_stats, repository_activity['sources']
+        )
+    repository_listing = github_repository_listing_result(
+        body.question, body, evidence, document_evidence
+    )
+    if repository_listing:
+        return attach_retrieval_trace(
+            repository_listing, body, evidence, retrieval_stats, repository_listing['sources']
+        )
     calendar_listed = calendar_event_list_result(body.question, body, evidence, document_evidence)
     if calendar_listed:
-        return calendar_listed
+        return attach_retrieval_trace(calendar_listed, body, evidence, retrieval_stats)
     source_listing = connected_source_listing_result(
         body.question, body, evidence, document_evidence
     )
     if source_listing:
-        return source_listing
+        return attach_retrieval_trace(source_listing, body, evidence, retrieval_stats)
     try:
         answer, payload = synthesize_connected(
             body.question,
@@ -1037,27 +1156,39 @@ def connected_chat(
         or any(n < 1 or n > len(payload) for n in refs)
         or _has_citation_gaps(answer or '', payload)
     ):
-        return {
-            'answer': 'The model returned an answer without usable source citations. Please retry; no unverified answer is shown.',
-            'sources': [],
-            'mode': 'citation_check_failed',
-            'scope': connected_scope(body),
-        }
+        return attach_retrieval_trace(
+            {
+                'answer': 'The model returned an answer without usable source citations. Please retry; no unverified answer is shown.',
+                'sources': [],
+                'mode': 'citation_check_failed',
+                'scope': connected_scope(body),
+            },
+            body,
+            evidence,
+            retrieval_stats,
+            [],
+        )
     # Preserve positional [n] citations used by the standard chat renderer.
     # Non-document evidence carries a URL so the UI opens the original record.
     sources = connected_sources_for_payload(payload, document_evidence)
     from .citation_audit import audit_citations
     from .decision_links import decision_timeline, related_sources
 
-    return {
-        'answer': answer,
-        'sources': sources,
-        'related_sources': related_sources(payload),
-        'decision_timeline': decision_timeline(payload),
-        'mode': 'connected',
-        'citation_audit': audit_citations(answer, payload),
-        'scope': connected_scope(body),
-    }
+    return attach_retrieval_trace(
+        {
+            'answer': answer,
+            'sources': sources,
+            'related_sources': related_sources(payload),
+            'decision_timeline': decision_timeline(payload),
+            'mode': 'connected',
+            'citation_audit': audit_citations(answer, payload),
+            'scope': connected_scope(body),
+        },
+        body,
+        evidence,
+        retrieval_stats,
+        payload,
+    )
 
 
 @app.post('/api/workspaces/{workspaceId}/connected-chat/stream')
@@ -1072,18 +1203,38 @@ def connected_chat_stream(
     import json
 
     def events():
-        yield (
-            json.dumps(
-                {'type': 'status', 'text': 'Searching selected sources…'}, ensure_ascii=False
-            )
-            + '\n'
+        provider_labels = {
+            'documents': 'Documents',
+            'gmail': 'Gmail',
+            'drive': 'Google Drive',
+            'github': 'GitHub',
+            'notion': 'Notion',
+            'slack': 'Slack',
+            'calendar': 'Calendar',
+            'linear': 'Linear',
+            'jira': 'Jira',
+            'onedrive': 'OneDrive',
+            'outlook': 'Outlook',
+            'sharepoint': 'SharePoint',
+        }
+        selected_sources = connected_scope(body)
+        source_names = [provider_labels.get(provider, provider) for provider in selected_sources]
+        search_status = (
+            f'Searching {" and ".join(source_names)}…'
+            if source_names
+            else 'Choose sources to search…'
         )
+        yield (json.dumps({'type': 'status', 'text': search_status}, ensure_ascii=False) + '\n')
         try:
-            evidence, document_evidence = collect_connected_evidence(workspaceId, body, actor, db)
+            retrieval_stats = {}
+            evidence, document_evidence = collect_connected_evidence(
+                workspaceId, body, actor, db, retrieval_stats
+            )
             if not evidence:
                 yield (
                     json.dumps(
-                        {'type': 'done', 'result': no_evidence_result(body)}, ensure_ascii=False
+                        {'type': 'done', 'result': no_evidence_result(body, retrieval_stats)},
+                        ensure_ascii=False,
                     )
                     + '\n'
                 )
@@ -1092,12 +1243,45 @@ def connected_chat_stream(
                 body.question, body, evidence, document_evidence
             )
             if listed:
+                listed = attach_retrieval_trace(listed, body, evidence, retrieval_stats)
                 yield json.dumps({'type': 'done', 'result': listed}, ensure_ascii=False) + '\n'
+                return
+            repository_activity = github_repository_activity_result(
+                body.question, body, evidence, document_evidence
+            )
+            if repository_activity:
+                repository_activity = attach_retrieval_trace(
+                    repository_activity,
+                    body,
+                    evidence,
+                    retrieval_stats,
+                    repository_activity['sources'],
+                )
+                yield (
+                    json.dumps({'type': 'done', 'result': repository_activity}, ensure_ascii=False)
+                    + '\n'
+                )
+                return
+            repository_listing = github_repository_listing_result(
+                body.question, body, evidence, document_evidence
+            )
+            if repository_listing:
+                repository_listing = attach_retrieval_trace(
+                    repository_listing,
+                    body,
+                    evidence,
+                    retrieval_stats,
+                    repository_listing['sources'],
+                )
+                yield json.dumps({'type': 'done', 'result': repository_listing}, ensure_ascii=False) + '\n'
                 return
             calendar_listed = calendar_event_list_result(
                 body.question, body, evidence, document_evidence
             )
             if calendar_listed:
+                calendar_listed = attach_retrieval_trace(
+                    calendar_listed, body, evidence, retrieval_stats
+                )
                 yield (
                     json.dumps({'type': 'done', 'result': calendar_listed}, ensure_ascii=False)
                     + '\n'
@@ -1107,6 +1291,9 @@ def connected_chat_stream(
                 body.question, body, evidence, document_evidence
             )
             if source_listing:
+                source_listing = attach_retrieval_trace(
+                    source_listing, body, evidence, retrieval_stats
+                )
                 yield (
                     json.dumps({'type': 'done', 'result': source_listing}, ensure_ascii=False)
                     + '\n'
@@ -1114,7 +1301,10 @@ def connected_chat_stream(
                 return
             yield (
                 json.dumps(
-                    {'type': 'status', 'text': 'Writing an answer from the evidence…'},
+                    {
+                        'type': 'status',
+                        'text': f'Retrieval complete · {len(evidence)} passages retained. Writing an answer…',
+                    },
                     ensure_ascii=False,
                 )
                 + '\n'
@@ -1132,6 +1322,11 @@ def connected_chat_stream(
                     body.question, doc_sources, [t.model_dump() for t in body.history]
                 )
                 result['scope'] = connected_scope(body)
+                attach_retrieval_trace(result, body, evidence, retrieval_stats)
+                if result.get('mode') in ('ai', 'connected') and result.get('sources'):
+                    from .citation_audit import audit_citations
+
+                    result['citation_audit'] = audit_citations(result['answer'], result['sources'])
                 yield (
                     json.dumps({'type': 'delta', 'text': result['answer']}, ensure_ascii=False)
                     + '\n'
@@ -1166,7 +1361,12 @@ def connected_chat_stream(
                         'decision_timeline': decision_timeline(event['sources']),
                         'mode': event['mode'],
                         'scope': connected_scope(body),
+                        'citation_audit': event.get('citation_audit'),
+                        'coverage_note': event.get('coverage_note'),
                     }
+                    attach_retrieval_trace(
+                        result, body, evidence, retrieval_stats, event['sources']
+                    )
                     yield json.dumps({'type': 'done', 'result': result}, ensure_ascii=False) + '\n'
                 else:
                     yield json.dumps(event, ensure_ascii=False) + '\n'

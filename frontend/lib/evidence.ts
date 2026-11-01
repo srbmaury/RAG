@@ -9,7 +9,7 @@ export function visibleEvidence(result: Answer | undefined) {
 
 /** Connected records have provider metadata, rather than numbered document sections. */
 export function sourceLocation(source: Source) {
-    if (source.provider)
+    if (source.provider && source.provider !== 'documents')
         return (
             (
                 {
@@ -28,4 +28,10 @@ export function sourceLocation(source: Source) {
             )[source.provider] || source.provider
         );
     return source.page > 0 ? `${source.location_type === 'page' ? 'Page' : 'Section'} ${source.page}` : 'Source excerpt';
+}
+
+/** Hide connector IDs accidentally used as a title when no human label exists. */
+export function sourceDisplayName(source: Source) {
+    if (source.provider === 'slack' && /^#?[A-Z0-9]{8,}$/.test(source.name.trim())) return 'Slack message';
+    return source.name;
 }
