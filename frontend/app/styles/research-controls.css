@@ -1,168 +1,168 @@
 /* Functional research workspace components. */
 button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 a {
-  color: inherit;
-  text-decoration: none;
+    color: inherit;
+    text-decoration: none;
 }
 button,
 a,
 input,
 textarea,
 select {
-  -webkit-tap-highlight-color: transparent;
+    -webkit-tap-highlight-color: transparent;
 }
 button {
-  transition:
-    background 0.15s,
-    border-color 0.15s;
+    transition:
+        background 0.15s,
+        border-color 0.15s;
 }
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid #70a78c;
-  outline-offset: 3px;
+    outline: 2px solid #70a78c;
+    outline-offset: 3px;
 }
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 20%, transparent);
-  border-color: #70a78c;
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 20%, transparent);
+    border-color: #70a78c;
 }
 input[type='checkbox'] {
-  accent-color: var(--brand);
+    accent-color: var(--brand);
 }
 [hidden] {
-  display: none !important;
+    display: none !important;
 }
 .composer:focus-within,
 .home-ask:focus-within,
 .document-search:focus-within,
 .modal-search:focus-within {
-  border-color: #70a78c;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 13%, transparent);
+    border-color: #70a78c;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 13%, transparent);
 }
 .composer textarea:focus-visible,
 .home-ask textarea:focus-visible,
 .document-search input:focus-visible,
 .modal-search input:focus-visible {
-  box-shadow: none;
+    box-shadow: none;
 }
 .eyebrow {
-  display: block;
-  color: var(--brand);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.3px;
+    display: block;
+    color: var(--brand);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.3px;
 }
 .spin {
-  animation: spin 1.2s linear infinite;
+    animation: spin 1.2s linear infinite;
 }
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+    to {
+        transform: rotate(360deg);
+    }
 }
 .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
 }
 .text-button {
-  border: 0;
-  background: none;
-  color: var(--brand);
-  font-size: 12px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+    border: 0;
+    background: none;
+    color: var(--brand);
+    font-size: 12px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 .mark svg path:first-child {
-  fill: #287b53;
+    fill: #287b53;
 }
 .workspace-btn > span:nth-child(2) {
-  min-width: 0;
+    min-width: 0;
 }
 .workspace-btn strong {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .workspace-btn > svg {
-  width: 14px;
-  height: 14px;
-  color: var(--sub);
+    width: 14px;
+    height: 14px;
+    color: var(--sub);
 }
 .sidebar-research {
-  border-top: 1px solid var(--line);
-  margin-top: 18px;
-  padding-top: 3px;
+    border-top: 1px solid var(--line);
+    margin-top: 18px;
+    padding-top: 3px;
 }
 .workspace-stat {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  width: 100%;
-  padding: 9px 12px;
-  font-size: 11px;
-  color: var(--sub);
-  text-align: left;
-  border: 0;
-  background: none;
-  border-radius: 7px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+    padding: 9px 12px;
+    font-size: 11px;
+    color: var(--sub);
+    text-align: left;
+    border: 0;
+    background: none;
+    border-radius: 7px;
 }
 .workspace-stat:hover {
-  background: var(--hover);
+    background: var(--hover);
 }
 .workspace-stat svg {
-  width: 15px;
-  height: 15px;
+    width: 15px;
+    height: 15px;
 }
 .workspace-stat span {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 .usage p {
-  font-size: 10px;
-  margin-top: 7px;
-  color: var(--faint);
+    font-size: 10px;
+    margin-top: 7px;
+    color: var(--faint);
 }
 .profile > div {
-  flex: 1;
-  min-width: 0;
+    flex: 1;
+    min-width: 0;
 }
 .profile strong,
 .profile small {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 .profile .icon-button svg {
-  width: 16px;
-  height: 16px;
+    width: 16px;
+    height: 16px;
 }
 .initials {
-  border: 1px solid var(--line);
-  cursor: pointer;
+    border: 1px solid var(--line);
+    cursor: pointer;
 }
 .expand-sidebar {
-  display: none;
+    display: none;
 }
 .collapsed .sidebar {
-  width: 64px;
-  padding: 16px 7px;
+    width: 64px;
+    padding: 16px 7px;
 }
 .collapsed .main {
-  margin-left: 64px;
+    margin-left: 64px;
 }
 .collapsed .brand-row {
-  justify-content: center;
-  padding: 0 0 30px;
+    justify-content: center;
+    padding: 0 0 30px;
 }
 .collapsed .brand-row > span:nth-child(2),
 .collapsed .sidebar-collapse,
@@ -172,345 +172,345 @@ input[type='checkbox'] {
 .collapsed .usage,
 .collapsed .profile > div,
 .collapsed .profile .avatar {
-  display: none;
+    display: none;
 }
 .collapsed .nav button {
-  justify-content: center;
+    justify-content: center;
 }
 .collapsed .profile {
-  justify-content: center;
-  padding-left: 0;
-  padding-right: 0;
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
 }
 .collapsed .expand-sidebar {
-  display: grid;
+    display: grid;
 }
 .sidebar-scrim {
-  display: none;
+    display: none;
 }
 .feedback {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  background: var(--active);
-  color: var(--text);
-  border: 1px solid var(--line2);
-  border-radius: 9px;
-  margin-bottom: 18px;
-  font-size: 12px;
-  line-height: 1.6;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--active);
+    color: var(--text);
+    border: 1px solid var(--line2);
+    border-radius: 9px;
+    margin-bottom: 18px;
+    font-size: 12px;
+    line-height: 1.6;
 }
 .feedback > svg {
-  width: 17px;
-  height: 17px;
-  color: var(--brand);
+    width: 17px;
+    height: 17px;
+    color: var(--brand);
 }
 .feedback > span {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 .feedback .icon-button {
-  margin-left: auto;
-  flex-shrink: 0;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 .feedback.error {
-  background: color-mix(in srgb, #e77968 10%, var(--panel));
-  border-color: color-mix(in srgb, #e77968 35%, var(--line));
-  color: var(--text);
+    background: color-mix(in srgb, #e77968 10%, var(--panel));
+    border-color: color-mix(in srgb, #e77968 35%, var(--line));
+    color: var(--text);
 }
 .feedback.error > svg {
-  color: #bd5545;
+    color: #bd5545;
 }
 .crumb {
-  display: flex;
-  align-items: center;
-  min-width: 0;
+    display: flex;
+    align-items: center;
+    min-width: 0;
 }
 .crumb .crumb-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0;
 }
 .research-heading {
-  min-width: 0;
-  flex: 1;
+    min-width: 0;
+    flex: 1;
 }
 .research-heading h1 {
-  max-width: 740px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+    max-width: 740px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 .research-mode {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--sub);
-  font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--sub);
+    font-size: 11px;
 }
 .research-mode i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #318b62;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #318b62;
 }
 .filter svg:last-child {
-  width: 12px;
-  height: 12px;
+    width: 12px;
+    height: 12px;
 }
 .research {
-  align-items: start;
+    align-items: start;
 }
 .thread {
-  background: var(--panel);
-  max-height: 650px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
+    background: var(--panel);
+    max-height: 650px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
 }
 .user-message + .answer-row {
-  margin-top: 12px;
+    margin-top: 12px;
 }
 .answer-row + .user-message {
-  margin-top: 30px;
+    margin-top: 30px;
 }
 .user-message .bubble {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 .user-message .bubble-row {
-  margin-bottom: 0;
+    margin-bottom: 0;
 }
 .research-welcome {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 44px 15px 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 44px 15px 30px;
 }
 .welcome-mark {
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 17px;
-  background: var(--active);
-  margin-bottom: 22px;
+    display: grid;
+    place-items: center;
+    width: 58px;
+    height: 58px;
+    border-radius: 17px;
+    background: var(--active);
+    margin-bottom: 22px;
 }
 .welcome-mark .mark svg {
-  width: 35px;
-  height: 35px;
+    width: 35px;
+    height: 35px;
 }
 .research-welcome .eyebrow {
-  font-size: 9px;
-  letter-spacing: 1.7px;
+    font-size: 9px;
+    letter-spacing: 1.7px;
 }
 .research-welcome h2 {
-  font-size: 27px;
-  letter-spacing: -1px;
-  line-height: 1.35;
-  font-weight: 700;
-  margin: 11px 0 14px;
+    font-size: 27px;
+    letter-spacing: -1px;
+    line-height: 1.35;
+    font-weight: 700;
+    margin: 11px 0 14px;
 }
 .research-welcome > p {
-  font-size: 12px;
-  max-width: 365px;
-  color: var(--sub);
-  line-height: 1.8;
-  margin-bottom: 24px;
+    font-size: 12px;
+    max-width: 365px;
+    color: var(--sub);
+    line-height: 1.8;
+    margin-bottom: 24px;
 }
 .starter-questions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-  width: 100%;
-  max-width: 510px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    width: 100%;
+    max-width: 510px;
 }
 .starter-questions button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  text-align: left;
-  padding: 12px 13px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: left;
+    padding: 12px 13px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    font-size: 11px;
 }
 .starter-questions button:hover {
-  background: var(--hover);
-  border-color: var(--line2);
+    background: var(--hover);
+    border-color: var(--line2);
 }
 .starter-questions svg {
-  width: 14px;
-  height: 14px;
-  color: var(--faint);
+    width: 14px;
+    height: 14px;
+    color: var(--faint);
 }
 .composer {
-  background: var(--panel);
+    background: var(--panel);
 }
 .composer textarea {
-  min-width: 0;
-  line-height: 1.6;
-  min-height: 32px;
+    min-width: 0;
+    line-height: 1.6;
+    min-height: 32px;
 }
 .composer-caption {
-  padding: 0 5px;
-  font-size: 10px;
-  line-height: 1.7;
+    padding: 0 5px;
+    font-size: 10px;
+    line-height: 1.7;
 }
 .thinking {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--sub);
-  padding: 24px 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--sub);
+    padding: 24px 8px;
 }
 .thinking svg {
-  width: 17px;
-  height: 17px;
-  color: var(--brand);
+    width: 17px;
+    height: 17px;
+    color: var(--brand);
 }
 .answer .markdown {
-  font-size: 13px;
-  line-height: 1.75;
-  overflow-wrap: anywhere;
+    font-size: 13px;
+    line-height: 1.75;
+    overflow-wrap: anywhere;
 }
 .answer p:last-child {
-  margin-bottom: 0;
+    margin-bottom: 0;
 }
 .answer-head span {
-  font-size: 10px;
+    font-size: 10px;
 }
 .source-chips .source-chip {
-  min-width: min(100%, 210px);
+    min-width: min(100%, 210px);
 }
 .source-chip .file {
-  width: 25px;
-  height: 29px;
-  font-size: 8px;
+    width: 25px;
+    height: 29px;
+    font-size: 8px;
 }
 .source-chip > span:last-child {
-  flex: 1;
+    flex: 1;
 }
 .source-chip small {
-  font-size: 10px;
-  margin-top: 2px;
+    font-size: 10px;
+    margin-top: 2px;
 }
 .tab-count {
-  padding: 1px 5px;
-  font-size: 10px;
-  border-radius: 4px;
-  background: var(--pill);
-  margin-left: 5px;
+    padding: 1px 5px;
+    font-size: 10px;
+    border-radius: 4px;
+    background: var(--pill);
+    margin-left: 5px;
 }
 .evidence-panel {
-  background: var(--panel);
+    background: var(--panel);
 }
 .evidence-placeholder {
-  padding: 40px 22px;
-  text-align: center;
-  color: var(--sub);
+    padding: 40px 22px;
+    text-align: center;
+    color: var(--sub);
 }
 .evidence-placeholder > svg {
-  width: 29px;
-  height: 29px;
-  color: var(--faint);
-  margin: 0 auto 14px;
+    width: 29px;
+    height: 29px;
+    color: var(--faint);
+    margin: 0 auto 14px;
 }
 .evidence-placeholder h3 {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 7px;
 }
 .evidence-placeholder p {
-  font-size: 11px;
-  line-height: 1.8;
+    font-size: 11px;
+    line-height: 1.8;
 }
 .doc-item > svg:last-child {
-  width: 13px;
-  height: 13px;
-  color: var(--faint);
+    width: 13px;
+    height: 13px;
+    color: var(--faint);
 }
 .doc-item .file {
-  width: 28px;
-  height: 32px;
-  font-size: 9px;
+    width: 28px;
+    height: 32px;
+    font-size: 9px;
 }
 .panel-caption {
-  padding: 16px 16px 8px;
-  color: var(--sub);
-  font-size: 11px;
+    padding: 16px 16px 8px;
+    color: var(--sub);
+    font-size: 11px;
 }
 .research-notes {
-  padding: 18px;
+    padding: 18px;
 }
 .research-notes label {
-  font-size: 12px;
-  font-weight: 600;
+    font-size: 12px;
+    font-weight: 600;
 }
 .research-notes textarea {
-  display: block;
-  width: 100%;
-  min-height: 220px;
-  max-height: 420px;
-  border: 1px solid var(--line2);
-  border-radius: 8px;
-  background: var(--bg);
-  padding: 12px;
-  font-size: 12px;
-  line-height: 1.7;
-  resize: vertical;
-  margin: 10px 0;
+    display: block;
+    width: 100%;
+    min-height: 220px;
+    max-height: 420px;
+    border: 1px solid var(--line2);
+    border-radius: 8px;
+    background: var(--bg);
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.7;
+    resize: vertical;
+    margin: 10px 0;
 }
 .research-notes .btn {
-  margin-top: 16px;
+    margin-top: 16px;
 }
 .empty-state {
-  text-align: center;
-  padding: 42px 22px;
-  color: var(--sub);
+    text-align: center;
+    padding: 42px 22px;
+    color: var(--sub);
 }
 .empty-state > span {
-  display: block;
-  margin-bottom: 14px;
-  color: var(--faint);
+    display: block;
+    margin-bottom: 14px;
+    color: var(--faint);
 }
 .empty-state svg {
-  width: 27px;
-  height: 27px;
+    width: 27px;
+    height: 27px;
 }
 .empty-state h3 {
-  font-size: 15px;
-  color: var(--text);
-  margin-bottom: 7px;
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 7px;
 }
 .empty-state p {
-  font-size: 12px;
-  max-width: 360px;
-  margin: 0 auto 20px;
-  line-height: 1.8;
+    font-size: 12px;
+    max-width: 360px;
+    margin: 0 auto 20px;
+    line-height: 1.8;
 }
 .empty-state .btn svg {
-  width: 16px;
-  height: 16px;
+    width: 16px;
+    height: 16px;
 }
 .home-ask {
-  background: var(--panel);
+    background: var(--panel);
 }
 .home-ask textarea {
-  line-height: 1.6;
-  color: var(--text);
+    line-height: 1.6;
+    color: var(--text);
 }
 .home-ask-footer {
-  gap: 14px;
+    gap: 14px;
 }
 .home-ask-footer .caption {
-  font-size: 11px;
+    font-size: 11px;
 }
