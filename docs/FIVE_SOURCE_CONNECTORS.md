@@ -1,7 +1,7 @@
 # Connected source setup
 
 Atlas supports read-only searches across Google Calendar, Linear, Jira,
-OneDrive and Outlook. Connect accounts from **Sources** and enable them per
+OneDrive, Outlook and SharePoint. Connect accounts from **Sources** and enable them per
 question in **Ask Atlas**. Credentials are encrypted and scoped to a workspace.
 
 ## Google Calendar OAuth
@@ -15,7 +15,7 @@ Google Cloud OAuth client:
 Atlas requests `calendar.readonly`, refreshes the credential when searching,
 and searches the primary calendar's available event text.
 
-## Microsoft OneDrive and Outlook OAuth
+## Microsoft OneDrive, Outlook and SharePoint OAuth
 
 Register an Azure/Entra app that supports organizational accounts and add
 the redirect URIs:
@@ -24,10 +24,15 @@ the redirect URIs:
 
 `http://localhost:3000/api/connected-oauth/outlook/callback`
 
+`http://localhost:3000/api/connected-oauth/sharepoint/callback`
+
 Configure `MICROSOFT_CLIENT_ID` and, when using a confidential web
 application, `MICROSOFT_CLIENT_SECRET`. The scopes requested are
 `User.Read Files.Read offline_access` (OneDrive) and
-`User.Read Mail.Read offline_access` (Outlook), with profile/OpenID scopes.
+`User.Read Mail.Read offline_access` (Outlook) and
+`User.Read Sites.Read.All Files.Read.All offline_access` (SharePoint), with profile/OpenID scopes.
+SharePoint queries use delegated Graph search to retrieve accessible file metadata and snippets.
+Full file content extraction or background indexing is **not** included.
 
 OneDrive currently searches metadata in the user's default drive rather than
 SharePoint or file contents. Outlook searches message subjects and previews.
