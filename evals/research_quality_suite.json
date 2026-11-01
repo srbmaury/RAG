@@ -1,0 +1,2408 @@
+{
+  "version": 1,
+  "origin": "fictional synthetic seeded scenarios, not representative user data",
+  "review_status": "unreviewed",
+  "case_count": 96,
+  "cases": [
+    {
+      "id": "direct_fact-01",
+      "category": "direct_fact",
+      "question": "What deployment window did ORION-17 approve?",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The ORION-17 deployment window is Friday at 18:00 UTC.",
+      "required_source_ids": [
+        "jira:support-0-0"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-0-0",
+          "title": "Evidence direct_fact 1",
+          "excerpt": "ORION-17 approved Friday 18:00 UTC as the deployment window."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-0-0",
+          "title": "Other discussion 1",
+          "excerpt": "The deployment window is Tuesday 07:00 UTC."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "date-01",
+      "category": "date",
+      "question": "When was COMET-21's migration merged?",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "COMET-21 was merged on 2026-09-12.",
+      "required_source_ids": [
+        "github:support-0-1"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-0-1",
+          "title": "Evidence date 1",
+          "excerpt": "COMET-21 migration merged on 2026-09-12."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-0-1",
+          "title": "Other discussion 1",
+          "excerpt": "COMET-21 migration was merged on 2026-10-01."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "numeric-01",
+      "category": "numeric",
+      "question": "What was the committed API error budget for NOVA-33?",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The NOVA-33 API error budget was 0.5%.",
+      "required_source_ids": [
+        "notion:support-0-2"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-0-2",
+          "title": "Evidence numeric 1",
+          "excerpt": "NOVA-33 committed an API error budget of 0.5%."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-0-2",
+          "title": "Other discussion 1",
+          "excerpt": "NOVA-33 committed an API error budget of 5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "ownership-01",
+      "category": "ownership",
+      "question": "Who owns the AURORA-14 incident follow-up?",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Priya is responsible for AURORA-14 follow-up.",
+      "required_source_ids": [
+        "slack:support-0-3"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-0-3",
+          "title": "Evidence ownership 1",
+          "excerpt": "AURORA-14 incident follow-up owner: Priya."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-0-3",
+          "title": "Other discussion 1",
+          "excerpt": "Samir owns the AURORA-14 follow-up."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "decision-01",
+      "category": "decision",
+      "question": "Which storage engine was approved for HELIOS-25?",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PostgreSQL was approved for HELIOS-25.",
+      "required_source_ids": [
+        "outlook:support-0-4"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-0-4",
+          "title": "Evidence decision 1",
+          "excerpt": "HELIOS-25 decision: PostgreSQL approved; alternatives deferred."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-0-4",
+          "title": "Other discussion 1",
+          "excerpt": "HELIOS-25 decision: SQLite approved."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "contradiction-01",
+      "category": "contradiction",
+      "question": "Do all sources agree on LYRA-46's release date?",
+      "expected_behavior": "identify_conflict",
+      "expected_answer": "No; sources disagree about LYRA-46 release date.",
+      "required_source_ids": [
+        "documents:support-0-5"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-0-5",
+          "title": "Evidence contradiction 1",
+          "excerpt": "LYRA-46 planned release date is 2026-11-09."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-0-5",
+          "title": "Other discussion 1",
+          "excerpt": "LYRA-46 planned release date is 2026-11-16."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "missing_evidence-01",
+      "category": "missing_evidence",
+      "question": "What was the final cost of POLARIS-52?",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Insufficient evidence: no final cost is recorded.",
+      "required_source_ids": [
+        "jira:support-0-6"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-0-6",
+          "title": "Evidence missing_evidence 1",
+          "excerpt": "POLARIS-52 planned procurement review; cost not finalized."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-0-6",
+          "title": "Other discussion 1",
+          "excerpt": "POLARIS-52 vendor shortlist approved; cost not recorded."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "cross_source-01",
+      "category": "cross_source",
+      "question": "Which pull request implemented ATLAS-61?",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PR #84 implemented ATLAS-61.",
+      "required_source_ids": [
+        "github:support-0-7"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-0-7",
+          "title": "Evidence cross_source 1",
+          "excerpt": "ATLAS-61 issue: implementation tracked in PR #84."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-0-7",
+          "title": "Other discussion 1",
+          "excerpt": "PR #84 merged to implement ATLAS-61."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "temporal-01",
+      "category": "temporal",
+      "question": "Was PHOENIX-70 deployment before or after approval?",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Approval preceded deployment for PHOENIX-70.",
+      "required_source_ids": [
+        "notion:support-0-8"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-0-8",
+          "title": "Evidence temporal 1",
+          "excerpt": "PHOENIX-70 approved on 2026-06-03."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-0-8",
+          "title": "Other discussion 1",
+          "excerpt": "PHOENIX-70 deployed on 2026-06-05."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "permission_boundary-01",
+      "category": "permission_boundary",
+      "question": "Can the requester see confidential MERCURY-88 details?",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Access cannot be established from these sources.",
+      "required_source_ids": [
+        "slack:support-0-9"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-0-9",
+          "title": "Evidence permission_boundary 1",
+          "excerpt": "MERCURY-88 access policy: restricted to authorized project members."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-0-9",
+          "title": "Other discussion 1",
+          "excerpt": "MERCURY-88 internal notes require separate authorization."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "quoted_evidence-01",
+      "category": "quoted_evidence",
+      "question": "What rollback trigger was defined for SIRIUS-92?",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "SIRIUS-92 rollback triggers after elevated errors persist for 10 minutes.",
+      "required_source_ids": [
+        "outlook:support-0-10"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-0-10",
+          "title": "Evidence quoted_evidence 1",
+          "excerpt": "SIRIUS-92 rollback condition: error rate above 2% for 10 minutes."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-0-10",
+          "title": "Other discussion 1",
+          "excerpt": "SIRIUS-92 rollout target error rate below 0.5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "negative_assertion-01",
+      "category": "negative_assertion",
+      "question": "Was the DRACO-11 customer export enabled?",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The DRACO-11 customer export was not enabled.",
+      "required_source_ids": [
+        "documents:support-0-11"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-0-11",
+          "title": "Evidence negative_assertion 1",
+          "excerpt": "DRACO-11 decision: customer export is not enabled."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-0-11",
+          "title": "Other discussion 1",
+          "excerpt": "DRACO-11 export feature discussed for the roadmap."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "direct_fact-02",
+      "category": "direct_fact",
+      "question": "What deployment window did ORION-17 approve? (scenario 2)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The ORION-17 deployment window is Friday at 18:00 UTC.",
+      "required_source_ids": [
+        "github:support-1-0"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-1-0",
+          "title": "Evidence direct_fact 2",
+          "excerpt": "ORION-17 approved Friday 18:00 UTC as the deployment window."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-1-0",
+          "title": "Other discussion 2",
+          "excerpt": "The deployment window is Tuesday 07:00 UTC."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "date-02",
+      "category": "date",
+      "question": "When was COMET-21's migration merged? (scenario 2)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "COMET-21 was merged on 2026-09-12.",
+      "required_source_ids": [
+        "notion:support-1-1"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-1-1",
+          "title": "Evidence date 2",
+          "excerpt": "COMET-21 migration merged on 2026-09-12."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-1-1",
+          "title": "Other discussion 2",
+          "excerpt": "COMET-21 migration was merged on 2026-10-01."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "numeric-02",
+      "category": "numeric",
+      "question": "What was the committed API error budget for NOVA-33? (scenario 2)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The NOVA-33 API error budget was 0.5%.",
+      "required_source_ids": [
+        "slack:support-1-2"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-1-2",
+          "title": "Evidence numeric 2",
+          "excerpt": "NOVA-33 committed an API error budget of 0.5%."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-1-2",
+          "title": "Other discussion 2",
+          "excerpt": "NOVA-33 committed an API error budget of 5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "ownership-02",
+      "category": "ownership",
+      "question": "Who owns the AURORA-14 incident follow-up? (scenario 2)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Priya is responsible for AURORA-14 follow-up.",
+      "required_source_ids": [
+        "outlook:support-1-3"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-1-3",
+          "title": "Evidence ownership 2",
+          "excerpt": "AURORA-14 incident follow-up owner: Priya."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-1-3",
+          "title": "Other discussion 2",
+          "excerpt": "Samir owns the AURORA-14 follow-up."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "decision-02",
+      "category": "decision",
+      "question": "Which storage engine was approved for HELIOS-25? (scenario 2)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PostgreSQL was approved for HELIOS-25.",
+      "required_source_ids": [
+        "documents:support-1-4"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-1-4",
+          "title": "Evidence decision 2",
+          "excerpt": "HELIOS-25 decision: PostgreSQL approved; alternatives deferred."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-1-4",
+          "title": "Other discussion 2",
+          "excerpt": "HELIOS-25 decision: SQLite approved."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "contradiction-02",
+      "category": "contradiction",
+      "question": "Do all sources agree on LYRA-46's release date? (scenario 2)",
+      "expected_behavior": "identify_conflict",
+      "expected_answer": "No; sources disagree about LYRA-46 release date.",
+      "required_source_ids": [
+        "jira:support-1-5"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-1-5",
+          "title": "Evidence contradiction 2",
+          "excerpt": "LYRA-46 planned release date is 2026-11-09."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-1-5",
+          "title": "Other discussion 2",
+          "excerpt": "LYRA-46 planned release date is 2026-11-16."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "missing_evidence-02",
+      "category": "missing_evidence",
+      "question": "What was the final cost of POLARIS-52? (scenario 2)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Insufficient evidence: no final cost is recorded.",
+      "required_source_ids": [
+        "github:support-1-6"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-1-6",
+          "title": "Evidence missing_evidence 2",
+          "excerpt": "POLARIS-52 planned procurement review; cost not finalized."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-1-6",
+          "title": "Other discussion 2",
+          "excerpt": "POLARIS-52 vendor shortlist approved; cost not recorded."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "cross_source-02",
+      "category": "cross_source",
+      "question": "Which pull request implemented ATLAS-61? (scenario 2)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PR #84 implemented ATLAS-61.",
+      "required_source_ids": [
+        "notion:support-1-7"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-1-7",
+          "title": "Evidence cross_source 2",
+          "excerpt": "ATLAS-61 issue: implementation tracked in PR #84."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-1-7",
+          "title": "Other discussion 2",
+          "excerpt": "PR #84 merged to implement ATLAS-61."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "temporal-02",
+      "category": "temporal",
+      "question": "Was PHOENIX-70 deployment before or after approval? (scenario 2)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Approval preceded deployment for PHOENIX-70.",
+      "required_source_ids": [
+        "slack:support-1-8"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-1-8",
+          "title": "Evidence temporal 2",
+          "excerpt": "PHOENIX-70 approved on 2026-06-03."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-1-8",
+          "title": "Other discussion 2",
+          "excerpt": "PHOENIX-70 deployed on 2026-06-05."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "permission_boundary-02",
+      "category": "permission_boundary",
+      "question": "Can the requester see confidential MERCURY-88 details? (scenario 2)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Access cannot be established from these sources.",
+      "required_source_ids": [
+        "outlook:support-1-9"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-1-9",
+          "title": "Evidence permission_boundary 2",
+          "excerpt": "MERCURY-88 access policy: restricted to authorized project members."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-1-9",
+          "title": "Other discussion 2",
+          "excerpt": "MERCURY-88 internal notes require separate authorization."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "quoted_evidence-02",
+      "category": "quoted_evidence",
+      "question": "What rollback trigger was defined for SIRIUS-92? (scenario 2)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "SIRIUS-92 rollback triggers after elevated errors persist for 10 minutes.",
+      "required_source_ids": [
+        "documents:support-1-10"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-1-10",
+          "title": "Evidence quoted_evidence 2",
+          "excerpt": "SIRIUS-92 rollback condition: error rate above 2% for 10 minutes."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-1-10",
+          "title": "Other discussion 2",
+          "excerpt": "SIRIUS-92 rollout target error rate below 0.5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "negative_assertion-02",
+      "category": "negative_assertion",
+      "question": "Was the DRACO-11 customer export enabled? (scenario 2)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The DRACO-11 customer export was not enabled.",
+      "required_source_ids": [
+        "jira:support-1-11"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-1-11",
+          "title": "Evidence negative_assertion 2",
+          "excerpt": "DRACO-11 decision: customer export is not enabled."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-1-11",
+          "title": "Other discussion 2",
+          "excerpt": "DRACO-11 export feature discussed for the roadmap."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "direct_fact-03",
+      "category": "direct_fact",
+      "question": "What deployment window did ORION-17 approve? (scenario 3)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The ORION-17 deployment window is Friday at 18:00 UTC.",
+      "required_source_ids": [
+        "notion:support-2-0"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-2-0",
+          "title": "Evidence direct_fact 3",
+          "excerpt": "ORION-17 approved Friday 18:00 UTC as the deployment window."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-2-0",
+          "title": "Other discussion 3",
+          "excerpt": "The deployment window is Tuesday 07:00 UTC."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "date-03",
+      "category": "date",
+      "question": "When was COMET-21's migration merged? (scenario 3)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "COMET-21 was merged on 2026-09-12.",
+      "required_source_ids": [
+        "slack:support-2-1"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-2-1",
+          "title": "Evidence date 3",
+          "excerpt": "COMET-21 migration merged on 2026-09-12."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-2-1",
+          "title": "Other discussion 3",
+          "excerpt": "COMET-21 migration was merged on 2026-10-01."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "numeric-03",
+      "category": "numeric",
+      "question": "What was the committed API error budget for NOVA-33? (scenario 3)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The NOVA-33 API error budget was 0.5%.",
+      "required_source_ids": [
+        "outlook:support-2-2"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-2-2",
+          "title": "Evidence numeric 3",
+          "excerpt": "NOVA-33 committed an API error budget of 0.5%."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-2-2",
+          "title": "Other discussion 3",
+          "excerpt": "NOVA-33 committed an API error budget of 5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "ownership-03",
+      "category": "ownership",
+      "question": "Who owns the AURORA-14 incident follow-up? (scenario 3)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Priya is responsible for AURORA-14 follow-up.",
+      "required_source_ids": [
+        "documents:support-2-3"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-2-3",
+          "title": "Evidence ownership 3",
+          "excerpt": "AURORA-14 incident follow-up owner: Priya."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-2-3",
+          "title": "Other discussion 3",
+          "excerpt": "Samir owns the AURORA-14 follow-up."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "decision-03",
+      "category": "decision",
+      "question": "Which storage engine was approved for HELIOS-25? (scenario 3)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PostgreSQL was approved for HELIOS-25.",
+      "required_source_ids": [
+        "jira:support-2-4"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-2-4",
+          "title": "Evidence decision 3",
+          "excerpt": "HELIOS-25 decision: PostgreSQL approved; alternatives deferred."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-2-4",
+          "title": "Other discussion 3",
+          "excerpt": "HELIOS-25 decision: SQLite approved."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "contradiction-03",
+      "category": "contradiction",
+      "question": "Do all sources agree on LYRA-46's release date? (scenario 3)",
+      "expected_behavior": "identify_conflict",
+      "expected_answer": "No; sources disagree about LYRA-46 release date.",
+      "required_source_ids": [
+        "github:support-2-5"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-2-5",
+          "title": "Evidence contradiction 3",
+          "excerpt": "LYRA-46 planned release date is 2026-11-09."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-2-5",
+          "title": "Other discussion 3",
+          "excerpt": "LYRA-46 planned release date is 2026-11-16."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "missing_evidence-03",
+      "category": "missing_evidence",
+      "question": "What was the final cost of POLARIS-52? (scenario 3)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Insufficient evidence: no final cost is recorded.",
+      "required_source_ids": [
+        "notion:support-2-6"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-2-6",
+          "title": "Evidence missing_evidence 3",
+          "excerpt": "POLARIS-52 planned procurement review; cost not finalized."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-2-6",
+          "title": "Other discussion 3",
+          "excerpt": "POLARIS-52 vendor shortlist approved; cost not recorded."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "cross_source-03",
+      "category": "cross_source",
+      "question": "Which pull request implemented ATLAS-61? (scenario 3)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PR #84 implemented ATLAS-61.",
+      "required_source_ids": [
+        "slack:support-2-7"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-2-7",
+          "title": "Evidence cross_source 3",
+          "excerpt": "ATLAS-61 issue: implementation tracked in PR #84."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-2-7",
+          "title": "Other discussion 3",
+          "excerpt": "PR #84 merged to implement ATLAS-61."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "temporal-03",
+      "category": "temporal",
+      "question": "Was PHOENIX-70 deployment before or after approval? (scenario 3)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Approval preceded deployment for PHOENIX-70.",
+      "required_source_ids": [
+        "outlook:support-2-8"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-2-8",
+          "title": "Evidence temporal 3",
+          "excerpt": "PHOENIX-70 approved on 2026-06-03."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-2-8",
+          "title": "Other discussion 3",
+          "excerpt": "PHOENIX-70 deployed on 2026-06-05."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "permission_boundary-03",
+      "category": "permission_boundary",
+      "question": "Can the requester see confidential MERCURY-88 details? (scenario 3)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Access cannot be established from these sources.",
+      "required_source_ids": [
+        "documents:support-2-9"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-2-9",
+          "title": "Evidence permission_boundary 3",
+          "excerpt": "MERCURY-88 access policy: restricted to authorized project members."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-2-9",
+          "title": "Other discussion 3",
+          "excerpt": "MERCURY-88 internal notes require separate authorization."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "quoted_evidence-03",
+      "category": "quoted_evidence",
+      "question": "What rollback trigger was defined for SIRIUS-92? (scenario 3)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "SIRIUS-92 rollback triggers after elevated errors persist for 10 minutes.",
+      "required_source_ids": [
+        "jira:support-2-10"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-2-10",
+          "title": "Evidence quoted_evidence 3",
+          "excerpt": "SIRIUS-92 rollback condition: error rate above 2% for 10 minutes."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-2-10",
+          "title": "Other discussion 3",
+          "excerpt": "SIRIUS-92 rollout target error rate below 0.5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "negative_assertion-03",
+      "category": "negative_assertion",
+      "question": "Was the DRACO-11 customer export enabled? (scenario 3)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The DRACO-11 customer export was not enabled.",
+      "required_source_ids": [
+        "github:support-2-11"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-2-11",
+          "title": "Evidence negative_assertion 3",
+          "excerpt": "DRACO-11 decision: customer export is not enabled."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-2-11",
+          "title": "Other discussion 3",
+          "excerpt": "DRACO-11 export feature discussed for the roadmap."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "direct_fact-04",
+      "category": "direct_fact",
+      "question": "What deployment window did ORION-17 approve? (scenario 4)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The ORION-17 deployment window is Friday at 18:00 UTC.",
+      "required_source_ids": [
+        "slack:support-3-0"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-3-0",
+          "title": "Evidence direct_fact 4",
+          "excerpt": "ORION-17 approved Friday 18:00 UTC as the deployment window."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-3-0",
+          "title": "Other discussion 4",
+          "excerpt": "The deployment window is Tuesday 07:00 UTC."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "date-04",
+      "category": "date",
+      "question": "When was COMET-21's migration merged? (scenario 4)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "COMET-21 was merged on 2026-09-12.",
+      "required_source_ids": [
+        "outlook:support-3-1"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-3-1",
+          "title": "Evidence date 4",
+          "excerpt": "COMET-21 migration merged on 2026-09-12."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-3-1",
+          "title": "Other discussion 4",
+          "excerpt": "COMET-21 migration was merged on 2026-10-01."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "numeric-04",
+      "category": "numeric",
+      "question": "What was the committed API error budget for NOVA-33? (scenario 4)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The NOVA-33 API error budget was 0.5%.",
+      "required_source_ids": [
+        "documents:support-3-2"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-3-2",
+          "title": "Evidence numeric 4",
+          "excerpt": "NOVA-33 committed an API error budget of 0.5%."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-3-2",
+          "title": "Other discussion 4",
+          "excerpt": "NOVA-33 committed an API error budget of 5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "ownership-04",
+      "category": "ownership",
+      "question": "Who owns the AURORA-14 incident follow-up? (scenario 4)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Priya is responsible for AURORA-14 follow-up.",
+      "required_source_ids": [
+        "jira:support-3-3"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-3-3",
+          "title": "Evidence ownership 4",
+          "excerpt": "AURORA-14 incident follow-up owner: Priya."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-3-3",
+          "title": "Other discussion 4",
+          "excerpt": "Samir owns the AURORA-14 follow-up."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "decision-04",
+      "category": "decision",
+      "question": "Which storage engine was approved for HELIOS-25? (scenario 4)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PostgreSQL was approved for HELIOS-25.",
+      "required_source_ids": [
+        "github:support-3-4"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-3-4",
+          "title": "Evidence decision 4",
+          "excerpt": "HELIOS-25 decision: PostgreSQL approved; alternatives deferred."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-3-4",
+          "title": "Other discussion 4",
+          "excerpt": "HELIOS-25 decision: SQLite approved."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "contradiction-04",
+      "category": "contradiction",
+      "question": "Do all sources agree on LYRA-46's release date? (scenario 4)",
+      "expected_behavior": "identify_conflict",
+      "expected_answer": "No; sources disagree about LYRA-46 release date.",
+      "required_source_ids": [
+        "notion:support-3-5"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-3-5",
+          "title": "Evidence contradiction 4",
+          "excerpt": "LYRA-46 planned release date is 2026-11-09."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-3-5",
+          "title": "Other discussion 4",
+          "excerpt": "LYRA-46 planned release date is 2026-11-16."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "missing_evidence-04",
+      "category": "missing_evidence",
+      "question": "What was the final cost of POLARIS-52? (scenario 4)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Insufficient evidence: no final cost is recorded.",
+      "required_source_ids": [
+        "slack:support-3-6"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-3-6",
+          "title": "Evidence missing_evidence 4",
+          "excerpt": "POLARIS-52 planned procurement review; cost not finalized."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-3-6",
+          "title": "Other discussion 4",
+          "excerpt": "POLARIS-52 vendor shortlist approved; cost not recorded."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "cross_source-04",
+      "category": "cross_source",
+      "question": "Which pull request implemented ATLAS-61? (scenario 4)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PR #84 implemented ATLAS-61.",
+      "required_source_ids": [
+        "outlook:support-3-7"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-3-7",
+          "title": "Evidence cross_source 4",
+          "excerpt": "ATLAS-61 issue: implementation tracked in PR #84."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-3-7",
+          "title": "Other discussion 4",
+          "excerpt": "PR #84 merged to implement ATLAS-61."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "temporal-04",
+      "category": "temporal",
+      "question": "Was PHOENIX-70 deployment before or after approval? (scenario 4)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Approval preceded deployment for PHOENIX-70.",
+      "required_source_ids": [
+        "documents:support-3-8"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-3-8",
+          "title": "Evidence temporal 4",
+          "excerpt": "PHOENIX-70 approved on 2026-06-03."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-3-8",
+          "title": "Other discussion 4",
+          "excerpt": "PHOENIX-70 deployed on 2026-06-05."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "permission_boundary-04",
+      "category": "permission_boundary",
+      "question": "Can the requester see confidential MERCURY-88 details? (scenario 4)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Access cannot be established from these sources.",
+      "required_source_ids": [
+        "jira:support-3-9"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-3-9",
+          "title": "Evidence permission_boundary 4",
+          "excerpt": "MERCURY-88 access policy: restricted to authorized project members."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-3-9",
+          "title": "Other discussion 4",
+          "excerpt": "MERCURY-88 internal notes require separate authorization."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "quoted_evidence-04",
+      "category": "quoted_evidence",
+      "question": "What rollback trigger was defined for SIRIUS-92? (scenario 4)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "SIRIUS-92 rollback triggers after elevated errors persist for 10 minutes.",
+      "required_source_ids": [
+        "github:support-3-10"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-3-10",
+          "title": "Evidence quoted_evidence 4",
+          "excerpt": "SIRIUS-92 rollback condition: error rate above 2% for 10 minutes."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-3-10",
+          "title": "Other discussion 4",
+          "excerpt": "SIRIUS-92 rollout target error rate below 0.5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "negative_assertion-04",
+      "category": "negative_assertion",
+      "question": "Was the DRACO-11 customer export enabled? (scenario 4)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The DRACO-11 customer export was not enabled.",
+      "required_source_ids": [
+        "notion:support-3-11"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-3-11",
+          "title": "Evidence negative_assertion 4",
+          "excerpt": "DRACO-11 decision: customer export is not enabled."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-3-11",
+          "title": "Other discussion 4",
+          "excerpt": "DRACO-11 export feature discussed for the roadmap."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "direct_fact-05",
+      "category": "direct_fact",
+      "question": "What deployment window did ORION-17 approve? (scenario 5)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The ORION-17 deployment window is Friday at 18:00 UTC.",
+      "required_source_ids": [
+        "outlook:support-4-0"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-4-0",
+          "title": "Evidence direct_fact 5",
+          "excerpt": "ORION-17 approved Friday 18:00 UTC as the deployment window."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-4-0",
+          "title": "Other discussion 5",
+          "excerpt": "The deployment window is Tuesday 07:00 UTC."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "date-05",
+      "category": "date",
+      "question": "When was COMET-21's migration merged? (scenario 5)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "COMET-21 was merged on 2026-09-12.",
+      "required_source_ids": [
+        "documents:support-4-1"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-4-1",
+          "title": "Evidence date 5",
+          "excerpt": "COMET-21 migration merged on 2026-09-12."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-4-1",
+          "title": "Other discussion 5",
+          "excerpt": "COMET-21 migration was merged on 2026-10-01."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "numeric-05",
+      "category": "numeric",
+      "question": "What was the committed API error budget for NOVA-33? (scenario 5)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The NOVA-33 API error budget was 0.5%.",
+      "required_source_ids": [
+        "jira:support-4-2"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-4-2",
+          "title": "Evidence numeric 5",
+          "excerpt": "NOVA-33 committed an API error budget of 0.5%."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-4-2",
+          "title": "Other discussion 5",
+          "excerpt": "NOVA-33 committed an API error budget of 5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "ownership-05",
+      "category": "ownership",
+      "question": "Who owns the AURORA-14 incident follow-up? (scenario 5)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Priya is responsible for AURORA-14 follow-up.",
+      "required_source_ids": [
+        "github:support-4-3"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-4-3",
+          "title": "Evidence ownership 5",
+          "excerpt": "AURORA-14 incident follow-up owner: Priya."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-4-3",
+          "title": "Other discussion 5",
+          "excerpt": "Samir owns the AURORA-14 follow-up."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "decision-05",
+      "category": "decision",
+      "question": "Which storage engine was approved for HELIOS-25? (scenario 5)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PostgreSQL was approved for HELIOS-25.",
+      "required_source_ids": [
+        "notion:support-4-4"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-4-4",
+          "title": "Evidence decision 5",
+          "excerpt": "HELIOS-25 decision: PostgreSQL approved; alternatives deferred."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-4-4",
+          "title": "Other discussion 5",
+          "excerpt": "HELIOS-25 decision: SQLite approved."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "contradiction-05",
+      "category": "contradiction",
+      "question": "Do all sources agree on LYRA-46's release date? (scenario 5)",
+      "expected_behavior": "identify_conflict",
+      "expected_answer": "No; sources disagree about LYRA-46 release date.",
+      "required_source_ids": [
+        "slack:support-4-5"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-4-5",
+          "title": "Evidence contradiction 5",
+          "excerpt": "LYRA-46 planned release date is 2026-11-09."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-4-5",
+          "title": "Other discussion 5",
+          "excerpt": "LYRA-46 planned release date is 2026-11-16."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "missing_evidence-05",
+      "category": "missing_evidence",
+      "question": "What was the final cost of POLARIS-52? (scenario 5)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Insufficient evidence: no final cost is recorded.",
+      "required_source_ids": [
+        "outlook:support-4-6"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-4-6",
+          "title": "Evidence missing_evidence 5",
+          "excerpt": "POLARIS-52 planned procurement review; cost not finalized."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-4-6",
+          "title": "Other discussion 5",
+          "excerpt": "POLARIS-52 vendor shortlist approved; cost not recorded."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "cross_source-05",
+      "category": "cross_source",
+      "question": "Which pull request implemented ATLAS-61? (scenario 5)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PR #84 implemented ATLAS-61.",
+      "required_source_ids": [
+        "documents:support-4-7"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-4-7",
+          "title": "Evidence cross_source 5",
+          "excerpt": "ATLAS-61 issue: implementation tracked in PR #84."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-4-7",
+          "title": "Other discussion 5",
+          "excerpt": "PR #84 merged to implement ATLAS-61."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "temporal-05",
+      "category": "temporal",
+      "question": "Was PHOENIX-70 deployment before or after approval? (scenario 5)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Approval preceded deployment for PHOENIX-70.",
+      "required_source_ids": [
+        "jira:support-4-8"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-4-8",
+          "title": "Evidence temporal 5",
+          "excerpt": "PHOENIX-70 approved on 2026-06-03."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-4-8",
+          "title": "Other discussion 5",
+          "excerpt": "PHOENIX-70 deployed on 2026-06-05."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "permission_boundary-05",
+      "category": "permission_boundary",
+      "question": "Can the requester see confidential MERCURY-88 details? (scenario 5)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Access cannot be established from these sources.",
+      "required_source_ids": [
+        "github:support-4-9"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-4-9",
+          "title": "Evidence permission_boundary 5",
+          "excerpt": "MERCURY-88 access policy: restricted to authorized project members."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-4-9",
+          "title": "Other discussion 5",
+          "excerpt": "MERCURY-88 internal notes require separate authorization."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "quoted_evidence-05",
+      "category": "quoted_evidence",
+      "question": "What rollback trigger was defined for SIRIUS-92? (scenario 5)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "SIRIUS-92 rollback triggers after elevated errors persist for 10 minutes.",
+      "required_source_ids": [
+        "notion:support-4-10"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-4-10",
+          "title": "Evidence quoted_evidence 5",
+          "excerpt": "SIRIUS-92 rollback condition: error rate above 2% for 10 minutes."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-4-10",
+          "title": "Other discussion 5",
+          "excerpt": "SIRIUS-92 rollout target error rate below 0.5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "negative_assertion-05",
+      "category": "negative_assertion",
+      "question": "Was the DRACO-11 customer export enabled? (scenario 5)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The DRACO-11 customer export was not enabled.",
+      "required_source_ids": [
+        "slack:support-4-11"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-4-11",
+          "title": "Evidence negative_assertion 5",
+          "excerpt": "DRACO-11 decision: customer export is not enabled."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-4-11",
+          "title": "Other discussion 5",
+          "excerpt": "DRACO-11 export feature discussed for the roadmap."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "direct_fact-06",
+      "category": "direct_fact",
+      "question": "What deployment window did ORION-17 approve? (scenario 6)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The ORION-17 deployment window is Friday at 18:00 UTC.",
+      "required_source_ids": [
+        "documents:support-5-0"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-5-0",
+          "title": "Evidence direct_fact 6",
+          "excerpt": "ORION-17 approved Friday 18:00 UTC as the deployment window."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-5-0",
+          "title": "Other discussion 6",
+          "excerpt": "The deployment window is Tuesday 07:00 UTC."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "date-06",
+      "category": "date",
+      "question": "When was COMET-21's migration merged? (scenario 6)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "COMET-21 was merged on 2026-09-12.",
+      "required_source_ids": [
+        "jira:support-5-1"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-5-1",
+          "title": "Evidence date 6",
+          "excerpt": "COMET-21 migration merged on 2026-09-12."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-5-1",
+          "title": "Other discussion 6",
+          "excerpt": "COMET-21 migration was merged on 2026-10-01."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "numeric-06",
+      "category": "numeric",
+      "question": "What was the committed API error budget for NOVA-33? (scenario 6)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The NOVA-33 API error budget was 0.5%.",
+      "required_source_ids": [
+        "github:support-5-2"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-5-2",
+          "title": "Evidence numeric 6",
+          "excerpt": "NOVA-33 committed an API error budget of 0.5%."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-5-2",
+          "title": "Other discussion 6",
+          "excerpt": "NOVA-33 committed an API error budget of 5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "ownership-06",
+      "category": "ownership",
+      "question": "Who owns the AURORA-14 incident follow-up? (scenario 6)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Priya is responsible for AURORA-14 follow-up.",
+      "required_source_ids": [
+        "notion:support-5-3"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-5-3",
+          "title": "Evidence ownership 6",
+          "excerpt": "AURORA-14 incident follow-up owner: Priya."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-5-3",
+          "title": "Other discussion 6",
+          "excerpt": "Samir owns the AURORA-14 follow-up."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "decision-06",
+      "category": "decision",
+      "question": "Which storage engine was approved for HELIOS-25? (scenario 6)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PostgreSQL was approved for HELIOS-25.",
+      "required_source_ids": [
+        "slack:support-5-4"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-5-4",
+          "title": "Evidence decision 6",
+          "excerpt": "HELIOS-25 decision: PostgreSQL approved; alternatives deferred."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-5-4",
+          "title": "Other discussion 6",
+          "excerpt": "HELIOS-25 decision: SQLite approved."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "contradiction-06",
+      "category": "contradiction",
+      "question": "Do all sources agree on LYRA-46's release date? (scenario 6)",
+      "expected_behavior": "identify_conflict",
+      "expected_answer": "No; sources disagree about LYRA-46 release date.",
+      "required_source_ids": [
+        "outlook:support-5-5"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-5-5",
+          "title": "Evidence contradiction 6",
+          "excerpt": "LYRA-46 planned release date is 2026-11-09."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-5-5",
+          "title": "Other discussion 6",
+          "excerpt": "LYRA-46 planned release date is 2026-11-16."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "missing_evidence-06",
+      "category": "missing_evidence",
+      "question": "What was the final cost of POLARIS-52? (scenario 6)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Insufficient evidence: no final cost is recorded.",
+      "required_source_ids": [
+        "documents:support-5-6"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-5-6",
+          "title": "Evidence missing_evidence 6",
+          "excerpt": "POLARIS-52 planned procurement review; cost not finalized."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-5-6",
+          "title": "Other discussion 6",
+          "excerpt": "POLARIS-52 vendor shortlist approved; cost not recorded."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "cross_source-06",
+      "category": "cross_source",
+      "question": "Which pull request implemented ATLAS-61? (scenario 6)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PR #84 implemented ATLAS-61.",
+      "required_source_ids": [
+        "jira:support-5-7"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-5-7",
+          "title": "Evidence cross_source 6",
+          "excerpt": "ATLAS-61 issue: implementation tracked in PR #84."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-5-7",
+          "title": "Other discussion 6",
+          "excerpt": "PR #84 merged to implement ATLAS-61."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "temporal-06",
+      "category": "temporal",
+      "question": "Was PHOENIX-70 deployment before or after approval? (scenario 6)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Approval preceded deployment for PHOENIX-70.",
+      "required_source_ids": [
+        "github:support-5-8"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-5-8",
+          "title": "Evidence temporal 6",
+          "excerpt": "PHOENIX-70 approved on 2026-06-03."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-5-8",
+          "title": "Other discussion 6",
+          "excerpt": "PHOENIX-70 deployed on 2026-06-05."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "permission_boundary-06",
+      "category": "permission_boundary",
+      "question": "Can the requester see confidential MERCURY-88 details? (scenario 6)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Access cannot be established from these sources.",
+      "required_source_ids": [
+        "notion:support-5-9"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-5-9",
+          "title": "Evidence permission_boundary 6",
+          "excerpt": "MERCURY-88 access policy: restricted to authorized project members."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-5-9",
+          "title": "Other discussion 6",
+          "excerpt": "MERCURY-88 internal notes require separate authorization."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "quoted_evidence-06",
+      "category": "quoted_evidence",
+      "question": "What rollback trigger was defined for SIRIUS-92? (scenario 6)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "SIRIUS-92 rollback triggers after elevated errors persist for 10 minutes.",
+      "required_source_ids": [
+        "slack:support-5-10"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-5-10",
+          "title": "Evidence quoted_evidence 6",
+          "excerpt": "SIRIUS-92 rollback condition: error rate above 2% for 10 minutes."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-5-10",
+          "title": "Other discussion 6",
+          "excerpt": "SIRIUS-92 rollout target error rate below 0.5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "negative_assertion-06",
+      "category": "negative_assertion",
+      "question": "Was the DRACO-11 customer export enabled? (scenario 6)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The DRACO-11 customer export was not enabled.",
+      "required_source_ids": [
+        "outlook:support-5-11"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-5-11",
+          "title": "Evidence negative_assertion 6",
+          "excerpt": "DRACO-11 decision: customer export is not enabled."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-5-11",
+          "title": "Other discussion 6",
+          "excerpt": "DRACO-11 export feature discussed for the roadmap."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "direct_fact-07",
+      "category": "direct_fact",
+      "question": "What deployment window did ORION-17 approve? (scenario 7)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The ORION-17 deployment window is Friday at 18:00 UTC.",
+      "required_source_ids": [
+        "jira:support-6-0"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-6-0",
+          "title": "Evidence direct_fact 7",
+          "excerpt": "ORION-17 approved Friday 18:00 UTC as the deployment window."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-6-0",
+          "title": "Other discussion 7",
+          "excerpt": "The deployment window is Tuesday 07:00 UTC."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "date-07",
+      "category": "date",
+      "question": "When was COMET-21's migration merged? (scenario 7)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "COMET-21 was merged on 2026-09-12.",
+      "required_source_ids": [
+        "github:support-6-1"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-6-1",
+          "title": "Evidence date 7",
+          "excerpt": "COMET-21 migration merged on 2026-09-12."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-6-1",
+          "title": "Other discussion 7",
+          "excerpt": "COMET-21 migration was merged on 2026-10-01."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "numeric-07",
+      "category": "numeric",
+      "question": "What was the committed API error budget for NOVA-33? (scenario 7)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The NOVA-33 API error budget was 0.5%.",
+      "required_source_ids": [
+        "notion:support-6-2"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-6-2",
+          "title": "Evidence numeric 7",
+          "excerpt": "NOVA-33 committed an API error budget of 0.5%."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-6-2",
+          "title": "Other discussion 7",
+          "excerpt": "NOVA-33 committed an API error budget of 5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "ownership-07",
+      "category": "ownership",
+      "question": "Who owns the AURORA-14 incident follow-up? (scenario 7)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Priya is responsible for AURORA-14 follow-up.",
+      "required_source_ids": [
+        "slack:support-6-3"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-6-3",
+          "title": "Evidence ownership 7",
+          "excerpt": "AURORA-14 incident follow-up owner: Priya."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-6-3",
+          "title": "Other discussion 7",
+          "excerpt": "Samir owns the AURORA-14 follow-up."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "decision-07",
+      "category": "decision",
+      "question": "Which storage engine was approved for HELIOS-25? (scenario 7)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PostgreSQL was approved for HELIOS-25.",
+      "required_source_ids": [
+        "outlook:support-6-4"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-6-4",
+          "title": "Evidence decision 7",
+          "excerpt": "HELIOS-25 decision: PostgreSQL approved; alternatives deferred."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-6-4",
+          "title": "Other discussion 7",
+          "excerpt": "HELIOS-25 decision: SQLite approved."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "contradiction-07",
+      "category": "contradiction",
+      "question": "Do all sources agree on LYRA-46's release date? (scenario 7)",
+      "expected_behavior": "identify_conflict",
+      "expected_answer": "No; sources disagree about LYRA-46 release date.",
+      "required_source_ids": [
+        "documents:support-6-5"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-6-5",
+          "title": "Evidence contradiction 7",
+          "excerpt": "LYRA-46 planned release date is 2026-11-09."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-6-5",
+          "title": "Other discussion 7",
+          "excerpt": "LYRA-46 planned release date is 2026-11-16."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "missing_evidence-07",
+      "category": "missing_evidence",
+      "question": "What was the final cost of POLARIS-52? (scenario 7)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Insufficient evidence: no final cost is recorded.",
+      "required_source_ids": [
+        "jira:support-6-6"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-6-6",
+          "title": "Evidence missing_evidence 7",
+          "excerpt": "POLARIS-52 planned procurement review; cost not finalized."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-6-6",
+          "title": "Other discussion 7",
+          "excerpt": "POLARIS-52 vendor shortlist approved; cost not recorded."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "cross_source-07",
+      "category": "cross_source",
+      "question": "Which pull request implemented ATLAS-61? (scenario 7)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PR #84 implemented ATLAS-61.",
+      "required_source_ids": [
+        "github:support-6-7"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-6-7",
+          "title": "Evidence cross_source 7",
+          "excerpt": "ATLAS-61 issue: implementation tracked in PR #84."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-6-7",
+          "title": "Other discussion 7",
+          "excerpt": "PR #84 merged to implement ATLAS-61."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "temporal-07",
+      "category": "temporal",
+      "question": "Was PHOENIX-70 deployment before or after approval? (scenario 7)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Approval preceded deployment for PHOENIX-70.",
+      "required_source_ids": [
+        "notion:support-6-8"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-6-8",
+          "title": "Evidence temporal 7",
+          "excerpt": "PHOENIX-70 approved on 2026-06-03."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-6-8",
+          "title": "Other discussion 7",
+          "excerpt": "PHOENIX-70 deployed on 2026-06-05."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "permission_boundary-07",
+      "category": "permission_boundary",
+      "question": "Can the requester see confidential MERCURY-88 details? (scenario 7)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Access cannot be established from these sources.",
+      "required_source_ids": [
+        "slack:support-6-9"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-6-9",
+          "title": "Evidence permission_boundary 7",
+          "excerpt": "MERCURY-88 access policy: restricted to authorized project members."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-6-9",
+          "title": "Other discussion 7",
+          "excerpt": "MERCURY-88 internal notes require separate authorization."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "quoted_evidence-07",
+      "category": "quoted_evidence",
+      "question": "What rollback trigger was defined for SIRIUS-92? (scenario 7)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "SIRIUS-92 rollback triggers after elevated errors persist for 10 minutes.",
+      "required_source_ids": [
+        "outlook:support-6-10"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-6-10",
+          "title": "Evidence quoted_evidence 7",
+          "excerpt": "SIRIUS-92 rollback condition: error rate above 2% for 10 minutes."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-6-10",
+          "title": "Other discussion 7",
+          "excerpt": "SIRIUS-92 rollout target error rate below 0.5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "negative_assertion-07",
+      "category": "negative_assertion",
+      "question": "Was the DRACO-11 customer export enabled? (scenario 7)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The DRACO-11 customer export was not enabled.",
+      "required_source_ids": [
+        "documents:support-6-11"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-6-11",
+          "title": "Evidence negative_assertion 7",
+          "excerpt": "DRACO-11 decision: customer export is not enabled."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-6-11",
+          "title": "Other discussion 7",
+          "excerpt": "DRACO-11 export feature discussed for the roadmap."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "direct_fact-08",
+      "category": "direct_fact",
+      "question": "What deployment window did ORION-17 approve? (scenario 8)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The ORION-17 deployment window is Friday at 18:00 UTC.",
+      "required_source_ids": [
+        "github:support-7-0"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-7-0",
+          "title": "Evidence direct_fact 8",
+          "excerpt": "ORION-17 approved Friday 18:00 UTC as the deployment window."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-7-0",
+          "title": "Other discussion 8",
+          "excerpt": "The deployment window is Tuesday 07:00 UTC."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "date-08",
+      "category": "date",
+      "question": "When was COMET-21's migration merged? (scenario 8)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "COMET-21 was merged on 2026-09-12.",
+      "required_source_ids": [
+        "notion:support-7-1"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-7-1",
+          "title": "Evidence date 8",
+          "excerpt": "COMET-21 migration merged on 2026-09-12."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-7-1",
+          "title": "Other discussion 8",
+          "excerpt": "COMET-21 migration was merged on 2026-10-01."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "numeric-08",
+      "category": "numeric",
+      "question": "What was the committed API error budget for NOVA-33? (scenario 8)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The NOVA-33 API error budget was 0.5%.",
+      "required_source_ids": [
+        "slack:support-7-2"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-7-2",
+          "title": "Evidence numeric 8",
+          "excerpt": "NOVA-33 committed an API error budget of 0.5%."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-7-2",
+          "title": "Other discussion 8",
+          "excerpt": "NOVA-33 committed an API error budget of 5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "ownership-08",
+      "category": "ownership",
+      "question": "Who owns the AURORA-14 incident follow-up? (scenario 8)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Priya is responsible for AURORA-14 follow-up.",
+      "required_source_ids": [
+        "outlook:support-7-3"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-7-3",
+          "title": "Evidence ownership 8",
+          "excerpt": "AURORA-14 incident follow-up owner: Priya."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-7-3",
+          "title": "Other discussion 8",
+          "excerpt": "Samir owns the AURORA-14 follow-up."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "decision-08",
+      "category": "decision",
+      "question": "Which storage engine was approved for HELIOS-25? (scenario 8)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PostgreSQL was approved for HELIOS-25.",
+      "required_source_ids": [
+        "documents:support-7-4"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-7-4",
+          "title": "Evidence decision 8",
+          "excerpt": "HELIOS-25 decision: PostgreSQL approved; alternatives deferred."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-7-4",
+          "title": "Other discussion 8",
+          "excerpt": "HELIOS-25 decision: SQLite approved."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "contradiction-08",
+      "category": "contradiction",
+      "question": "Do all sources agree on LYRA-46's release date? (scenario 8)",
+      "expected_behavior": "identify_conflict",
+      "expected_answer": "No; sources disagree about LYRA-46 release date.",
+      "required_source_ids": [
+        "jira:support-7-5"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-7-5",
+          "title": "Evidence contradiction 8",
+          "excerpt": "LYRA-46 planned release date is 2026-11-09."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-7-5",
+          "title": "Other discussion 8",
+          "excerpt": "LYRA-46 planned release date is 2026-11-16."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "missing_evidence-08",
+      "category": "missing_evidence",
+      "question": "What was the final cost of POLARIS-52? (scenario 8)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Insufficient evidence: no final cost is recorded.",
+      "required_source_ids": [
+        "github:support-7-6"
+      ],
+      "sources": [
+        {
+          "provider": "github",
+          "id": "support-7-6",
+          "title": "Evidence missing_evidence 8",
+          "excerpt": "POLARIS-52 planned procurement review; cost not finalized."
+        },
+        {
+          "provider": "slack",
+          "id": "distractor-7-6",
+          "title": "Other discussion 8",
+          "excerpt": "POLARIS-52 vendor shortlist approved; cost not recorded."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "cross_source-08",
+      "category": "cross_source",
+      "question": "Which pull request implemented ATLAS-61? (scenario 8)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "PR #84 implemented ATLAS-61.",
+      "required_source_ids": [
+        "notion:support-7-7"
+      ],
+      "sources": [
+        {
+          "provider": "notion",
+          "id": "support-7-7",
+          "title": "Evidence cross_source 8",
+          "excerpt": "ATLAS-61 issue: implementation tracked in PR #84."
+        },
+        {
+          "provider": "outlook",
+          "id": "distractor-7-7",
+          "title": "Other discussion 8",
+          "excerpt": "PR #84 merged to implement ATLAS-61."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "temporal-08",
+      "category": "temporal",
+      "question": "Was PHOENIX-70 deployment before or after approval? (scenario 8)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "Approval preceded deployment for PHOENIX-70.",
+      "required_source_ids": [
+        "slack:support-7-8"
+      ],
+      "sources": [
+        {
+          "provider": "slack",
+          "id": "support-7-8",
+          "title": "Evidence temporal 8",
+          "excerpt": "PHOENIX-70 approved on 2026-06-03."
+        },
+        {
+          "provider": "documents",
+          "id": "distractor-7-8",
+          "title": "Other discussion 8",
+          "excerpt": "PHOENIX-70 deployed on 2026-06-05."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "permission_boundary-08",
+      "category": "permission_boundary",
+      "question": "Can the requester see confidential MERCURY-88 details? (scenario 8)",
+      "expected_behavior": "abstain_or_qualify",
+      "expected_answer": "Access cannot be established from these sources.",
+      "required_source_ids": [
+        "outlook:support-7-9"
+      ],
+      "sources": [
+        {
+          "provider": "outlook",
+          "id": "support-7-9",
+          "title": "Evidence permission_boundary 8",
+          "excerpt": "MERCURY-88 access policy: restricted to authorized project members."
+        },
+        {
+          "provider": "jira",
+          "id": "distractor-7-9",
+          "title": "Other discussion 8",
+          "excerpt": "MERCURY-88 internal notes require separate authorization."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "quoted_evidence-08",
+      "category": "quoted_evidence",
+      "question": "What rollback trigger was defined for SIRIUS-92? (scenario 8)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "SIRIUS-92 rollback triggers after elevated errors persist for 10 minutes.",
+      "required_source_ids": [
+        "documents:support-7-10"
+      ],
+      "sources": [
+        {
+          "provider": "documents",
+          "id": "support-7-10",
+          "title": "Evidence quoted_evidence 8",
+          "excerpt": "SIRIUS-92 rollback condition: error rate above 2% for 10 minutes."
+        },
+        {
+          "provider": "github",
+          "id": "distractor-7-10",
+          "title": "Other discussion 8",
+          "excerpt": "SIRIUS-92 rollout target error rate below 0.5%."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    },
+    {
+      "id": "negative_assertion-08",
+      "category": "negative_assertion",
+      "question": "Was the DRACO-11 customer export enabled? (scenario 8)",
+      "expected_behavior": "answer_with_citation",
+      "expected_answer": "The DRACO-11 customer export was not enabled.",
+      "required_source_ids": [
+        "jira:support-7-11"
+      ],
+      "sources": [
+        {
+          "provider": "jira",
+          "id": "support-7-11",
+          "title": "Evidence negative_assertion 8",
+          "excerpt": "DRACO-11 decision: customer export is not enabled."
+        },
+        {
+          "provider": "notion",
+          "id": "distractor-7-11",
+          "title": "Other discussion 8",
+          "excerpt": "DRACO-11 export feature discussed for the roadmap."
+        }
+      ],
+      "notes": "Fictional synthetic fixture. Gold label is author-provided, not human-adjudicated."
+    }
+  ]
+}
