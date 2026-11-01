@@ -20,7 +20,6 @@ import {
   Upload,
   X,
   LoaderCircle,
-  Download,
   MessageSquare,
   Moon,
   Sun,
@@ -31,7 +30,6 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { conversationPlan } from '../lib/conversation';
-import { sourceLocation } from '../lib/evidence';
 import { requestedConnectedSource } from '../lib/query-routing';
 import { useConversation } from '../hooks/useConversation';
 import { useAtlasTheme } from '../hooks/useAtlasTheme';
