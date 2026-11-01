@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import pytest
 from fastapi import HTTPException
 
@@ -56,6 +58,184 @@ def test_calendar_search_normalizes_event(monkeypatch):
     rows = batch_connectors.search('calendar', 'token', 'Atlas')
     assert rows[0]['provider'] == 'calendar'
     assert '2026-11-02' in rows[0]['excerpt']
+
+
+def test_calendar_upcoming_count_searches_all_calendars_without_text_filter(monkeypatch):
+    calls = []
+    events_by_calendar = {
+        'primary': [
+            {
+                'id': 'later',
+                'summary': 'Later event',
+                'start': {'dateTime': '2026-11-05T09:00:00+05:30'},
+                'end': {'dateTime': '2026-11-05T10:00:00+05:30'},
+            }
+        ],
+        'work@example.com': [
+            {
+                'id': 'earlier',
+                'summary': 'Earlier event',
+                'start': {'dateTime': '2026-11-04T09:00:00+05:30'},
+            }
+        ],
+    }
+
+    def fake_request(provider, token, url, *, params=None, graphql=None):
+        calls.append((url, params or {}))
+        if url.endswith('/calendarList'):
+            return {'items': [{'id': 'primary'}, {'id': 'work@example.com'}]}
+        calendar_id = 'work@example.com' if 'work%40example.com' in url else 'primary'
+        return {'items': events_by_calendar[calendar_id]}
+
+    monkeypatch.setattr(batch_connectors, '_request', fake_request)
+    question = 'list next 10 events from my calendar'
+    rows = batch_connectors.search('calendar', 'token', question)
+
+    assert [row['id'] for row in rows] == ['earlier', 'later']
+    assert rows[0]['date'] == '2026-11-04T09:00:00+05:30'
+    event_requests = [(url, params) for url, params in calls if '/events' in url]
+    assert len(event_requests) == 2
+    assert all('q' not in params for _, params in event_requests)
+    assert all(params['maxResults'] == 50 for _, params in event_requests)
+    assert all(params['timeMin'] != '2000-01-01T00:00:00Z' for _, params in event_requests)
+
+
+def test_calendar_tomorrow_bounds_cover_one_kolkata_day():
+    bounds = batch_connectors._calendar_date_bounds('show events tomorrow')
+    start = datetime.fromisoformat(bounds['timeMin'])
+    end = datetime.fromisoformat(bounds['timeMax'])
+    assert end - start == timedelta(days=1)
+
+
+def test_calendar_list_result_respects_requested_count_and_orders_citations():
+    from types import SimpleNamespace
+
+    from app.main import calendar_event_list_result
+    from app.sources import Evidence
+
+    question = 'list next 10 events from my calendar'
+    body = SimpleNamespace(providers=['calendar'])
+    evidence = [
+        Evidence(
+            'calendar',
+            'past-event',
+            'Old event',
+            'Details',
+            'https://calendar.google.com/past',
+            '2025-07-29T20:00:00+05:30',
+        ),
+        *[
+            Evidence(
+                'calendar',
+                f'event-{index}',
+                f'Event {index}',
+                'Details',
+                'https://calendar.google.com/event',
+                f'2026-11-{index + 3:02d}T10:00:00+05:30',
+            )
+            for index in reversed(range(12))
+        ],
+    ]
+
+    result = calendar_event_list_result(question, body, evidence, {})
+
+    assert result['mode'] == 'source_results'
+    assert len(result['sources']) == 10
+    assert [source['name'] for source in result['sources']] == [f'Event {i}' for i in range(10)]
+    assert len([line for line in result['answer'].splitlines() if line[:1].isdigit()]) == 10
+    assert 'upcoming events' in result['answer']
+    assert 'Old event' not in result['answer']
+
+
+def test_calendar_matching_event_search_does_not_claim_every_event_is_upcoming():
+    from types import SimpleNamespace
+
+    from app.main import calendar_event_list_result
+    from app.sources import Evidence
+
+    body = SimpleNamespace(providers=['calendar'])
+    evidence = [
+        Evidence(
+            'calendar', 'past', 'Earlier flight', 'Details', None, '2025-07-29T20:00:00+05:30'
+        ),
+        Evidence(
+            'calendar', 'future', 'Later flight', 'Details', None, '2026-11-02T15:50:00+05:30'
+        ),
+    ]
+
+    result = calendar_event_list_result('Find flight 6E 501 on my calendar', body, evidence, {})
+
+    assert 'matching events' in result['answer']
+    assert 'upcoming events' not in result['answer']
+    assert len(result['sources']) == 2
+
+
+def test_calendar_singular_next_event_returns_one_future_event():
+    from types import SimpleNamespace
+
+    from app.main import calendar_event_list_result
+    from app.sources import Evidence
+
+    body = SimpleNamespace(providers=['calendar'])
+    evidence = [
+        Evidence('calendar', 'past', 'Earlier event', 'Details', None, '2025-07-29T20:00:00+05:30'),
+        Evidence(
+            'calendar',
+            'first',
+            'First future event',
+            'Details',
+            None,
+            '2026-11-03T09:00:00+05:30',
+        ),
+        Evidence(
+            'calendar',
+            'second',
+            'Second future event',
+            'Details',
+            None,
+            '2026-11-04T09:00:00+05:30',
+        ),
+    ]
+
+    result = calendar_event_list_result(
+        'What is the next event in my calendar?', body, evidence, {}
+    )
+
+    assert len(result['sources']) == 1
+    assert result['sources'][0]['name'] == 'First future event'
+    assert result['answer'].startswith('Here is 1 upcoming event ')
+
+
+def test_connected_source_listing_cites_drive_and_gmail_titles():
+    from types import SimpleNamespace
+
+    from app.main import connected_source_listing_result
+    from app.sources import Evidence
+
+    body = SimpleNamespace(include_documents=False, include_gmail=True, providers=['drive'])
+    evidence = [
+        Evidence(
+            'drive',
+            'drive-1',
+            'Saurabh_Maurya_Resume_AI_Engineer.pdf',
+            'Resume content',
+            'https://drive.google.com/file/d/drive-1',
+        ),
+        Evidence('gmail', 'mail-1', 'Resume discussion', 'Resume attached'),
+    ]
+
+    result = connected_source_listing_result(
+        'Find resume files and emails mentioning resumes', body, evidence, {}
+    )
+
+    assert result['mode'] == 'source_results'
+    assert 'Found 2 matching items in Google Drive, Gmail:' in result['answer']
+    assert [source['name'] for source in result['sources']] == [
+        'Saurabh_Maurya_Resume_AI_Engineer.pdf',
+        'Resume discussion',
+    ]
+    assert result['sources'][0]['url'] == 'https://drive.google.com/file/d/drive-1'
+    assert '[1]' in result['answer'] and '[2]' in result['answer']
 
 
 def test_outlook_search_normalizes_mail(monkeypatch):

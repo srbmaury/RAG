@@ -39,15 +39,13 @@ input[type='checkbox'] {
 }
 .composer:focus-within,
 .home-ask:focus-within,
-.document-search:focus-within,
-.modal-search:focus-within {
+.document-search:focus-within {
     border-color: #70a78c;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 13%, transparent);
 }
 .composer textarea:focus-visible,
 .home-ask textarea:focus-visible,
-.document-search input:focus-visible,
-.modal-search input:focus-visible {
+.document-search input:focus-visible {
     box-shadow: none;
 }
 .eyebrow {

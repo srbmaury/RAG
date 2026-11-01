@@ -2,6 +2,7 @@
 import { Download, FolderOpen, RotateCcw, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Doc } from '../../lib/types';
+import { fileExtension } from '../../utils/utils';
 import { EmptyState, FileBadge, Status } from '../ui/WorkspacePrimitives';
 
 interface DocumentTableProps {
@@ -61,7 +62,7 @@ export function DocumentTable({ items, filter, onClearFilter, uploadButton, onIn
                                     </span>
                                 </button>
                             </td>
-                            <td>{d.name.split('.').pop()?.toUpperCase()}</td>
+                            <td>{fileExtension(d.name).toUpperCase() || '—'}</td>
                             <td>{formatSize(d.size)}</td>
                             <td>{d.chunk_count || '—'}</td>
                             <td>

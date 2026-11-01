@@ -60,6 +60,7 @@ import { AtlasMark, FileBadge, EmptyState, Dialog } from './ui/WorkspacePrimitiv
 import { flushSync } from 'react-dom';
 
 import { prettyBytes, prompts } from '../utils/utils';
+import { RESEARCH_PROVIDERS } from '../lib/providers';
 
 export function AtlasWorkspace() {
     const { theme, toggleTheme } = useAtlasTheme();
@@ -604,6 +605,21 @@ export function AtlasWorkspace() {
                                 driveStatus={driveStatus}
                                 sourceStatuses={sourceStatuses}
                                 connectedProviders={connectedProviders}
+                                onSelectAll={(select) => {
+                                    if (!select) {
+                                        setIncludeDocuments(false);
+                                        setConnectedGmail(false);
+                                        setConnectedProviders([]);
+                                        return;
+                                    }
+                                    setIncludeDocuments(true);
+                                    if (gmailStatus?.connected) setConnectedGmail(true);
+                                    setConnectedProviders(
+                                        RESEARCH_PROVIDERS.filter((provider) =>
+                                            provider === 'drive' ? driveStatus?.connected : sourceStatuses.some((item) => item.provider === provider && item.connected),
+                                        ),
+                                    );
+                                }}
                                 onToggleProvider={(provider, enabled) => setConnectedProviders((old) => (enabled ? [...old, provider] : old.filter((x) => x !== provider)))}
                                 onManage={() => navigate('sources')}
                             />

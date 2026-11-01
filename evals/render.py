@@ -12,14 +12,6 @@ for name in ['baseline', 'ollama']:
             r['id']: r
             for r in (json.loads(line) for line in path.read_text().splitlines() if line.strip())
         }
-handbook = [
-    '# 100 document-grounded questions and reference answers',
-    '',
-    dataset['scope'],
-    '',
-    'These reference answers are curated from the documents, independent of app responses. Financial/provider statements describe the September 2026 note and are not verified current onboarding advice. PDF statements follow each book’s edition and geographic scope.',
-    '',
-]
 report = [
     '# Document Q&A evaluation',
     '',
@@ -55,24 +47,6 @@ for name, run in runs.items():
     report.append('')
 blocks = []
 for q in dataset['questions']:
-    handbook += [
-        f'## {q["id"]}: {q["question"]}',
-        '',
-        f'**Type:** {q["category"]}',
-        '',
-        '**Reference answer:** ' + q['expected_answer'],
-        '',
-    ]
-    for e in q['evidence']:
-        handbook += [
-            f'**Source:** {e["document"]}, {"page" if e["document"].endswith(".pdf") else "section"} {e["page"]}; chunk `{e["chunk_id"]}`.',
-            '',
-        ]
-    if q['history']:
-        handbook += [
-            '**Conversation context:** ' + json.dumps(q['history'], ensure_ascii=False),
-            '',
-        ]
     content = f'<h2>{html.escape(q["id"] + ": " + q["question"])}</h2><p><b>Reference answer:</b> {html.escape(q["expected_answer"])}</p>'
     for e in q['evidence']:
         content += f'<details><summary>{html.escape(e["document"])} · location {e["page"]}</summary><pre>{html.escape(e["text"])}</pre></details>'
@@ -88,8 +62,6 @@ for q in dataset['questions']:
             content += f'<p>{html.escape(s["name"])} · location {s["page"]}</p><pre>{html.escape(s["text"])}</pre>'
         content += '</details>'
     blocks.append(f'<article data-status="{" ".join(statuses)}">{content}</article>')
-(root / 'QUESTIONS_AND_ANSWERS.md').write_text('\n'.join(handbook))
-(root / 'REPORT.md').write_text('\n'.join(report))
 page = (
     """<!doctype html><html><meta charset="utf-8"><title>Atlas: 100-question evaluation</title><style>body{font:15px system-ui;max-width:1000px;margin:40px auto;padding:0 20px;background:#f7f9f4;color:#25312b}header{position:sticky;top:0;background:#f7f9f4;padding:15px 0}input,select{font:inherit;padding:10px;border:1px solid #d9e1d1;border-radius:6px}input{width:60%}article{background:white;border:1px solid #dce4d4;padding:24px;margin:20px 0;border-radius:9px}h2{font-size:18px}pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font:13px system-ui;background:#f2f5ed;padding:15px}summary{cursor:pointer;padding:8px}h3{color:#526e44;font-size:14px}</style><h1>100 document-grounded questions</h1><p>Curated reference answers, original evidence, and actual application responses. “Pass” means automated rubric checks passed, not a guarantee of complete semantic correctness.</p><header><input id="search" placeholder="Search questions, answers, or documents…"><select id="filter"><option value="">All results</option><option value="flagged">Flagged in either run</option><option value="pass">Passed in either run</option></select><span id="count"></span></header>"""
     + ''.join(blocks)

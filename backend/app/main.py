@@ -6,7 +6,9 @@ import re
 import secrets
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
@@ -48,6 +50,7 @@ from .research_queries import (
     drive_query_for_question,
     filter_credit_card_offer_evidence,
     gmail_query_for_question,
+    provider_query_terms,
 )
 from .retrieval import retrieve
 from .web_sources import router as web_router
@@ -582,7 +585,7 @@ class ConnectedQuestion(Question):
     include_documents: bool = True
     include_gmail: bool = False
     gmail_query: str = Field(default='newer_than:30d', max_length=400)
-    providers: List[str] = Field(default_factory=list, max_length=4)
+    providers: List[str] = Field(default_factory=list, max_length=12)
 
 
 def collect_connected_evidence(workspaceId, body, actor, db):
@@ -606,6 +609,7 @@ def collect_connected_evidence(workspaceId, body, actor, db):
     if any(p not in (*PROVIDERS, 'drive') for p in body.providers):
         raise HTTPException(422, 'Unknown connected provider.')
     evidence, document_evidence = [], {}
+    tasks = []
     try:
         if body.include_documents:
             for item in retrieve(
@@ -618,47 +622,81 @@ def collect_connected_evidence(workspaceId, body, actor, db):
         if body.include_gmail:
             entry = connection(db, actor, workspaceId)
             token = access_token(entry, db)
-            matches = gmail_get(
-                token,
-                GMAIL_API + '/messages',
-                {'q': gmail_query_for_question(body.gmail_query, body.question), 'maxResults': 8},
-            ).get('messages', [])
-            for m in matches:
-                msg = email_from_json(
-                    gmail_get(token, GMAIL_API + '/messages/' + m['id'], {'format': 'full'})
+            tasks.append(
+                (
+                    'gmail',
+                    lambda: _search_gmail(
+                        token,
+                        body,
+                        GMAIL_API,
+                        gmail_get,
+                        email_from_json,
+                        gmail_query_for_question,
+                    ),
                 )
-                evidence.append(
-                    Evidence(
-                        'gmail',
-                        msg['id'],
-                        msg['subject'],
-                        (msg['body'] or msg['snippet'])[:8000],
-                        msg['url'],
-                        msg['date'],
-                    )
-                )
+            )
         if 'drive' in body.providers:
             drive_token = drive_access_token(db, actor, workspaceId)
-            drive_items = drive_evidence(
-                drive_token, drive_search(drive_token, drive_query_for_question(body.question))
-            )
-            for hit in drive_items:
-                evidence.append(
-                    Evidence('drive', hit['id'], hit['title'], hit['excerpt'], hit.get('url'))
+            tasks.append(
+                (
+                    'drive',
+                    lambda: drive_evidence(
+                        drive_token,
+                        drive_search(drive_token, drive_query_for_question(body.question)),
+                    ),
                 )
+            )
         for provider in dict.fromkeys(p for p in body.providers if p != 'drive'):
             _, provider_token = read_connection(db, actor, workspaceId, provider)
-            for hit in source_search(provider, provider_token, body.question):
-                excerpt_limit = 8000 if provider == 'slack' else 3000
-                evidence.append(
-                    Evidence(
-                        provider,
-                        hit['id'],
-                        hit['title'],
-                        hit.get('excerpt', '')[:excerpt_limit],
-                        hit.get('url'),
-                    )
+            tasks.append(
+                (
+                    provider,
+                    lambda p=provider, t=provider_token: source_search(p, t, body.question),
                 )
+            )
+        # A single slow connector should not serialize all selected sources. Keep
+        # a small bounded pool and retain successful results if another source fails.
+        if tasks:
+            with ThreadPoolExecutor(max_workers=min(len(tasks), 8)) as executor:
+                futures = {executor.submit(search): provider for provider, search in tasks}
+                failures = []
+                for future in as_completed(futures):
+                    provider = futures[future]
+                    try:
+                        hits = future.result()
+                        if provider == 'gmail':
+                            evidence.extend(hits)
+                        elif provider == 'drive':
+                            evidence.extend(
+                                Evidence(
+                                    'drive', hit['id'], hit['title'], hit['excerpt'], hit.get('url')
+                                )
+                                for hit in hits
+                            )
+                        else:
+                            excerpt_limit = 8000 if provider == 'slack' else 3000
+                            evidence.extend(
+                                Evidence(
+                                    provider,
+                                    hit['id'],
+                                    hit['title'],
+                                    hit.get('excerpt', '')[:excerpt_limit],
+                                    hit.get('url'),
+                                    hit.get('date'),
+                                )
+                                for hit in hits
+                            )
+                    except Exception as exc:
+                        # A slow optional source should not discard results
+                        # already returned by the other selected sources.
+                        failures.append((provider, exc))
+                        log.warning(
+                            'Connected retrieval failed for %s: %s',
+                            provider,
+                            type(exc).__name__,
+                        )
+                if failures and len(failures) == len(tasks) and not evidence:
+                    raise failures[0][1]
     except HTTPException:
         raise
     except Exception as exc:
@@ -668,6 +706,31 @@ def collect_connected_evidence(workspaceId, body, actor, db):
 
     filtered = filter_credit_card_offer_evidence(body.question, evidence)
     return prepare_evidence(body.question, filtered), document_evidence
+
+
+def _search_gmail(token, body, gmail_api, gmail_get, email_from_json, gmail_query_for_question):
+    matches = gmail_get(
+        token,
+        gmail_api + '/messages',
+        {'q': gmail_query_for_question(body.gmail_query, body.question), 'maxResults': 8},
+    ).get('messages', [])
+    from .sources import Evidence
+
+    def read_message(item):
+        message = email_from_json(
+            gmail_get(token, gmail_api + '/messages/' + item['id'], {'format': 'full'})
+        )
+        return Evidence(
+            'gmail',
+            message['id'],
+            message['subject'],
+            (message['body'] or message['snippet'])[:8000],
+            message['url'],
+            message['date'],
+        )
+
+    with ThreadPoolExecutor(max_workers=min(len(matches), 4) or 1) as executor:
+        return list(executor.map(read_message, matches))
 
 
 def connected_sources_for_payload(payload, document_evidence):
@@ -701,6 +764,7 @@ def connected_sources_for_payload(payload, document_evidence):
                 else entry.get('provider', 'source'),
                 'provider': entry.get('provider'),
                 'url': origin_url or entry.get('url'),
+                'date': entry.get('date'),
             }
         )
     return sources
@@ -722,6 +786,12 @@ def no_evidence_result(body):
         'github': 'GitHub',
         'notion': 'Notion',
         'slack': 'Slack',
+        'calendar': 'Google Calendar',
+        'linear': 'Linear',
+        'jira': 'Jira',
+        'onedrive': 'OneDrive',
+        'outlook': 'Outlook',
+        'sharepoint': 'SharePoint',
     }
     scope = connected_scope(body)
     if not scope:
@@ -768,6 +838,137 @@ def github_pull_request_list_result(question, body, evidence, document_evidence)
     }
 
 
+def calendar_event_list_result(question, body, evidence, document_evidence):
+    """Return chronological calendar rows directly, preserving each event citation."""
+    if 'calendar' not in body.providers or not re.search(
+        r'\b(calendar|event|events|flight|appointment|meeting|schedule)\b', question, re.I
+    ):
+        return None
+    from .external_sources import requested_result_limit
+
+    upcoming = bool(re.search(r'\b(next|upcoming|soon)\b', question, re.I))
+    matches = sorted(
+        (item for item in evidence if item.provider == 'calendar'),
+        key=lambda item: item.date or '',
+    )
+    if upcoming:
+        now = datetime.now(timezone.utc)
+        future = []
+        for item in matches:
+            try:
+                event_date = datetime.fromisoformat((item.date or '').replace('Z', '+00:00'))
+                if event_date.tzinfo is None:
+                    event_date = event_date.replace(tzinfo=timezone.utc)
+                if event_date >= now:
+                    future.append(item)
+            except ValueError:
+                continue
+        matches = future
+    if not matches:
+        return None
+    default_limit = (
+        1 if re.search(r'\bnext\s+(?:event|meeting|appointment)\b', question, re.I) else 10
+    )
+    limit = requested_result_limit(question, default=default_limit, max_limit=30)
+    shown = matches[:limit]
+    payload = [
+        item.as_prompt(index) | {'origin_id': item.source_id} for index, item in enumerate(shown, 1)
+    ]
+    event_kind = 'upcoming' if upcoming else 'matching'
+    description = f'{event_kind} event' if len(shown) == 1 else f'{event_kind} events'
+    verb = 'is' if len(shown) == 1 else 'are'
+    lines = [f'Here {verb} {len(shown)} {description} from Google Calendar:']
+    for index, item in enumerate(shown, 1):
+        event_date = item.date or 'Date unavailable'
+        lines.append(f'{index}. **{item.title}** — {event_date} [{index}]')
+    if len(matches) > len(shown):
+        lines.append(f'Showing the first {len(shown)} of {len(matches)} events.')
+    return {
+        'answer': '\n'.join(lines),
+        'sources': connected_sources_for_payload(payload, document_evidence),
+        'mode': 'source_results',
+        'scope': ['calendar'],
+    }
+
+
+def connected_source_listing_result(question, body, evidence, document_evidence):
+    """Answer explicit connected-file/email listings from source-owned titles."""
+    asks_to_list = bool(
+        re.search(r'\b(?:list|show|find|search|get|name)\b', question, re.I)
+        and re.search(
+            r'\b(?:files?|documents?|emails?|messages?|conversations?|pages?|tickets?|issues?|items?|results?)\b',
+            question,
+            re.I,
+        )
+    )
+    simple_search = bool(
+        len(provider_query_terms(question)) <= 2
+        and not re.search(
+            r'\b(?:what|why|how|who|where|when|is|are|does|did|can|could|should|would|explain|summarize|compare)\b',
+            question,
+            re.I,
+        )
+    )
+    if not asks_to_list and not simple_search:
+        return None
+    scope = [provider for provider in connected_scope(body) if provider != 'documents']
+    searchable_scopes = {
+        'drive',
+        'gmail',
+        'onedrive',
+        'outlook',
+        'sharepoint',
+        'notion',
+        'slack',
+        'github',
+        'linear',
+        'jira',
+    }
+    if not set(scope) & searchable_scopes:
+        return None
+    matches = [item for item in evidence if item.provider in scope]
+    if not matches:
+        return None
+
+    from .external_sources import requested_result_limit
+
+    limit = requested_result_limit(question, default=12, max_limit=30)
+    shown = matches[:limit]
+    payload = [
+        item.as_prompt(index) | {'origin_id': item.source_id} for index, item in enumerate(shown, 1)
+    ]
+    labels = {
+        'drive': 'Google Drive',
+        'gmail': 'Gmail',
+        'github': 'GitHub',
+        'notion': 'Notion',
+        'slack': 'Slack',
+        'calendar': 'Google Calendar',
+        'linear': 'Linear',
+        'jira': 'Jira',
+        'onedrive': 'OneDrive',
+        'outlook': 'Outlook',
+        'sharepoint': 'SharePoint',
+    }
+    result_providers = list(dict.fromkeys(item.provider for item in matches))
+    result_labels = [labels.get(provider, provider) for provider in result_providers]
+    lines = [f'Found {len(matches)} matching items in {", ".join(result_labels)}:']
+    empty_providers = [provider for provider in scope if provider not in result_providers]
+    if empty_providers:
+        empty_labels = ', '.join(labels.get(provider, provider) for provider in empty_providers)
+        lines.append(f'No matching items from {empty_labels}.')
+    for index, item in enumerate(shown, 1):
+        lines.append(f'- **{item.title}** · {labels.get(item.provider, item.provider)} [{index}]')
+    if len(matches) > len(shown):
+        lines.append(f'Showing the first {len(shown)} of {len(matches)} matches.')
+    return {
+        'answer': '\n'.join(lines),
+        'sources': connected_sources_for_payload(payload, document_evidence),
+        'mode': 'source_results',
+        'scope': scope,
+    }
+
+
 @app.post('/api/workspaces/{workspaceId}/connected-chat')
 def connected_chat(
     workspaceId: str,
@@ -791,6 +992,14 @@ def connected_chat(
     listed = github_pull_request_list_result(body.question, body, evidence, document_evidence)
     if listed:
         return listed
+    calendar_listed = calendar_event_list_result(body.question, body, evidence, document_evidence)
+    if calendar_listed:
+        return calendar_listed
+    source_listing = connected_source_listing_result(
+        body.question, body, evidence, document_evidence
+    )
+    if source_listing:
+        return source_listing
     try:
         answer, payload = synthesize_connected(
             body.question,
@@ -821,7 +1030,13 @@ def connected_chat(
             502, 'Connected answer generation failed. Check the AI provider logs.'
         ) from exc
     refs = {int(x) for x in re.findall(r'\[(\d+)\]', answer or '')}
-    if not refs or any(n < 1 or n > len(payload) for n in refs):
+    from .connected_synthesis import _has_citation_gaps
+
+    if (
+        not refs
+        or any(n < 1 or n > len(payload) for n in refs)
+        or _has_citation_gaps(answer or '', payload)
+    ):
         return {
             'answer': 'The model returned an answer without usable source citations. Please retry; no unverified answer is shown.',
             'sources': [],
@@ -878,6 +1093,24 @@ def connected_chat_stream(
             )
             if listed:
                 yield json.dumps({'type': 'done', 'result': listed}, ensure_ascii=False) + '\n'
+                return
+            calendar_listed = calendar_event_list_result(
+                body.question, body, evidence, document_evidence
+            )
+            if calendar_listed:
+                yield (
+                    json.dumps({'type': 'done', 'result': calendar_listed}, ensure_ascii=False)
+                    + '\n'
+                )
+                return
+            source_listing = connected_source_listing_result(
+                body.question, body, evidence, document_evidence
+            )
+            if source_listing:
+                yield (
+                    json.dumps({'type': 'done', 'result': source_listing}, ensure_ascii=False)
+                    + '\n'
+                )
                 return
             yield (
                 json.dumps(

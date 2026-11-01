@@ -8,10 +8,15 @@ endpoints or arbitrary caller-supplied API hosts are supported.
 import os
 import re
 import time
+from datetime import date, datetime, timedelta, timezone
+from datetime import time as datetime_time
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import HTTPException
+
+from .research_queries import CALENDAR_QUERY_STOPWORDS, provider_query_terms
 
 NEW_PROVIDERS = ('calendar', 'linear', 'jira', 'onedrive', 'outlook', 'sharepoint')
 
@@ -92,6 +97,44 @@ def _result(provider, identifier, title, excerpt, url):
     }
 
 
+def _calendar_query_terms(query):
+    """Remove conversational filler and event-count phrases from Calendar search."""
+    kept = provider_query_terms(query, extra_stopwords=CALENDAR_QUERY_STOPWORDS)
+    return ' '.join(kept)
+
+
+def _calendar_date_bounds(query):
+    """Return Asia/Kolkata day bounds for explicit relative or ISO dates."""
+    now = datetime.now(ZoneInfo('Asia/Kolkata'))
+    if re.search(r'\btomorrow\b', query, re.I):
+        target = now.date() + timedelta(days=1)
+    elif re.search(r'\btoday\b|\btonight\b', query, re.I):
+        target = now.date()
+    else:
+        explicit = re.search(r'\b(20\d{2})-(\d{1,2})-(\d{1,2})\b', query)
+        if not explicit:
+            return {}
+        try:
+            target = date(*(int(part) for part in explicit.groups()))
+        except ValueError:
+            return {}
+    start = datetime.combine(target, datetime_time.min, tzinfo=now.tzinfo)
+    end = start + timedelta(days=1)
+    return {
+        'timeMin': start.astimezone(timezone.utc).isoformat(),
+        'timeMax': end.astimezone(timezone.utc).isoformat(),
+    }
+
+
+def _calendar_events(token, calendar_id, params):
+    return _request(
+        'calendar',
+        token,
+        f'https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe="")}/events',
+        params=params,
+    ).get('items', [])
+
+
 def profile(provider, token):
     if provider == 'calendar':
         d = _request(
@@ -125,39 +168,72 @@ def profile(provider, token):
 def search(provider, token, query):
     query = query.strip()[:180]
     if provider == 'calendar':
-        d = _request(
+        terms = _calendar_query_terms(query)
+        upcoming_request = bool(re.search(r'\b(next|upcoming|soon)\b', query, re.I))
+        broad_calendar_query = bool(
+            re.search(r'\b(next|upcoming|soon|events?|calendar|schedule)\b', query, re.I)
+        )
+        if not terms and not broad_calendar_query:
+            return []
+        date_bounds = _calendar_date_bounds(query)
+        params = {
+            'maxResults': 50,
+            'singleEvents': 'true',
+            'orderBy': 'startTime',
+            'timeMin': '2000-01-01T00:00:00Z',
+            **date_bounds,
+        }
+        if terms:
+            params['q'] = terms
+        if upcoming_request and not date_bounds:
+            params['timeMin'] = datetime.now(ZoneInfo('Asia/Kolkata')).isoformat()
+        elif not terms and broad_calendar_query and not date_bounds:
+            params['timeMin'] = datetime.now(ZoneInfo('Asia/Kolkata')).isoformat()
+        calendars = _request(
             provider,
             token,
-            'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-            params={
-                'q': query,
-                'maxResults': 20,
-                'singleEvents': 'true',
-                'orderBy': 'startTime',
-                'timeMin': '2000-01-01T00:00:00Z',
-            },
+            'https://www.googleapis.com/calendar/v3/users/me/calendarList',
+            params={'maxResults': 250},
+        ).get('items', [])
+        calendar_ids = list(
+            dict.fromkeys(['primary'] + [item['id'] for item in calendars if item.get('id')])
         )
+        events = []
+        for calendar_id in calendar_ids:
+            events.extend(_calendar_events(token, calendar_id, params))
         rows = []
-        for e in d.get('items', []):
+        seen = set()
+        for e in sorted(
+            events,
+            key=lambda item: (item.get('start') or {}).get('dateTime')
+            or (item.get('start') or {}).get('date', ''),
+        ):
+            if e.get('id') in seen:
+                continue
+            seen.add(e.get('id'))
             start = (e.get('start') or {}).get('dateTime') or (e.get('start') or {}).get('date', '')
-            rows.append(
-                _result(
-                    provider,
-                    e.get('id'),
-                    e.get('summary'),
-                    f'{start} {e.get("description", "")} {e.get("location", "")}',
-                    e.get('htmlLink'),
-                )
+            end = (e.get('end') or {}).get('dateTime') or (e.get('end') or {}).get('date', '')
+            row = _result(
+                provider,
+                e.get('id'),
+                e.get('summary'),
+                f'{start}{" – " + end if end else ""} {e.get("description", "")} {e.get("location", "")}',
+                e.get('htmlLink'),
             )
+            if row:
+                row['date'] = start
+                rows.append(row)
         return [x for x in rows if x]
     if provider == 'linear':
+        search_terms = provider_query_terms(query, limit=6)
+        search_query = ' '.join(search_terms) or query
         d = _request(
             provider,
             token,
             'https://api.linear.app/graphql',
             graphql={
                 'query': 'query SearchIssues($query: String!) { searchIssues(term: $query, first: 15) { nodes { id identifier title description url } } }',
-                'variables': {'query': query},
+                'variables': {'query': search_query},
             },
         )
         nodes = ((d.get('data') or {}).get('searchIssues') or {}).get('nodes', [])
@@ -176,7 +252,8 @@ def search(provider, token, query):
         ]
     if provider == 'jira':
         # Atlassian search/JQL API: escape user-supplied terms, never accept raw JQL.
-        terms = re.findall(r'[a-zA-Z0-9_-]{2,}', query)[:6]
+        terms = provider_query_terms(query, limit=6)
+        terms = [term for term in terms if re.fullmatch(r'[a-zA-Z0-9_-]{2,}', term)]
         if not terms:
             return []
         jql = ' OR '.join(f'text ~ "{t}"' for t in terms)
@@ -201,11 +278,13 @@ def search(provider, token, query):
         return [x for x in result if x]
     if provider == 'onedrive':
         # Graph drive search searches the authorized user's drive, not all SharePoint sites.
+        search_terms = provider_query_terms(query, limit=6)
+        search_query = query[:100] if "'" in query else (' '.join(search_terms) or query[:100])
         d = _request(
             provider,
             token,
             "https://graph.microsoft.com/v1.0/me/drive/root/search(q='"
-            + quote(query.replace("'", "''"), safe='')
+            + quote(search_query.replace("'", "''"), safe='')
             + "')",
             params={'$top': 15, '$select': 'id,name,webUrl,description,file'},
         )
@@ -225,6 +304,8 @@ def search(provider, token, query):
     if provider == 'sharepoint':
         # Search delegated SharePoint content accessible to the signed-in user.
         # The search endpoint returns metadata/snippets, not complete file bodies.
+        search_terms = provider_query_terms(query, limit=6)
+        search_query = ' '.join(search_terms) or query[:100]
         d = _request(
             provider,
             token,
@@ -233,7 +314,7 @@ def search(provider, token, query):
                 'requests': [
                     {
                         'entityTypes': ['driveItem'],
-                        'query': {'queryString': query},
+                        'query': {'queryString': search_query},
                         'from': 0,
                         'size': 20,
                     }
@@ -259,12 +340,14 @@ def search(provider, token, query):
                     )
         return [x for x in rows if x]
     if provider == 'outlook':
+        search_terms = provider_query_terms(query, limit=6)
+        search_query = ' '.join(search_terms) or query[:100]
         d = _request(
             provider,
             token,
             'https://graph.microsoft.com/v1.0/me/messages',
             params={
-                '$search': '"' + query.replace('"', '') + '"',
+                '$search': '"' + search_query.replace('"', '') + '"',
                 '$top': 15,
                 '$select': 'id,subject,bodyPreview,webLink,receivedDateTime',
             },

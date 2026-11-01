@@ -27,6 +27,12 @@ def test_prefers_title_relevance():
     assert prepare_evidence('cache invalidation', rows)[0].source_id == '2'
 
 
+def test_matches_filename_terms_separated_by_underscores():
+    row = item('drive', 'resume', 'Saurabh_Maurya_Resume_AI_Engineer.pdf', 'Experienced engineer')
+
+    assert prepare_evidence('resume', [row]) == [row]
+
+
 def test_canonical_url_safely_handles_bad_values():
     assert canonical_url('file:///etc/hosts') == ''
     assert canonical_url('https://EXAMPLE.com/a#fragment') == 'https://example.com/a'

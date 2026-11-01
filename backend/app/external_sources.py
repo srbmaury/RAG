@@ -14,6 +14,11 @@ from pydantic import BaseModel, Field
 from . import batch_connectors
 from .db import ExternalConnection, Session, SourceHealthCheck
 from .gmail import actor, allowed_workspace, crypt
+from .research_queries import (
+    GITHUB_QUERY_STOPWORDS,
+    SLACK_QUERY_STOPWORDS,
+    provider_query_terms,
+)
 
 router = APIRouter(prefix='/api')
 log = logging.getLogger(__name__)
@@ -37,7 +42,9 @@ def http_json(url, token, provider, params=None, method='GET'):
     if provider == 'notion':
         headers['Notion-Version'] = '2022-06-28'
     try:
-        with httpx.Client(timeout=20) as client:
+        with httpx.Client(
+            timeout=httpx.Timeout(20, connect=5), follow_redirects=False, trust_env=False
+        ) as client:
             if method == 'POST':
                 response = client.post(url, headers=headers, json=params or {})
             else:
@@ -229,44 +236,11 @@ def github_search_query(query):
         if not re.search(r'\b(?:is:issue|is:pr|is:pull-request|type:issue|type:pr)\b', query, re.I):
             query += ' is:issue'
         return query[:240]
-    words = re.findall(r'[a-zA-Z0-9_][a-zA-Z0-9_.-]*', query)
-    stopwords = {
-        'what',
-        'which',
-        'where',
-        'when',
-        'why',
-        'how',
-        'can',
-        'you',
-        'tell',
-        'me',
-        'about',
-        'the',
-        'and',
-        'or',
-        'my',
-        'in',
-        'on',
-        'for',
-        'are',
-        'is',
-        'was',
-        'were',
-        'does',
-        'did',
-        'with',
-        'from',
-        'please',
-        'find',
-        'all',
-        'issues',
-        'pull',
-        'requests',
-    }
-    terms = [word for word in words if word.lower() not in stopwords]
-    simplified = ' '.join(terms[:9])[:180] or ' '.join(words[:5])[:180]
-    return (simplified + ' is:issue')[:240]
+    terms = [
+        word for word in provider_query_terms(query) if word.lower() not in GITHUB_QUERY_STOPWORDS
+    ]
+    simplified = ' '.join(terms[:9])[:180]
+    return f'{simplified} is:issue'.strip()[:240]
 
 
 def github_repository_query(query, login):
@@ -274,57 +248,9 @@ def github_repository_query(query, login):
     query = query.strip()
     if any(term in query.lower() for term in ('repo:', 'org:', 'user:')):
         return query[:240]
-    words = re.findall(r'[a-zA-Z0-9_][a-zA-Z0-9_.-]*', query)
+    shared_terms = provider_query_terms(query)
     explicit_account_scope = bool(re.search(r'\b(my|mine)\b', query, re.I))
-    stopwords = {
-        'what',
-        'which',
-        'where',
-        'when',
-        'why',
-        'how',
-        'can',
-        'you',
-        'tell',
-        'me',
-        'about',
-        'the',
-        'and',
-        'or',
-        'my',
-        'in',
-        'on',
-        'for',
-        'are',
-        'is',
-        'was',
-        'were',
-        'does',
-        'did',
-        'with',
-        'from',
-        'please',
-        'find',
-        'all',
-        'different',
-        'kinds',
-        'kind',
-        'types',
-        'type',
-        'projects',
-        'project',
-        'repositories',
-        'repository',
-        'repos',
-        'github',
-        'list',
-        'describe',
-        'summarize',
-        'overview',
-        'portfolio',
-        'there',
-    }
-    terms = [word for word in words if word.lower() not in stopwords]
+    terms = [word for word in shared_terms if word.lower() not in GITHUB_QUERY_STOPWORDS]
     owner = f'user:{login}' if login else ''
     if explicit_account_scope and terms:
         return owner
@@ -379,50 +305,11 @@ def github_pull_request_query(query):
         query = re.sub(r'\btype:pr\b', 'is:pr', query, flags=re.I)
         return query[:240]
     state = 'open' if re.search(r'\b(open|active|unmerged)\b', lowered) else None
-    tokens = re.findall(r'[a-zA-Z0-9_][a-zA-Z0-9_.-]*', query)
-    stopwords = {
-        'list',
-        'show',
-        'find',
-        'get',
-        'all',
-        'one',
-        'two',
-        'three',
-        'four',
-        'five',
-        'six',
-        'seven',
-        'eight',
-        'nine',
-        'ten',
-        'my',
-        'mine',
-        'of',
-        'from',
-        'in',
-        'on',
-        'github',
-        'open',
-        'active',
-        'unmerged',
-        'pull',
-        'request',
-        'requests',
-        'pr',
-        'prs',
-        'please',
-        'what',
-        'are',
-        'the',
-        'a',
-        'an',
-        'recent',
-        'recently',
-        'updated',
-        'latest',
-    }
-    terms = [token for token in tokens if token.lower() not in stopwords]
+    terms = [
+        token
+        for token in provider_query_terms(query)
+        if token.lower() not in GITHUB_QUERY_STOPWORDS
+    ]
     # The caller adds the authenticated GitHub user's login when the user asks
     # for "my" PRs. Keep this helper focused on the type/state/topic filters.
     return ' '.join(
@@ -443,7 +330,7 @@ def github_pull_request_ownership_qualifier(query, login):
     return f'author:{login}'
 
 
-def requested_result_limit(query, default=30):
+def requested_result_limit(query, default=30, max_limit=None):
     """Honor a small explicit result count in a natural language request."""
     numbers = {
         'one': 1,
@@ -459,71 +346,26 @@ def requested_result_limit(query, default=30):
     }
     match = re.search(
         r'\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\b'
-        r'.{0,70}\b(?:pull\s*requests?|prs?)\b',
+        r'.{0,70}\b(?:pull\s*requests?|prs?|events?|appointments?|meetings?|'
+        r'files?|documents?|emails?|messages?|results?|items?)\b',
         query,
         re.I,
     )
     if not match:
         return default
     value = match.group(1).lower()
-    return min(int(value) if value.isdigit() else numbers[value], default)
+    return min(int(value) if value.isdigit() else numbers[value], max_limit or default)
 
 
 def slack_search_query(query):
     """Reduce a natural-language request to Slack's supported search terms."""
-    words = re.findall(r'[a-zA-Z0-9_.@#-]+', query)
-    stopwords = {
-        'what',
-        'which',
-        'where',
-        'when',
-        'why',
-        'how',
-        'can',
-        'could',
-        'would',
-        'should',
-        'please',
-        'find',
-        'list',
-        'show',
-        'tell',
-        'me',
-        'about',
-        'the',
-        'and',
-        'or',
-        'from',
-        'my',
-        'in',
-        'on',
-        'for',
-        'are',
-        'is',
-        'was',
-        'were',
-        'does',
-        'did',
-        'with',
-        'give',
-        'summarize',
-        'summary',
-        'recent',
-        'recently',
-        'latest',
-        'team',
-        'discuss',
-        'discussed',
-        'slack',
-        'message',
-        'messages',
-        'decision',
-        'decisions',
-        'date',
-        'cite',
-    }
-    terms = list(dict.fromkeys(word for word in words if word.lower() not in stopwords))
-    return ' '.join(terms[:8]) or query[:100]
+    # Preserve Slack's structured filters (in:, from:, after:, before:, etc.)
+    # verbatim; normalize only ordinary conversational questions.
+    if re.search(r'\b(?:in|from|to|after|before|on|during|has|is):\S+', query, re.I):
+        return query[:180]
+    normalized_terms = set(provider_query_terms(query, extra_stopwords=SLACK_QUERY_STOPWORDS))
+    words = re.findall(r'[A-Za-z0-9_.@#-]+', query)
+    return ' '.join(dict.fromkeys(word for word in words if word.lower() in normalized_terms))
 
 
 def github_search_all_pages(token, query, per_page=100, max_pages=10):
@@ -626,11 +468,17 @@ def source_search(provider, token, query):
             for x in d.get('items', [])
         ]
     if provider == 'notion':
+        # Notion search is a title search. Keep useful nouns/identifiers rather
+        # than sending the complete conversational question to its API.
+        search_terms = provider_query_terms(query, limit=5)
+        if not search_terms:
+            return []
+        notion_query = ' '.join(search_terms)
         d = http_json(
             'https://api.notion.com/v1/search',
             token,
             provider,
-            {'query': query, 'page_size': 8},
+            {'query': notion_query, 'page_size': 8},
             method='POST',
         )
         title_result_ids = {x.get('id') for x in d.get('results', [])}
@@ -643,43 +491,14 @@ def source_search(provider, token, query):
                 'https://api.notion.com/v1/search',
                 token,
                 provider,
-                {'page_size': 25},
+                {'page_size': 8},
                 method='POST',
             )
             pages = [x for x in d.get('results', []) if x.get('object') == 'page']
 
-        terms = {term.lower() for term in re.findall(r"[a-zA-Z0-9_'-]{3,}", query)}
-        stopwords = {
-            'what',
-            'which',
-            'where',
-            'when',
-            'why',
-            'how',
-            'can',
-            'you',
-            'tell',
-            'about',
-            'the',
-            'and',
-            'for',
-            'are',
-            'was',
-            'were',
-            'does',
-            'did',
-            'with',
-            'from',
-            'please',
-            'find',
-            'all',
-            'page',
-            'pages',
-            'notion',
-        }
-        terms -= stopwords
+        terms = set(search_terms)
         items = []
-        for page in pages[:25]:
+        for page in pages[:8]:
             props = page.get('properties') or {}
             title_parts = (
                 page.get('title')
@@ -688,7 +507,7 @@ def source_search(provider, token, query):
                 or []
             )
             label = ''.join(t.get('plain_text', '') for t in title_parts) or 'Notion page'
-            text = notion_page_text(token, page.get('id'))
+            text = notion_page_text(token, page.get('id'), max_blocks=120)
             haystack = (label + '\n' + text).lower()
             score = sum(haystack.count(term) for term in terms)
             # Title-only matches from Notion's API remain useful even when the
@@ -709,11 +528,14 @@ def source_search(provider, token, query):
             )
         items.sort(key=lambda item: item.pop('_score'), reverse=True)
         return items[:8]
+    normalized_query = slack_search_query(query)
+    if not normalized_query:
+        return []
     d = http_json(
         'https://slack.com/api/search.all',
         token,
         provider,
-        {'query': slack_search_query(query), 'count': 8},
+        {'query': normalized_query, 'count': 8},
     )
     if not d.get('ok'):
         if d.get('error') == 'not_allowed_token_type':
@@ -745,7 +567,7 @@ def notion_rich_text(values):
     return ''.join(value.get('plain_text', '') for value in (values or []))
 
 
-def notion_page_text(token, page_id, max_blocks=300):
+def notion_page_text(token, page_id, max_blocks=120):
     """Read plain text from a Notion page and its nested readable blocks."""
     if not page_id:
         return ''

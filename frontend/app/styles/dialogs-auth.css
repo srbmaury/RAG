@@ -161,6 +161,12 @@
     height: 16px;
     color: var(--brand);
 }
+.search-results-heading {
+    margin: 16px 0 5px;
+    color: var(--sub);
+    font-size: 11px;
+    font-weight: 700;
+}
 .search-results {
     margin: 13px -10px 0;
     max-height: 440px;
@@ -207,6 +213,19 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     line-height: 1.85;
+}
+.document-plain p {
+    margin: 0 0 12px;
+}
+.document-plain p:last-child {
+    margin-bottom: 0;
+}
+.document-plain a,
+.document-markdown a {
+    color: var(--brand);
+    text-decoration: underline;
+    text-underline-offset: 0.16em;
+    overflow-wrap: anywhere;
 }
 .document-markdown,
 .markdown {

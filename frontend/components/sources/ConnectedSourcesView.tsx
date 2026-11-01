@@ -70,8 +70,8 @@ export function ConnectedSourcesView({ sourceState, gmailState, controller, setN
                         onOpen={(provider) => {
                             setSourceManage(provider);
                             if (provider === 'gmail') window.scrollTo({ top: 0, behavior: 'instant' });
-                            if (['github', 'notion', 'slack', 'calendar', 'linear', 'jira', 'onedrive', 'outlook', 'sharepoint'].includes(provider)) {
-                                setSourceProvider(provider as 'github' | 'notion' | 'slack' | 'calendar' | 'linear' | 'jira' | 'onedrive' | 'outlook' | 'sharepoint');
+                            if (provider !== 'gmail' && provider !== 'drive') {
+                                setSourceProvider(provider);
                                 setSourceResults([]);
                             }
                         }}

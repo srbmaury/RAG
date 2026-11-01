@@ -1,11 +1,8 @@
 'use client';
 import { ArrowUpRight, ChevronRight, Search, Sparkles } from 'lucide-react';
 import type { Doc } from '../../lib/types';
+import { prettyBytes } from '../../utils/utils';
 import { FileBadge, Dialog } from '../ui/WorkspacePrimitives';
-
-function prettyBytes(n: number) {
-    return n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
 
 export function WorkspaceSearchDialog({
     query,
@@ -33,15 +30,16 @@ export function WorkspaceSearchDialog({
                     autoFocus
                     data-autofocus
                     aria-label="Search your workspace"
-                    placeholder="Find a document or ask a question…"
+                    placeholder="Search document titles or ask across selected sources…"
                     value={query}
                     onChange={(event) => onQueryChange(event.target.value)}
                 />
             </div>
+            <div className="search-results-heading">Documents in this workspace</div>
             {query.trim() && (
                 <button className="search-question" disabled={!canAsk} onClick={() => onAsk(query)}>
                     <Sparkles />
-                    <span>Ask Atlas: {query}</span>
+                    <span>Search selected sources with Atlas: {query}</span>
                     <ArrowUpRight />
                 </button>
             )}

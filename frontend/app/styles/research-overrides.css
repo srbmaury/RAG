@@ -304,6 +304,28 @@ button.source-provider-card.selected {
     color: var(--sub);
     margin-right: 3px;
 }
+.unified-source-select-all {
+    border: 1px solid var(--line2);
+    border-radius: 7px;
+    background: var(--panel);
+    color: var(--brand);
+    font-size: 11px;
+    font-weight: 650;
+    padding: 7px 10px;
+    cursor: pointer;
+}
+.unified-source-select-all:hover {
+    background: var(--wash);
+}
+.unified-source-select-all:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+}
+.modal-search input:focus-visible,
+.library-search-row input:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
 .unified-sources label {
     display: inline-flex;
     align-items: center;

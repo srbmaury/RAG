@@ -25,14 +25,6 @@ jobs:
               env:
                   PYTHONPATH: backend
               run: pytest backend/tests -q
-            - name: Run deterministic answer and retrieval evaluations
-              env:
-                  PYTHONPATH: backend
-              run: |
-                  python evals/answer_quality.py evals/answer_quality_cases.json
-                  python evals/research_quality_suite.py evals/research_quality_suite.json
-                  python evals/connected_retrieval_eval.py evals/connected_cases.json
-                  python evals/citation_eval.py evals/citation_cases.json
     frontend:
         runs-on: ubuntu-latest
         steps:

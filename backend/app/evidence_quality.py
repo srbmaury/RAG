@@ -4,35 +4,14 @@ Never infer a relationship just because two records share a keyword.
 These utilities preserve original source IDs and URLs for citation integrity.
 """
 
-import re
 from urllib.parse import urlsplit, urlunsplit
 
-STOP = {
-    'the',
-    'and',
-    'for',
-    'with',
-    'from',
-    'what',
-    'which',
-    'this',
-    'that',
-    'about',
-    'show',
-    'find',
-    'where',
-    'when',
-    'does',
-    'have',
-    'were',
-    'are',
-    'our',
-    'please',
-}
+from .research_queries import natural_search_terms
+from .retrieval import minimum_query_overlap, tokens
 
 
 def keywords(text):
-    return {word for word in re.findall(r'[a-z0-9]{3,}', (text or '').lower()) if word not in STOP}
+    return {word for word in tokens(text) if len(word) >= 3}
 
 
 def canonical_url(url):
@@ -76,6 +55,8 @@ def score(item, question):
 
 def prepare_evidence(question, items, *, limit=60, per_provider=20):
     """Deduplicate exact references and rank by topical relevance with source diversity."""
+    query_terms = set(tokens(' '.join(natural_search_terms(question))))
+    required_overlap = minimum_query_overlap(' '.join(query_terms)) if query_terms else 0
     unique = []
     seen = set()
     for item in items:
@@ -83,6 +64,10 @@ def prepare_evidence(question, items, *, limit=60, per_provider=20):
         if key in seen:
             continue
         seen.add(key)
+        if query_terms:
+            item_terms = set(tokens(f'{item.title}\n{item.excerpt}'))
+            if len(query_terms & item_terms) < required_overlap:
+                continue
         unique.append(item)
     ranked = sorted(enumerate(unique), key=lambda row: (-score(row[1], question), row[0]))
     by_provider = {}

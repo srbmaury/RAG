@@ -12,4 +12,6 @@ def test_default_retrieval_fixture_is_present_and_runnable():
     assert len(cases) >= 2
     report = evaluate(cases, lexical_rank, k=1)
     assert report['cases'] == len(cases)
-    assert 0 <= report['recall_at_k'] <= 1
+    assert report['recall_at_k'] == 1
+    assert report['precision_at_k'] == 1
+    assert report['mrr_at_k'] == 1

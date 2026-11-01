@@ -368,7 +368,3 @@ Tokens and originals are workspace data. Protect the database, document volume, 
 - `frontend/utils/`: typed session, document, and conversation actions.
 - `frontend/app/{globals,rebuild}.css`: ordered entry points for styles in `frontend/app/styles/`; rule order is preserved for existing visual refinements.
 - `compose.yaml`: PostgreSQL, API, worker, and web services.
-
-## Design preview
-
-Open [the interactive Atlas design preview](docs/Atlas_Research_Workspace.html) locally. It uses fictional sample content and does not connect to the backend; `frontend/app/` is the working interface.

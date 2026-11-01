@@ -13,7 +13,7 @@ test.beforeEach(async({page})=>{
     if(path==='/workspaces/w1/documents')return json([{id:'d1',name:'notes.md',size:128,status:'ready',pages:1,chunk_count:1}]);
     if(path==='/gmail/status')return json({connected:false,email:null,configured:false});
     if(path==='/drive/status')return json({connected:false,account:null,configured:false});
-    if(path==='/workspaces/w1/sources')return json([{provider:'github',connected:true,account:'test-user'}]);
+    if(path==='/workspaces/w1/sources')return json([{provider:'github',connected:true,account:'test-user'},{provider:'calendar',connected:true,account:'test-user'}]);
     if(path.includes('external')&&method==='GET')return json([]);
     if(path==='/workspaces/w1/conversations'&&method==='GET')return json([{id:'old',title:'Earlier conversation',updated:1234}]);
     if(path==='/workspaces/w1/conversations'&&method==='POST'){
@@ -33,7 +33,7 @@ test.beforeEach(async({page})=>{
     if(path==='/workspaces/w1/connected-chat/stream'&&method==='POST'){
       const data=route.request().postDataJSON();
       const scope=[...(data.include_documents?['documents']:[]),...(data.include_gmail?['gmail']:[]),...(data.providers||[])];
-      const sources=(data.providers||[]).includes('github')?[{chunk_id:'pr-1',document_id:'',name:'A very long GitHub pull request title without a file extension',page:0,location_type:'github',provider:'github',url:'https://github.com/example/repo/pull/1',text:'A connected GitHub record.'}]:[];
+      const sources=(data.providers||[]).includes('github')?[{chunk_id:'pr-1',document_id:'',name:'A very long GitHub pull request title without a file extension',page:0,location_type:'github',provider:'github',url:'https://github.com/example/repo/pull/1',text:'First source line.\nSecond source line.\n\nOriginal: https://example.com/record?q=ok.'}]:[];
       const result={answer:'The answer is grounded in the selected sources. [1]',sources,mode:'connected',scope};
       const body=[
         {type:'status',text:'Searching selected sources…'},
@@ -111,6 +111,108 @@ test('source-only questions can exclude documents and restore scope from chat hi
   await expect(page.getByRole('checkbox',{name:'GitHub'})).toBeChecked();
 });
 
+test('single and multiple selected providers are sent with the prompt',async({page})=>{
+  await page.route('**/api/workspaces/w1/sources',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([
+    {provider:'github',connected:true,account:'test-user'},
+    {provider:'calendar',connected:true,account:'test-user'},
+  ])}));
+  const requests: {question:string;include_documents:boolean;providers:string[]}[]=[];
+  await page.route('**/api/workspaces/w1/connected-chat/stream',async route=>{
+    const data=route.request().postDataJSON();
+    requests.push(data);
+    const sources=data.providers.includes('github')?[{chunk_id:'pr-1',document_id:'',name:'GitHub issue',page:0,location_type:'github',provider:'github',url:'https://github.com/example/repo/issues/1',text:'First source line.\nSecond source line.\n\nOriginal: https://example.com/record?q=ok.'}]:[];
+    const result={answer:'A supported result. [1]',sources,mode:'connected',scope:[...(data.include_documents?['documents']:[]),...data.providers]};
+    const body=[{type:'status',text:'Searching selected sources…'},{type:'done',result}].map(event=>JSON.stringify(event)).join('\n')+'\n';
+    await route.fulfill({status:200,contentType:'application/x-ndjson',body});
+  });
+
+  await page.reload();
+  await expect(page.getByRole('navigation',{name:'Main navigation'})).toBeVisible();
+  await expect(page.getByRole('checkbox',{name:'Calendar'})).toBeEnabled();
+  await page.getByRole('checkbox',{name:'Documents'}).uncheck();
+  await page.getByRole('checkbox',{name:'GitHub'}).check();
+  await page.getByRole('textbox',{name:'Your question'}).fill('Summarize the selected issue');
+  await page.getByRole('button',{name:'Send question'}).click();
+  await expect.poll(()=>requests.length).toBe(1);
+  expect(requests[0]).toMatchObject({include_documents:false,providers:['github']});
+
+  await page.getByRole('button',{name:'New chat',exact:true}).click();
+  await page.getByRole('checkbox',{name:'Documents'}).uncheck();
+  await page.getByRole('checkbox',{name:'GitHub'}).check();
+  await page.getByRole('checkbox',{name:'Calendar'}).check();
+  await page.getByRole('textbox',{name:'Your question'}).fill('Compare details from the selected sources');
+  await page.getByRole('button',{name:'Send question'}).click();
+  await expect.poll(()=>requests.length).toBe(2);
+  expect(requests[1]).toMatchObject({include_documents:false,providers:['github','calendar']});
+});
+
+test('source passage keeps paragraphs and makes URLs clickable',async({page})=>{
+  await page.getByRole('checkbox',{name:'Documents'}).uncheck();
+  await page.getByRole('checkbox',{name:'GitHub'}).check();
+  await page.getByRole('textbox',{name:'Your question'}).fill('Find the source passage');
+  await page.getByRole('button',{name:'Send question'}).click();
+  await page.getByRole('button',{name:/Open source 1: A very long GitHub pull request title/}).click();
+  const dialog=page.getByRole('dialog',{name:'Source passage'});
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.document-plain p')).toHaveCount(2);
+  const link=dialog.getByRole('link',{name:'https://example.com/record?q=ok'});
+  await expect(link).toHaveAttribute('href','https://example.com/record?q=ok');
+  await expect(link).toHaveAttribute('target','_blank');
+});
+
+test('select all toggles, and calendar prompts stay scoped to calendar',async({page})=>{
+  const providers=['github','notion','slack','calendar','linear','jira','onedrive','outlook','sharepoint'];
+  await page.route('**/api/workspaces/w1/sources',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(providers.map(provider=>({provider,connected:true,account:'test-user'})))}));
+  await page.route('**/api/gmail/status*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({connected:true,email:'test@example.com',configured:true})}));
+  await page.route('**/api/workspaces/w1/drive/status',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({connected:true,account:'test@example.com',configured:true})}));
+  const requests: {question:string;include_documents:boolean;include_gmail:boolean;providers:string[]}[]=[];
+  await page.route('**/api/workspaces/w1/connected-chat/stream',async route=>{
+    requests.push(route.request().postDataJSON());
+    const result={answer:'Your next calendar event is: [1]',sources:[],mode:'source_results',scope:['calendar']};
+    await route.fulfill({status:200,contentType:'application/x-ndjson',body:JSON.stringify({type:'done',result})+'\n'});
+  });
+
+  await page.reload();
+  await expect(page.getByRole('navigation',{name:'Main navigation'})).toBeVisible();
+  await expect(page.getByRole('checkbox',{name:'Calendar'})).toBeEnabled();
+  await page.getByRole('button',{name:'Select all connected sources and documents'}).click();
+  await expect(page.getByRole('button',{name:'Unselect all connected sources and documents'})).toBeVisible();
+  for (const name of ['Documents','Gmail','Drive','GitHub','Notion','Slack','Calendar','Linear','Jira','OneDrive','Outlook','SharePoint'])
+    await expect(page.getByRole('checkbox',{name,exact:true})).toBeChecked();
+  await page.getByRole('button',{name:'Unselect all connected sources and documents'}).click();
+  for (const name of ['Documents','Gmail','Drive','GitHub','Notion','Slack','Calendar','Linear','Jira','OneDrive','Outlook','SharePoint'])
+    await expect(page.getByRole('checkbox',{name,exact:true})).not.toBeChecked();
+
+  await page.getByRole('checkbox',{name:'Documents'}).check();
+  await page.getByRole('textbox',{name:'Your question'}).fill('list next 10 events from my calendar');
+  await page.getByRole('button',{name:'Send question'}).click();
+  await expect.poll(()=>requests.length).toBe(1);
+  expect(requests[0]).toMatchObject({include_documents:false,include_gmail:false,providers:['calendar']});
+});
+
+test('explicit Gmail selection is preserved for flight email questions',async({page})=>{
+  await page.route('**/api/gmail/status*',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({connected:true,email:'test@example.com',configured:true})}));
+  const requests: {question:string;include_documents:boolean;include_gmail:boolean;providers:string[]}[]=[];
+  await page.route('**/api/workspaces/w1/connected-chat/stream',async route=>{
+    const data=route.request().postDataJSON();
+    requests.push(data);
+    const result={answer:'No matching email was found.',sources:[],mode:'source_results',scope:['gmail']};
+    await route.fulfill({status:200,contentType:'application/x-ndjson',body:JSON.stringify({type:'done',result})+'\n'});
+  });
+  await page.reload();
+  await expect(page.getByRole('checkbox',{name:'Gmail'})).toBeEnabled();
+  await page.getByRole('checkbox',{name:'Documents'}).uncheck();
+  await page.getByRole('checkbox',{name:'Gmail'}).check();
+  await page.getByRole('textbox',{name:'Your question'}).fill('Find my flight email for Varanasi 6E 501');
+  await page.getByRole('button',{name:'Send question'}).click();
+  await expect.poll(()=>requests.length).toBe(1);
+  expect(requests[0]).toMatchObject({include_documents:false,include_gmail:true,providers:[]});
+  await expect(page.locator('.answer-row')).toBeVisible();
+  await expect(page.locator('.answer-head').last()).toContainText('Live source results');
+  await expect(page.locator('.answer-head').last()).toContainText('Gmail');
+  await expect(page.getByRole('checkbox',{name:'Calendar'})).not.toBeChecked();
+});
+
 test('new chat resets source scope to documents only',async({page})=>{
   await page.getByRole('checkbox',{name:'Documents'}).uncheck();
   await page.getByRole('checkbox',{name:'GitHub'}).check();
@@ -141,10 +243,25 @@ test('global search starts independent research after opening a saved chat',asyn
   await page.getByRole('button',{name:/Search documents or ask/}).click();
   await expect(page.getByRole('textbox',{name:'Search your workspace',exact:true})).toBeFocused();
   await page.getByRole('textbox',{name:'Search your workspace',exact:true}).fill('Independent question');
-  await page.getByRole('button',{name:'Ask Atlas: Independent question',exact:true}).click();
+  await page.getByRole('button',{name:'Search selected sources with Atlas: Independent question',exact:true}).click();
   await expect(page.locator('.answer-row')).toBeVisible();
   await expect(page.locator('.user-message')).toHaveCount(1);
   await expect(page.locator('.user-message')).toHaveText(/Independent question/);
+});
+
+test('workspace and document search inputs do not show the inner focus box',async({page})=>{
+  await page.getByRole('button',{name:/Search documents or ask/}).click();
+  const workspaceSearch=page.getByRole('textbox',{name:'Search your workspace',exact:true});
+  await expect(workspaceSearch).toBeFocused();
+  await expect.poll(()=>workspaceSearch.evaluate(node=>getComputedStyle(node).outlineStyle)).toBe('none');
+  await expect.poll(()=>workspaceSearch.evaluate(node=>getComputedStyle(node).boxShadow)).toBe('none');
+
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Documents',exact:true}).click();
+  const documentSearch=page.getByRole('searchbox',{name:'Search documents'});
+  await expect(documentSearch).toBeFocused();
+  await expect.poll(()=>documentSearch.evaluate(node=>getComputedStyle(node).outlineStyle)).toBe('none');
+  await expect.poll(()=>documentSearch.evaluate(node=>getComputedStyle(node).boxShadow)).toBe('none');
 });
 
 test('library search and clear restore the document list',async({page})=>{

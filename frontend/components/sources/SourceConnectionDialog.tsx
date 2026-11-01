@@ -2,6 +2,7 @@
 import { ArrowUpRight } from 'lucide-react';
 import { Dialog } from '../ui/WorkspacePrimitives';
 import { useSourceConnections } from '../../hooks/useSourceConnections';
+import type { ExternalSourceProvider } from '../../lib/providers';
 type State = ReturnType<typeof useSourceConnections>;
 
 interface SourceConnectionDialogProps {
@@ -13,7 +14,7 @@ interface SourceConnectionDialogProps {
     onConnectSource: () => void;
     onConnectOAuthSource: () => void;
     onSearchSource: () => void;
-    onDisconnectSource: (provider: string) => void;
+    onDisconnectSource: (provider: ExternalSourceProvider) => void;
 }
 export function SourceConnectionDialog({
     state,
