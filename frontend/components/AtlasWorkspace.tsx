@@ -12,6 +12,7 @@ import {DocumentPassage} from '../components/DocumentPassage';
 import '../app/rebuild.css';
 import {ConversationTranscript} from './chat/ConversationTranscript';
 import {ResearchComposer} from './chat/ResearchComposer';
+import {DocumentsView} from './documents/DocumentsView';
 import {AtlasMark,FileBadge,Status,EmptyState,Dialog} from './ui/WorkspacePrimitives';
 import {IntegrationTile} from '../components/IntegrationTile';
 import {flushSync} from 'react-dom';
@@ -602,17 +603,7 @@ export function AtlasWorkspace() {
           <ResearchComposer query={query} onChange={setQuery} onSubmit={()=>void ask()} onUpload={()=>input.current?.click()} uploading={uploading} busy={busy} hasAskSources={hasAskSources} hasMessages={messages.length>0}/><p className="caption composer-caption">{messages.length?'Follow-ups use this conversation’s context. ':''}Review supporting passages before relying on an answer.</p></div>
           </div></div>
         </section>}
-        {wid && tab==='documents' && <section className="document-library-v3">
-          <div className="crumb">Workspace<span>›</span>Library</div>
-          <div className="library-intro"><div><span className="section-kicker">YOUR KNOWLEDGE LIBRARY</span><h1>Documents</h1><p>Every file you add becomes part of the answers Atlas can explain and reference.</p></div>{uploadButton}</div>
-          <div className="library-stat-strip"><span><strong>{docs.length}</strong> Documents</span><span><strong>{ready.length}</strong> Ready to search</span><span><strong>{storage?prettyBytes(storage):'0 KB'}</strong> Storage used</span></div>
-          <div className="library-workspace">
-            <div className="library-workspace-heading"><div><h2>All documents</h2><p>Search and manage files in this workspace</p></div><span>{filtered.length} files</span></div>
-            <div className="library-search-row"><label><Search size={17}/><input type="search" aria-label="Search documents" placeholder="Search your documents…" value={filter} onChange={e=>setFilter(e.target.value)}/></label></div>
-            {renderDocuments(filtered)}
-          </div>
-          <div className={`home-dropzone ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}><span className="home-drop-icon"><Upload size={20}/></span><div><strong>Add documents to your library</strong><p>Drag in PDFs, Word, text, Markdown, CSV, JSON or HTML · max {Math.round(user.max_file_bytes/1024/1024)} MB each.</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Browse files</button></div>
-        </section>}
+        {wid && tab==='documents' && <DocumentsView uploadButton={uploadButton} totalDocuments={docs.length} readyDocuments={ready.length} storageLabel={storage?prettyBytes(storage):'0 KB'} filteredCount={filtered.length} filter={filter} onFilter={setFilter} documentTable={renderDocuments(filtered)} dragging={dragging} onDragging={setDragging} onDrop={files=>void upload(files)} maxSizeMB={Math.round(user.max_file_bytes/1024/1024)} uploading={uploading} onBrowse={()=>input.current?.click()}/>}
         {wid && tab==='sources' && <section className="connected-page">
           {sourceManage!=='gmail' && <div className="sources-overview">
           <div className="crumb">Workspace<span>›</span>Sources</div><div className="heading-row"><div><span className="eyebrow">YOUR INTEGRATIONS</span><h1>Connected sources</h1><p className="subtitle">Connect external services to your research workspace. Access stays read-only.</p></div>
