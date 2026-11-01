@@ -20,7 +20,23 @@ interface DocumentsViewProps {
     onBrowse: () => void;
 }
 
-export function DocumentsView({ uploadButton, webImport, totalDocuments, readyDocuments, storageLabel, filteredCount, filter, onFilter, documentTable, dragging, onDragging, onDrop, maxSizeMB, uploading, onBrowse }: DocumentsViewProps) {
+export function DocumentsView({
+    uploadButton,
+    webImport,
+    totalDocuments,
+    readyDocuments,
+    storageLabel,
+    filteredCount,
+    filter,
+    onFilter,
+    documentTable,
+    dragging,
+    onDragging,
+    onDrop,
+    maxSizeMB,
+    uploading,
+    onBrowse,
+}: DocumentsViewProps) {
     return (
         <section className="document-library-v3">
             <div className="crumb">

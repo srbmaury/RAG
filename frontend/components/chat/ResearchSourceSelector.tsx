@@ -18,7 +18,18 @@ interface ResearchSourceSelectorProps {
     onManage: () => void;
 }
 
-export function ResearchSourceSelector({ includeDocuments, onIncludeDocuments, gmailStatus, connectedGmail, onIncludeGmail, driveStatus, sourceStatuses, connectedProviders, onToggleProvider, onManage }: ResearchSourceSelectorProps) {
+export function ResearchSourceSelector({
+    includeDocuments,
+    onIncludeDocuments,
+    gmailStatus,
+    connectedGmail,
+    onIncludeGmail,
+    driveStatus,
+    sourceStatuses,
+    connectedProviders,
+    onToggleProvider,
+    onManage,
+}: ResearchSourceSelectorProps) {
     return (
         <div className="unified-sources">
             <span className="unified-sources-label">Search sources</span>

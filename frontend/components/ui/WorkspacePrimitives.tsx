@@ -39,7 +39,13 @@ export function EmptyState({ icon, title, text, action }: { icon: ReactNode; tit
         </div>
     );
 }
-export function Dialog({ title, onClose, children, className = '', closeLabel = 'Close dialog' }: {
+export function Dialog({
+    title,
+    onClose,
+    children,
+    className = '',
+    closeLabel = 'Close dialog',
+}: {
     title: string;
     onClose: () => void;
     children: ReactNode;

@@ -15,7 +15,17 @@ interface SourceConnectionDialogProps {
     onSearchSource: () => void;
     onDisconnectSource: (provider: string) => void;
 }
-export function SourceConnectionDialog({ state, onClose, onSearchDrive, onDisconnectDrive, onConnectDrive, onConnectSource, onConnectOAuthSource, onSearchSource, onDisconnectSource }: SourceConnectionDialogProps) {
+export function SourceConnectionDialog({
+    state,
+    onClose,
+    onSearchDrive,
+    onDisconnectDrive,
+    onConnectDrive,
+    onConnectSource,
+    onConnectOAuthSource,
+    onSearchSource,
+    onDisconnectSource,
+}: SourceConnectionDialogProps) {
     const {
         driveStatus,
         driveQuery,

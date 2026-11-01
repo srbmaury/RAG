@@ -21,7 +21,23 @@ interface WorkspaceSidebarProps {
     email: string;
     onSignOut: () => void;
 }
-export function WorkspaceSidebar({ open, onCollapse, onWorkspaceSettings, workspace, workspaceCount, tab, onNavigate, chats, onOpenChat, onAllChats, readyCount, storageLabel, initials, email, onSignOut }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({
+    open,
+    onCollapse,
+    onWorkspaceSettings,
+    workspace,
+    workspaceCount,
+    tab,
+    onNavigate,
+    chats,
+    onOpenChat,
+    onAllChats,
+    readyCount,
+    storageLabel,
+    initials,
+    email,
+    onSignOut,
+}: WorkspaceSidebarProps) {
     return (
         <aside className={`sidebar ${open ? 'open' : ''}`}>
             <div className="brand-row">
