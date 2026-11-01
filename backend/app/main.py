@@ -132,7 +132,7 @@ def workspace(workspaceId, actor, db):
 
 def document(workspaceId, did, actor, db):
     workspace(workspaceId, actor, db)
-    item = db.query(Document).filter_by(id=did, workspace_id=wid).first()
+    item = db.query(Document).filter_by(id=did, workspace_id=workspaceId).first()
     if not item:
         raise HTTPException(404, 'Document not found.')
     return item
@@ -198,12 +198,12 @@ def issue_login(actor, response, db):
     return {'id': actor.id, 'email': actor.email}
 
 
-@app.get('/api/workspaces/{wid}/processing-stats')
+@app.get('/api/workspaces/{workspaceId}/processing-stats')
 def processing_stats(workspaceId: str, actor=Depends(user), db=Depends(database)):
     workspace(workspaceId, actor, db)
     rows = (
         db.query(Document.status, func.count(Document.id))
-        .filter(Document.workspace_id == wid)
+        .filter(Document.workspace_id == workspaceId)
         .group_by(Document.status)
         .all()
     )
@@ -290,14 +290,14 @@ class DeleteWorkspaceRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
 
-@app.delete('/api/workspaces/{wid}')
+@app.delete('/api/workspaces/{workspaceId}')
 def delete_workspace(
     workspaceId: str, body: DeleteWorkspaceRequest, actor=Depends(user), db=Depends(database)
 ):
     item = workspace(workspaceId, actor, db)
     if body.name != item.name:
         raise HTTPException(422, 'Type the exact workspace name to confirm deletion.')
-    documents = db.query(Document).filter_by(workspace_id=wid).all()
+    documents = db.query(Document).filter_by(workspace_id=workspaceId).all()
     if any(d.status in ('queued', 'processing') for d in documents):
         raise HTTPException(
             409,
@@ -305,14 +305,14 @@ def delete_workspace(
         )
     ids = [d.id for d in documents]
     # Use explicit deletes for SQLite and PostgreSQL; no reliance on ORM cascades.
-    db.query(GmailOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
-    db.query(DriveOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
-    db.query(ConnectedOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
-    db.query(GmailConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
-    db.query(ExternalConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
-    db.query(Conversation).filter_by(workspace_id=wid).delete(synchronize_session=False)
-    db.query(Chunk).filter_by(workspace_id=wid).delete(synchronize_session=False)
-    db.query(Document).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(GmailOAuthState).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
+    db.query(DriveOAuthState).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
+    db.query(ConnectedOAuthState).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
+    db.query(GmailConnection).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
+    db.query(ExternalConnection).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
+    db.query(Conversation).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
+    db.query(Chunk).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
+    db.query(Document).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
     db.delete(item)
     db.commit()
     for did in ids:
@@ -320,28 +320,28 @@ def delete_workspace(
     return {'ok': True}
 
 
-@app.get('/api/workspaces/{wid}/documents')
+@app.get('/api/workspaces/{workspaceId}/documents')
 def documents(workspaceId: str, actor=Depends(user), db=Depends(database)):
     workspace(workspaceId, actor, db)
     return [
         public_doc(d)
-        for d in db.query(Document).filter_by(workspace_id=wid).order_by(Document.created.desc())
+        for d in db.query(Document).filter_by(workspace_id=workspaceId).order_by(Document.created.desc())
     ]
 
 
-@app.post('/api/workspaces/{wid}/uploads')
+@app.post('/api/workspaces/{workspaceId}/uploads')
 def start_upload(workspaceId: str, body: UploadRequest, actor=Depends(user), db=Depends(database)):
     workspace(workspaceId, actor, db)
     return uploads.start(workspaceId, actor.id, body.name, body.size, MAX_FILE_BYTES, SUPPORTED)
 
 
-@app.get('/api/workspaces/{wid}/uploads/{upload_id}')
+@app.get('/api/workspaces/{workspaceId}/uploads/{upload_id}')
 def upload_status(workspaceId: str, upload_id: str, actor=Depends(user), db=Depends(database)):
     workspace(workspaceId, actor, db)
     return uploads.status(upload_id, workspaceId, actor.id)
 
 
-@app.put('/api/workspaces/{wid}/uploads/{upload_id}')
+@app.put('/api/workspaces/{workspaceId}/uploads/{upload_id}')
 async def upload_part(
     workspaceId: str,
     upload_id: str,
@@ -359,20 +359,20 @@ async def upload_part(
     return await run_in_threadpool(uploads.append, upload_id, workspaceId, actor.id, offset, data)
 
 
-@app.post('/api/workspaces/{wid}/uploads/{upload_id}/complete')
+@app.post('/api/workspaces/{workspaceId}/uploads/{upload_id}/complete')
 def complete_upload(workspaceId: str, upload_id: str, actor=Depends(user), db=Depends(database)):
     workspace(workspaceId, actor, db)
     doc, duplicate = uploads.finish(upload_id, workspaceId, actor.id, db)
     return {**public_doc(doc), 'duplicate': duplicate}
 
 
-@app.delete('/api/workspaces/{wid}/uploads/{upload_id}')
+@app.delete('/api/workspaces/{workspaceId}/uploads/{upload_id}')
 def cancel_upload(workspaceId: str, upload_id: str, actor=Depends(user), db=Depends(database)):
     workspace(workspaceId, actor, db)
     return uploads.cancel(upload_id, workspaceId, actor.id)
 
 
-@app.post('/api/workspaces/{wid}/documents')
+@app.post('/api/workspaces/{workspaceId}/documents')
 async def upload(
     workspaceId: str, files: List[UploadFile] = File(...), actor=Depends(user), db=Depends(database)
 ):
@@ -436,7 +436,7 @@ async def upload(
     return {'documents': results}
 
 
-@app.get('/api/workspaces/{wid}/documents/{did}/chunks')
+@app.get('/api/workspaces/{workspaceId}/documents/{did}/chunks')
 def chunks(workspaceId: str, did: str, offset: int = 0, actor=Depends(user), db=Depends(database)):
     doc = document(workspaceId, did, actor, db)
     if offset < 0:
@@ -454,7 +454,7 @@ def chunks(workspaceId: str, did: str, offset: int = 0, actor=Depends(user), db=
     }
 
 
-@app.get('/api/workspaces/{wid}/documents/{did}/original')
+@app.get('/api/workspaces/{workspaceId}/documents/{did}/original')
 def original(workspaceId: str, did: str, actor=Depends(user), db=Depends(database)):
     doc = document(workspaceId, did, actor, db)
     return FileResponse(
@@ -462,7 +462,7 @@ def original(workspaceId: str, did: str, actor=Depends(user), db=Depends(databas
     )
 
 
-@app.post('/api/workspaces/{wid}/documents/{did}/retry')
+@app.post('/api/workspaces/{workspaceId}/documents/{did}/retry')
 def retry(workspaceId: str, did: str, actor=Depends(user), db=Depends(database)):
     doc = document(workspaceId, did, actor, db)
     if doc.status not in ('failed', 'ready'):
@@ -473,7 +473,7 @@ def retry(workspaceId: str, did: str, actor=Depends(user), db=Depends(database))
     return public_doc(doc)
 
 
-@app.delete('/api/workspaces/{wid}/documents/{did}')
+@app.delete('/api/workspaces/{workspaceId}/documents/{did}')
 def delete(workspaceId: str, did: str, actor=Depends(user), db=Depends(database)):
     doc = document(workspaceId, did, actor, db)
     db.delete(doc)
@@ -494,7 +494,7 @@ class ConversationRename(BaseModel):
 
 def owned_conversation(workspaceId, cid, actor, db):
     workspace(workspaceId, actor, db)
-    item = db.query(Conversation).filter_by(id=cid, workspace_id=wid).first()
+    item = db.query(Conversation).filter_by(id=cid, workspace_id=workspaceId).first()
     if item is None:
         raise HTTPException(404, 'Conversation not found.')
     return item
@@ -510,19 +510,19 @@ def conversation_data(item):
     }
 
 
-@app.get('/api/workspaces/{wid}/conversations')
+@app.get('/api/workspaces/{workspaceId}/conversations')
 def list_conversations(workspaceId: str, actor=Depends(user), db=Depends(database)):
     workspace(workspaceId, actor, db)
     items = (
         db.query(Conversation)
-        .filter_by(workspace_id=wid)
+        .filter_by(workspace_id=workspaceId)
         .order_by(Conversation.updated.desc())
         .all()
     )
     return [{'id': c.id, 'title': c.title, 'updated': c.updated} for c in items]
 
 
-@app.post('/api/workspaces/{wid}/conversations')
+@app.post('/api/workspaces/{workspaceId}/conversations')
 def create_conversation(
     workspaceId: str, body: ConversationPayload, actor=Depends(user), db=Depends(database)
 ):
@@ -533,12 +533,12 @@ def create_conversation(
     return conversation_data(item)
 
 
-@app.get('/api/workspaces/{wid}/conversations/{cid}')
+@app.get('/api/workspaces/{workspaceId}/conversations/{cid}')
 def get_conversation(workspaceId: str, cid: str, actor=Depends(user), db=Depends(database)):
     return conversation_data(owned_conversation(workspaceId, cid, actor, db))
 
 
-@app.put('/api/workspaces/{wid}/conversations/{cid}')
+@app.put('/api/workspaces/{workspaceId}/conversations/{cid}')
 def update_conversation(
     workspaceId: str, cid: str, body: ConversationPayload, actor=Depends(user), db=Depends(database)
 ):
@@ -550,7 +550,7 @@ def update_conversation(
     return conversation_data(item)
 
 
-@app.patch('/api/workspaces/{wid}/conversations/{cid}')
+@app.patch('/api/workspaces/{workspaceId}/conversations/{cid}')
 def rename_conversation(
     workspaceId: str, cid: str, body: ConversationRename, actor=Depends(user), db=Depends(database)
 ):
@@ -561,7 +561,7 @@ def rename_conversation(
     return conversation_data(item)
 
 
-@app.delete('/api/workspaces/{wid}/conversations/{cid}')
+@app.delete('/api/workspaces/{workspaceId}/conversations/{cid}')
 def delete_conversation(workspaceId: str, cid: str, actor=Depends(user), db=Depends(database)):
     db.delete(owned_conversation(workspaceId, cid, actor, db))
     db.commit()
@@ -606,7 +606,7 @@ def collect_connected_evidence(workspaceId, body, actor, db):
                 )
                 document_evidence[item['chunk_id']] = item
         if body.include_gmail:
-            entry = connection(db, actor, wid)
+            entry = connection(db, actor, workspaceId)
             token = access_token(entry, db)
             matches = gmail_get(
                 token,
@@ -628,7 +628,7 @@ def collect_connected_evidence(workspaceId, body, actor, db):
                     )
                 )
         if 'drive' in body.providers:
-            drive_token = drive_access_token(db, actor, wid)
+            drive_token = drive_access_token(db, actor, workspaceId)
             drive_items = drive_evidence(
                 drive_token, drive_search(drive_token, drive_query_for_question(body.question))
             )
@@ -758,7 +758,7 @@ def github_pull_request_list_result(question, body, evidence, document_evidence)
     }
 
 
-@app.post('/api/workspaces/{wid}/connected-chat')
+@app.post('/api/workspaces/{workspaceId}/connected-chat')
 def connected_chat(
     workspaceId: str, body: ConnectedQuestion, request: Request, actor=Depends(user), db=Depends(database)
 ):
@@ -831,7 +831,7 @@ def connected_chat(
     }
 
 
-@app.post('/api/workspaces/{wid}/connected-chat/stream')
+@app.post('/api/workspaces/{workspaceId}/connected-chat/stream')
 def connected_chat_stream(
     workspaceId: str, body: ConnectedQuestion, request: Request, actor=Depends(user), db=Depends(database)
 ):
@@ -935,7 +935,7 @@ def connected_chat_stream(
     )
 
 
-@app.get('/api/workspaces/{wid}/sources/health')
+@app.get('/api/workspaces/{workspaceId}/sources/health')
 def source_health(workspaceId: str, actor=Depends(user), db=Depends(database)):
     workspace(workspaceId, actor, db)
     return {
@@ -947,12 +947,12 @@ def source_health(workspaceId: str, actor=Depends(user), db=Depends(database)):
                 'error': row.error,
                 'checked_at': row.checked_at,
             }
-            for row in db.query(SourceHealthCheck).filter_by(workspace_id=wid).all()
+            for row in db.query(SourceHealthCheck).filter_by(workspace_id=workspaceId).all()
         ]
     }
 
 
-@app.post('/api/workspaces/{wid}/sources/health/check')
+@app.post('/api/workspaces/{workspaceId}/sources/health/check')
 def verify_sources(workspaceId: str, request: Request, actor=Depends(user), db=Depends(database)):
     """Check real provider access; return only status, account, and match counts."""
     workspace(workspaceId, actor, db)
@@ -1013,11 +1013,11 @@ def verify_sources(workspaceId: str, request: Request, actor=Depends(user), db=D
         else:
             record(provider, False, lambda: None)
 
-    gmail_row = db.query(GmailConnection).filter_by(workspace_id=wid).first()
+    gmail_row = db.query(GmailConnection).filter_by(workspace_id=workspaceId).first()
     if gmail_row:
 
         def check_gmail():
-            entry = gmail_connection(db, actor, wid)
+            entry = gmail_connection(db, actor, workspaceId)
             token = gmail_access(entry, db)
             items = gmail_get(
                 token, GMAIL_API + '/messages', {'q': 'newer_than:30d', 'maxResults': 1}
@@ -1032,7 +1032,7 @@ def verify_sources(workspaceId: str, request: Request, actor=Depends(user), db=D
     if drive_row:
 
         def check_drive():
-            token = drive_access(db, actor, wid)
+            token = drive_access(db, actor, workspaceId)
             return drive_row.account, len(drive_search(token, ''))
 
         record('drive', True, check_drive, drive_row.account)
@@ -1042,7 +1042,7 @@ def verify_sources(workspaceId: str, request: Request, actor=Depends(user), db=D
     return {'checks': checks}
 
 
-@app.post('/api/workspaces/{wid}/chat')
+@app.post('/api/workspaces/{workspaceId}/chat')
 def chat(workspaceId: str, body: Question, actor=Depends(user), db=Depends(database)):
     workspace(workspaceId, actor, db)
     if not body.question.strip():
