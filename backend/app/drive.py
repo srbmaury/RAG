@@ -7,11 +7,12 @@ import os
 import secrets
 import time
 from urllib.parse import urlencode
+from typing import Annotated
 
 import httpx
 import pypdfium2 as pdfium
 from docx import Document as WordDocument
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
@@ -98,7 +99,7 @@ def google_token(payload):
 
 
 @router.get('/drive/connect')
-def connect(workspaceId: str, request: Request):
+def connect(workspaceId: Annotated[str, Query(alias='wid')], request: Request):
     configured()
     with Session() as db:
         who = actor(request, db)
@@ -300,7 +301,7 @@ class DriveSearch(BaseModel):
 
 
 @router.get('/workspaces/{workspaceId}/drive/status')
-def status(workspaceId: str, request: Request):
+def status(workspaceId: Annotated[str, Query(alias='wid')], request: Request):
     with Session() as db:
         who = actor(request, db)
         allowed_workspace(db, who, workspaceId)
