@@ -11,7 +11,7 @@ from urllib.parse import quote
 import httpx
 from fastapi import HTTPException
 
-NEW_PROVIDERS = ("calendar", "linear", "jira", "onedrive", "outlook")
+NEW_PROVIDERS = ("calendar", "linear", "jira", "onedrive", "outlook", "sharepoint")
 
 
 def _request(provider, token, url, *, params=None, graphql=None):
@@ -134,6 +134,24 @@ def search(provider, token, query):
                      params={"$top": 15, "$select": "id,name,webUrl,description,file"})
         return [v for e in d.get("value", []) if (v := _result(provider, e.get("id"), e.get("name"),
                                                                e.get("description") or e.get("name"), e.get("webUrl")))]
+    if provider == "sharepoint":
+        # Search delegated SharePoint content accessible to the signed-in user.
+        # The search endpoint returns metadata/snippets, not complete file bodies.
+        d = _request(provider, token, "https://graph.microsoft.com/v1.0/search/query",
+                     graphql={"requests": [{"entityTypes": ["driveItem"], "query": {"queryString": query},
+                                            "from": 0, "size": 20}]})
+        rows = []
+        for container in d.get("value", []):
+            for hit in container.get("hitsContainers", []):
+                for entry in hit.get("hits", []):
+                    item = entry.get("resource") or {}
+                    parent = item.get("parentReference") or {}
+                    if not parent.get("siteId"):
+                        continue
+                    rows.append(_result(provider, item.get("id"), item.get("name"),
+                                        entry.get("summary") or item.get("description") or item.get("name"),
+                                        item.get("webUrl")))
+        return [x for x in rows if x]
     if provider == "outlook":
         d = _request(provider, token, "https://graph.microsoft.com/v1.0/me/messages",
                      params={"$search": '"' + query.replace('"', "") + '"', "$top": 15,
