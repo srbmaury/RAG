@@ -486,7 +486,9 @@ def collect_connected_evidence(wid, body, actor, db):
     except Exception as exc:
         log.exception('Connected retrieval failed')
         raise HTTPException(502, 'Could not retrieve connected sources.') from exc
-    return filter_credit_card_offer_evidence(body.question, evidence), document_evidence
+    from .evidence_quality import prepare_evidence
+    filtered = filter_credit_card_offer_evidence(body.question, evidence)
+    return prepare_evidence(body.question, filtered), document_evidence
 
 
 def connected_sources_for_payload(payload, document_evidence):
