@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from .config import DATA, MAX_FILE_BYTES
@@ -147,7 +147,7 @@ def save_webpage(wid: str, url: str, db) -> dict:
 
 
 @router.post("/workspaces/{wid}/web-pages")
-def add_web_page(wid: str, body: UrlRequest, request: __import__("fastapi").Request):
+def add_web_page(wid: str, body: UrlRequest, request: Request):
     # Import inside handler to avoid circular import with app.main.
     from .gmail import actor, allowed_workspace
     with Session() as db:
