@@ -63,6 +63,12 @@ async def request_diagnostics(request: Request, call_next):
         log.exception('request_failed id=%s method=%s path=%s', request_id, request.method, request.url.path)
         raise
     elapsed_ms = round((time.monotonic() - started) * 1000)
+    # The frontend and API remain on one origin via the Next.js proxy.
+    # These headers protect browser-facing content without assuming a CDN/WAF.
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
     response.headers['X-Request-ID'] = request_id
     response.headers['Server-Timing'] = f'api;dur={elapsed_ms}'
     log.info('request id=%s method=%s path=%s status=%s duration_ms=%s',
