@@ -607,9 +607,10 @@ def connected_chat_stream(wid: str, body: ConnectedQuestion, request: Request,
                 yield json.dumps({'type': 'done', 'result': listed}, ensure_ascii=False) + '\n'
                 return
             yield json.dumps({'type': 'status', 'text': 'Writing an answer from the evidence…'}, ensure_ascii=False) + '\n'
-            # With no configured model and no external sources selected, keep
-            # document search useful by streaming the existing local excerpt mode.
-            if not enabled() and body.include_documents and not body.include_gmail and not body.providers:
+            # Document-only questions use the dedicated citation-checked answer generator.
+            # This avoids the cross-source streaming model's short timeout and keeps
+            # ordinary document Q&A focused on the user's requested answer.
+            if body.include_documents and not body.include_gmail and not body.providers:
                 doc_sources = [document_evidence[item.source_id]
                                for item in evidence if item.provider == 'documents'
                                and item.source_id in document_evidence]
