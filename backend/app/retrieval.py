@@ -7,12 +7,12 @@ from .db import Session, Chunk, Document, engine
 from .ai import embed, enabled, embedding_model_id
 from . import config
 
-STOP = set('a an the is are was were of to in and or for on with what which how does do did can could would should please tell me about it this that from many there my documents document uploaded upload source sources file files any have'.split())
+STOP = set('a an the is are was were of to in and or for on with what which how does do did can could would should please tell me about it this that from many there my documents document uploaded upload source sources file files any have write wrote lines line sentences sentence paragraph paragraphs words word short brief describe description give ten five three two one overview'.split())
 GENERIC_FILENAME_TERMS = set('readme improved improvement improvements document documents project projects file files pdf docx txt md guide note notes review brief product summary overview gateway payment option'.split())
 def tokens(value):
     result = []
     for term in re.findall(r'\w+', value.lower()):
-        if term in STOP or len(term) <= 1: continue
+        if term in STOP or len(term) <= 1 or term.isdigit(): continue
         if len(term) > 4 and term.endswith('ies'):
             term = term[:-3] + 'y'
         elif len(term) > 4 and re.search(r'(ches|shes|sses|xes|zes)$', term):
@@ -138,7 +138,7 @@ def retrieve(workspace_id, query, document_ids=None, limit=8):
         names = {d.id: d.name for d in db.query(Document).filter(Document.workspace_id == workspace_id)}
         ranked = [c for c in candidates.values()
                   if has_query_support(query, c.text, names.get(c.document_id, ''))
-                  or semantic_scores.get(c.id, 0) >= .68]
+                  or (len(terms) > 1 and semantic_scores.get(c.id, 0) >= .68)]
         ranked.sort(key=lambda c: scores[c.id] + .001 * len(terms & set(tokens(c.text))) / max(len(terms), 1), reverse=True)
         selected = diversify_ranked_chunks(ranked, limit)
         return [source(c, names[c.document_id]) for c in selected]

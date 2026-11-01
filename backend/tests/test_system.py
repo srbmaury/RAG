@@ -546,9 +546,9 @@ def test_connected_synthesis_hides_reasoning_and_validates_before_emitting(monke
         'Summarize the change', [Evidence('github','1','Retry PR','Adds retry support')],
         'ollama', '', 'model', None, 'http://ollama', 'model'))
     assert [event['type'] for event in events] == ['complete']
-    assert events[0]['mode'] == 'source_results'
+    assert events[0]['mode'] == 'generation_failed'
     assert 'Let me analyze' not in events[0]['answer']
-    assert 'Retry PR' in events[0]['answer'] and '[1]' in events[0]['answer']
+    assert events[0]['sources'] == []
 
 
 def test_connected_synthesis_emits_only_citation_checked_final_text(monkeypatch):
@@ -574,7 +574,7 @@ def test_connected_synthesis_emits_only_citation_checked_final_text(monkeypatch)
     assert events[1]['mode'] == 'connected'
 
 
-def test_local_connected_synthesis_times_out_to_cited_source_matches(monkeypatch):
+def test_local_connected_synthesis_timeout_does_not_masquerade_as_answer(monkeypatch):
     from contextlib import contextmanager
     from app import connected_synthesis
     from app.sources import Evidence
@@ -591,9 +591,9 @@ def test_local_connected_synthesis_times_out_to_cited_source_matches(monkeypatch
     events=list(connected_synthesis.stream_connected(
         'What is deforestation?', [Evidence('documents','1','Forest guide','Deforestation removes native forest cover.')],
         'ollama', '', 'model', None, 'http://ollama', 'model'))
-    assert events[0]['type']=='status' and 'too long' in events[0]['text']
-    assert events[-1]['type']=='complete' and events[-1]['mode']=='source_results'
-    assert 'Forest guide' in events[-1]['answer'] and '[1]' in events[-1]['answer']
+    assert events[-1]['type']=='complete' and events[-1]['mode']=='generation_failed'
+    assert 'timed out' in events[-1]['answer']
+    assert events[-1]['sources'] == []
 
 
 def test_connected_chat_stream_returns_explicit_no_evidence_result(client):

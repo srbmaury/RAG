@@ -582,10 +582,8 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
         raise HTTPException(502, 'Connected answer generation failed. Check the AI provider logs.') from exc
     refs = {int(x) for x in re.findall(r'\[(\d+)\]', answer or '')}
     if not refs or any(n < 1 or n > len(payload) for n in refs):
-        payload = payload[:12]
-        return {'answer': source_results_answer(payload),
-                'sources': connected_sources_for_payload(payload, document_evidence),
-                'mode': 'source_results', 'scope': connected_scope(body)}
+        return {'answer': 'The model returned an answer without usable source citations. Please retry; no unverified answer is shown.',
+                'sources': [], 'mode': 'citation_check_failed', 'scope': connected_scope(body)}
     # Preserve positional [n] citations used by the standard chat renderer.
     # Non-document evidence carries a URL so the UI opens the original record.
     sources = connected_sources_for_payload(payload, document_evidence)
@@ -609,9 +607,10 @@ def connected_chat_stream(wid: str, body: ConnectedQuestion, request: Request,
                 yield json.dumps({'type': 'done', 'result': listed}, ensure_ascii=False) + '\n'
                 return
             yield json.dumps({'type': 'status', 'text': 'Writing an answer from the evidence…'}, ensure_ascii=False) + '\n'
-            # With no configured model and no external sources selected, keep
-            # document search useful by streaming the existing local excerpt mode.
-            if not enabled() and body.include_documents and not body.include_gmail and not body.providers:
+            # Document-only questions use the dedicated citation-checked answer generator.
+            # This avoids the cross-source streaming model's short timeout and keeps
+            # ordinary document Q&A focused on the user's requested answer.
+            if body.include_documents and not body.include_gmail and not body.providers:
                 doc_sources = [document_evidence[item.source_id]
                                for item in evidence if item.provider == 'documents'
                                and item.source_id in document_evidence]
