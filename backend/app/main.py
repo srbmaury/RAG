@@ -562,7 +562,9 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
     # Non-document evidence carries a URL so the UI opens the original record.
     sources = connected_sources_for_payload(payload, document_evidence)
     from .citation_audit import audit_citations
-    return {'answer': answer, 'sources': sources, 'mode': 'connected',
+    from .decision_links import related_sources, decision_timeline
+    return {'answer': answer, 'sources': sources, 'related_sources': related_sources(payload),
+            'decision_timeline': decision_timeline(payload), 'mode': 'connected',
             'citation_audit': audit_citations(answer, payload), 'scope': connected_scope(body)}
 
 
@@ -604,7 +606,10 @@ def connected_chat_stream(wid: str, body: ConnectedQuestion, request: Request,
                 if event['type'] == 'complete':
                     public_sources = connected_sources_for_payload(
                         event['sources'], document_evidence) if event['sources'] else []
+                    from .decision_links import related_sources, decision_timeline
                     result = {'answer': event['answer'], 'sources': public_sources,
+                              'related_sources': related_sources(event['sources']),
+                              'decision_timeline': decision_timeline(event['sources']),
                               'mode': event['mode'], 'scope': connected_scope(body)}
                     yield json.dumps({'type': 'done', 'result': result}, ensure_ascii=False) + '\n'
                 else:

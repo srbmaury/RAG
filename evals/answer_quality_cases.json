@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "answer": "The deployment deadline is December 4 [1].",
+      "sources": [
+        {
+          "text": "Deadline is December 4."
+        }
+      ]
+    },
+    {
+      "answer": "The cache uses Redis [1]. The rollout started in 2026 [2].",
+      "sources": [
+        {
+          "text": "Redis is the chosen cache."
+        },
+        {
+          "text": "Rollout started in 2026."
+        }
+      ]
+    },
+    {
+      "answer": "The team picked Redis.",
+      "sources": [
+        {
+          "text": "Redis selected."
+        }
+      ]
+    },
+    {
+      "answer": "The target is 35% [2].",
+      "sources": [
+        {
+          "text": "The target is 35%."
+        }
+      ]
+    }
+  ]
+}
