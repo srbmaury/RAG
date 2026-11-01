@@ -64,7 +64,7 @@ def actor(request: Request, db: DatabaseSession):
 
 
 def allowed_workspace(db, user, wid):
-    workspace = db.query(Workspace).filter_by(id=wid, owner_id=user.id).first()
+    workspace = db.query(Workspace).filter_by(id=workspaceId, owner_id=user.id).first()
     if workspace is None:
         raise HTTPException(404, 'Workspace not found.')
     return workspace
@@ -174,7 +174,7 @@ class SummaryRequest(BaseModel):
 
 
 @router.get('/gmail/status')
-def status(wid: str, request: Request):
+def status(workspaceId: str, request: Request):
     with Session() as db:
         user = actor(request, db)
         allowed_workspace(db, user, wid)
@@ -187,7 +187,7 @@ def status(wid: str, request: Request):
 
 
 @router.get('/gmail/connect')
-def connect(wid: str, request: Request):
+def connect(workspaceId: str, request: Request):
     configured()
     with Session() as db:
         user = actor(request, db)
@@ -197,7 +197,7 @@ def connect(wid: str, request: Request):
             GmailOAuthState(
                 value=hashlib.sha256(state.encode()).hexdigest(),
                 user_id=user.id,
-                workspace_id=wid,
+                workspace_id=workspaceId,
                 expires=time.time() + 600,
             )
         )
@@ -234,7 +234,7 @@ def callback(request: Request, state: str = '', code: str = ''):
             is None
         ):
             raise HTTPException(400, 'The connected workspace is no longer available.')
-        wid = oauth.workspace_id
+        workspaceId = oauth.workspace_id
         db.delete(oauth)
         db.commit()
         try:
@@ -265,12 +265,12 @@ def callback(request: Request, state: str = '', code: str = ''):
             db.flush()
         db.add(
             GmailConnection(
-                workspace_id=wid,
+                workspace_id=workspaceId,
                 email=profile.get('emailAddress', ''),
                 refresh_token=crypt().encrypt(refresh.encode()).decode(),
             )
         )
-        health = db.get(SourceHealthCheck, (wid, 'gmail'))
+        health = db.get(SourceHealthCheck, (workspaceId, 'gmail'))
         if health:
             db.delete(health)
         db.commit()
@@ -278,7 +278,7 @@ def callback(request: Request, state: str = '', code: str = ''):
 
 
 @router.post('/workspaces/{wid}/gmail/search')
-def search(wid: str, body: SearchRequest, request: Request):
+def search(workspaceId: str, body: SearchRequest, request: Request):
     try:
         with Session() as db:
             user = actor(request, db)
@@ -305,7 +305,7 @@ def search(wid: str, body: SearchRequest, request: Request):
 
 
 @router.post('/workspaces/{wid}/gmail/summarize')
-def summarize(wid: str, body: SummaryRequest, request: Request):
+def summarize(workspaceId: str, body: SummaryRequest, request: Request):
     if not (config.API_KEY or config.AI_PROVIDER == 'ollama'):
         raise HTTPException(409, 'Configure an AI provider to summarize emails.')
     if any(not mid.isalnum() for mid in body.message_ids):
@@ -461,7 +461,7 @@ def query_summary_model(messages, instructions, max_tokens=1400):
 
 
 @router.post('/workspaces/{wid}/gmail/summarize-query')
-def summarize_query(wid: str, body: QuerySummaryRequest, request: Request):
+def summarize_query(workspaceId: str, body: QuerySummaryRequest, request: Request):
     """Search Gmail using its query syntax; summarize matches in small batches."""
     if not (config.AI_PROVIDER == 'ollama' or (config.AI_PROVIDER == 'openai' and config.API_KEY)):
         raise HTTPException(409, 'Configure an AI provider to summarize Gmail messages.')
@@ -593,12 +593,12 @@ def summarize_query(wid: str, body: QuerySummaryRequest, request: Request):
 
 
 @router.delete('/workspaces/{wid}/gmail')
-def disconnect(wid: str, request: Request):
+def disconnect(workspaceId: str, request: Request):
     with Session() as db:
         user = actor(request, db)
         allowed_workspace(db, user, wid)
         db.query(GmailConnection).filter_by(workspace_id=wid).delete()
-        health = db.get(SourceHealthCheck, (wid, 'gmail'))
+        health = db.get(SourceHealthCheck, (workspaceId, 'gmail'))
         if health:
             db.delete(health)
         db.commit()

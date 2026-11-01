@@ -123,15 +123,15 @@ def user(request: Request, db=Depends(database)):
     return db.get(User, login.user_id)
 
 
-def workspace(wid, actor, db):
-    item = db.query(Workspace).filter_by(id=wid, owner_id=actor.id).first()
+def workspace(workspaceId, actor, db):
+    item = db.query(Workspace).filter_by(id=workspaceId, owner_id=actor.id).first()
     if not item:
         raise HTTPException(404, 'Workspace not found.')
     return item
 
 
-def document(wid, did, actor, db):
-    workspace(wid, actor, db)
+def document(workspaceId, did, actor, db):
+    workspace(workspaceId, actor, db)
     item = db.query(Document).filter_by(id=did, workspace_id=wid).first()
     if not item:
         raise HTTPException(404, 'Document not found.')
@@ -199,8 +199,8 @@ def issue_login(actor, response, db):
 
 
 @app.get('/api/workspaces/{wid}/processing-stats')
-def processing_stats(wid: str, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
+def processing_stats(workspaceId: str, actor=Depends(user), db=Depends(database)):
+    workspace(workspaceId, actor, db)
     rows = (
         db.query(Document.status, func.count(Document.id))
         .filter(Document.workspace_id == wid)
@@ -292,9 +292,9 @@ class DeleteWorkspaceRequest(BaseModel):
 
 @app.delete('/api/workspaces/{wid}')
 def delete_workspace(
-    wid: str, body: DeleteWorkspaceRequest, actor=Depends(user), db=Depends(database)
+    workspaceId: str, body: DeleteWorkspaceRequest, actor=Depends(user), db=Depends(database)
 ):
-    item = workspace(wid, actor, db)
+    item = workspace(workspaceId, actor, db)
     if body.name != item.name:
         raise HTTPException(422, 'Type the exact workspace name to confirm deletion.')
     documents = db.query(Document).filter_by(workspace_id=wid).all()
@@ -321,8 +321,8 @@ def delete_workspace(
 
 
 @app.get('/api/workspaces/{wid}/documents')
-def documents(wid: str, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
+def documents(workspaceId: str, actor=Depends(user), db=Depends(database)):
+    workspace(workspaceId, actor, db)
     return [
         public_doc(d)
         for d in db.query(Document).filter_by(workspace_id=wid).order_by(Document.created.desc())
@@ -330,53 +330,53 @@ def documents(wid: str, actor=Depends(user), db=Depends(database)):
 
 
 @app.post('/api/workspaces/{wid}/uploads')
-def start_upload(wid: str, body: UploadRequest, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
-    return uploads.start(wid, actor.id, body.name, body.size, MAX_FILE_BYTES, SUPPORTED)
+def start_upload(workspaceId: str, body: UploadRequest, actor=Depends(user), db=Depends(database)):
+    workspace(workspaceId, actor, db)
+    return uploads.start(workspaceId, actor.id, body.name, body.size, MAX_FILE_BYTES, SUPPORTED)
 
 
 @app.get('/api/workspaces/{wid}/uploads/{upload_id}')
-def upload_status(wid: str, upload_id: str, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
-    return uploads.status(upload_id, wid, actor.id)
+def upload_status(workspaceId: str, upload_id: str, actor=Depends(user), db=Depends(database)):
+    workspace(workspaceId, actor, db)
+    return uploads.status(upload_id, workspaceId, actor.id)
 
 
 @app.put('/api/workspaces/{wid}/uploads/{upload_id}')
 async def upload_part(
-    wid: str,
+    workspaceId: str,
     upload_id: str,
     request: Request,
     offset: int = 0,
     actor=Depends(user),
     db=Depends(database),
 ):
-    workspace(wid, actor, db)
+    workspace(workspaceId, actor, db)
     data = bytearray()
     async for block in request.stream():
         data.extend(block)
         if len(data) > uploads.PART_BYTES:
             raise HTTPException(413, 'Upload part exceeds 8 MB.')
-    return await run_in_threadpool(uploads.append, upload_id, wid, actor.id, offset, data)
+    return await run_in_threadpool(uploads.append, upload_id, workspaceId, actor.id, offset, data)
 
 
 @app.post('/api/workspaces/{wid}/uploads/{upload_id}/complete')
-def complete_upload(wid: str, upload_id: str, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
-    doc, duplicate = uploads.finish(upload_id, wid, actor.id, db)
+def complete_upload(workspaceId: str, upload_id: str, actor=Depends(user), db=Depends(database)):
+    workspace(workspaceId, actor, db)
+    doc, duplicate = uploads.finish(upload_id, workspaceId, actor.id, db)
     return {**public_doc(doc), 'duplicate': duplicate}
 
 
 @app.delete('/api/workspaces/{wid}/uploads/{upload_id}')
-def cancel_upload(wid: str, upload_id: str, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
-    return uploads.cancel(upload_id, wid, actor.id)
+def cancel_upload(workspaceId: str, upload_id: str, actor=Depends(user), db=Depends(database)):
+    workspace(workspaceId, actor, db)
+    return uploads.cancel(upload_id, workspaceId, actor.id)
 
 
 @app.post('/api/workspaces/{wid}/documents')
 async def upload(
-    wid: str, files: List[UploadFile] = File(...), actor=Depends(user), db=Depends(database)
+    workspaceId: str, files: List[UploadFile] = File(...), actor=Depends(user), db=Depends(database)
 ):
-    workspace(wid, actor, db)
+    workspace(workspaceId, actor, db)
     if len(files) > 50:
         raise HTTPException(422, 'Upload at most 50 files per batch.')
     results = []
@@ -403,14 +403,14 @@ async def upload(
             if not count:
                 raise ValueError('File is empty.')
             existing = (
-                db.query(Document).filter_by(workspace_id=wid, digest=digest.hexdigest()).first()
+                db.query(Document).filter_by(workspace_id=workspaceId, digest=digest.hexdigest()).first()
             )
             if existing:
                 path.unlink(missing_ok=True)
                 results.append({**public_doc(existing), 'duplicate': True})
                 continue
             doc = Document(
-                id=did, workspace_id=wid, name=name, size=count, digest=digest.hexdigest()
+                id=did, workspace_id=workspaceId, name=name, size=count, digest=digest.hexdigest()
             )
             db.add(doc)
             db.commit()
@@ -419,7 +419,7 @@ async def upload(
             db.rollback()
             path.unlink(missing_ok=True)
             existing = (
-                db.query(Document).filter_by(workspace_id=wid, digest=digest.hexdigest()).first()
+                db.query(Document).filter_by(workspace_id=workspaceId, digest=digest.hexdigest()).first()
             )
             if not existing:
                 raise
@@ -437,8 +437,8 @@ async def upload(
 
 
 @app.get('/api/workspaces/{wid}/documents/{did}/chunks')
-def chunks(wid: str, did: str, offset: int = 0, actor=Depends(user), db=Depends(database)):
-    doc = document(wid, did, actor, db)
+def chunks(workspaceId: str, did: str, offset: int = 0, actor=Depends(user), db=Depends(database)):
+    doc = document(workspaceId, did, actor, db)
     if offset < 0:
         raise HTTPException(422, 'Offset must be non-negative.')
     return {
@@ -455,16 +455,16 @@ def chunks(wid: str, did: str, offset: int = 0, actor=Depends(user), db=Depends(
 
 
 @app.get('/api/workspaces/{wid}/documents/{did}/original')
-def original(wid: str, did: str, actor=Depends(user), db=Depends(database)):
-    doc = document(wid, did, actor, db)
+def original(workspaceId: str, did: str, actor=Depends(user), db=Depends(database)):
+    doc = document(workspaceId, did, actor, db)
     return FileResponse(
         DATA / 'files' / did, filename=doc.name, content_disposition_type='attachment'
     )
 
 
 @app.post('/api/workspaces/{wid}/documents/{did}/retry')
-def retry(wid: str, did: str, actor=Depends(user), db=Depends(database)):
-    doc = document(wid, did, actor, db)
+def retry(workspaceId: str, did: str, actor=Depends(user), db=Depends(database)):
+    doc = document(workspaceId, did, actor, db)
     if doc.status not in ('failed', 'ready'):
         raise HTTPException(409, 'Document is already queued or processing.')
     db.query(Chunk).filter_by(document_id=did).delete()
@@ -474,8 +474,8 @@ def retry(wid: str, did: str, actor=Depends(user), db=Depends(database)):
 
 
 @app.delete('/api/workspaces/{wid}/documents/{did}')
-def delete(wid: str, did: str, actor=Depends(user), db=Depends(database)):
-    doc = document(wid, did, actor, db)
+def delete(workspaceId: str, did: str, actor=Depends(user), db=Depends(database)):
+    doc = document(workspaceId, did, actor, db)
     db.delete(doc)
     # Reports can contain copied passages; invalidate them on source deletion.
     db.commit()
@@ -492,8 +492,8 @@ class ConversationRename(BaseModel):
     title: str = Field(min_length=1, max_length=120)
 
 
-def owned_conversation(wid, cid, actor, db):
-    workspace(wid, actor, db)
+def owned_conversation(workspaceId, cid, actor, db):
+    workspace(workspaceId, actor, db)
     item = db.query(Conversation).filter_by(id=cid, workspace_id=wid).first()
     if item is None:
         raise HTTPException(404, 'Conversation not found.')
@@ -511,8 +511,8 @@ def conversation_data(item):
 
 
 @app.get('/api/workspaces/{wid}/conversations')
-def list_conversations(wid: str, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
+def list_conversations(workspaceId: str, actor=Depends(user), db=Depends(database)):
+    workspace(workspaceId, actor, db)
     items = (
         db.query(Conversation)
         .filter_by(workspace_id=wid)
@@ -524,25 +524,25 @@ def list_conversations(wid: str, actor=Depends(user), db=Depends(database)):
 
 @app.post('/api/workspaces/{wid}/conversations')
 def create_conversation(
-    wid: str, body: ConversationPayload, actor=Depends(user), db=Depends(database)
+    workspaceId: str, body: ConversationPayload, actor=Depends(user), db=Depends(database)
 ):
-    workspace(wid, actor, db)
-    item = Conversation(workspace_id=wid, title=body.title.strip(), messages=body.messages)
+    workspace(workspaceId, actor, db)
+    item = Conversation(workspace_id=workspaceId, title=body.title.strip(), messages=body.messages)
     db.add(item)
     db.commit()
     return conversation_data(item)
 
 
 @app.get('/api/workspaces/{wid}/conversations/{cid}')
-def get_conversation(wid: str, cid: str, actor=Depends(user), db=Depends(database)):
-    return conversation_data(owned_conversation(wid, cid, actor, db))
+def get_conversation(workspaceId: str, cid: str, actor=Depends(user), db=Depends(database)):
+    return conversation_data(owned_conversation(workspaceId, cid, actor, db))
 
 
 @app.put('/api/workspaces/{wid}/conversations/{cid}')
 def update_conversation(
-    wid: str, cid: str, body: ConversationPayload, actor=Depends(user), db=Depends(database)
+    workspaceId: str, cid: str, body: ConversationPayload, actor=Depends(user), db=Depends(database)
 ):
-    item = owned_conversation(wid, cid, actor, db)
+    item = owned_conversation(workspaceId, cid, actor, db)
     item.title = body.title.strip()
     item.messages = body.messages
     item.updated = time.time()
@@ -552,9 +552,9 @@ def update_conversation(
 
 @app.patch('/api/workspaces/{wid}/conversations/{cid}')
 def rename_conversation(
-    wid: str, cid: str, body: ConversationRename, actor=Depends(user), db=Depends(database)
+    workspaceId: str, cid: str, body: ConversationRename, actor=Depends(user), db=Depends(database)
 ):
-    item = owned_conversation(wid, cid, actor, db)
+    item = owned_conversation(workspaceId, cid, actor, db)
     item.title = body.title.strip()
     item.updated = time.time()
     db.commit()
@@ -562,8 +562,8 @@ def rename_conversation(
 
 
 @app.delete('/api/workspaces/{wid}/conversations/{cid}')
-def delete_conversation(wid: str, cid: str, actor=Depends(user), db=Depends(database)):
-    db.delete(owned_conversation(wid, cid, actor, db))
+def delete_conversation(workspaceId: str, cid: str, actor=Depends(user), db=Depends(database)):
+    db.delete(owned_conversation(workspaceId, cid, actor, db))
     db.commit()
     return {'ok': True}
 
@@ -575,14 +575,14 @@ class ConnectedQuestion(Question):
     providers: List[str] = Field(default_factory=list, max_length=4)
 
 
-def collect_connected_evidence(wid, body, actor, db):
-    workspace(wid, actor, db)
+def collect_connected_evidence(workspaceId, body, actor, db):
+    workspace(workspaceId, actor, db)
     if not body.question.strip():
         raise HTTPException(422, 'Enter a question.')
     if body.document_ids:
         count = (
             db.query(Document)
-            .filter(Document.workspace_id == wid, Document.id.in_(body.document_ids))
+            .filter(Document.workspace_id == workspaceId, Document.id.in_(body.document_ids))
             .count()
         )
         if count != len(set(body.document_ids)):
@@ -599,7 +599,7 @@ def collect_connected_evidence(wid, body, actor, db):
     try:
         if body.include_documents:
             for item in retrieve(
-                wid, retrieval_query(body.question, body.history), body.document_ids
+                workspaceId, retrieval_query(body.question, body.history), body.document_ids
             )[:6]:
                 evidence.append(
                     Evidence('documents', item['chunk_id'], item['name'], item['text'][:1800], None)
@@ -637,7 +637,7 @@ def collect_connected_evidence(wid, body, actor, db):
                     Evidence('drive', hit['id'], hit['title'], hit['excerpt'], hit.get('url'))
                 )
         for provider in dict.fromkeys(p for p in body.providers if p != 'drive'):
-            _, provider_token = read_connection(db, actor, wid, provider)
+            _, provider_token = read_connection(db, actor, workspaceId, provider)
             for hit in source_search(provider, provider_token, body.question):
                 excerpt_limit = 8000 if provider == 'slack' else 3000
                 evidence.append(
@@ -760,14 +760,14 @@ def github_pull_request_list_result(question, body, evidence, document_evidence)
 
 @app.post('/api/workspaces/{wid}/connected-chat')
 def connected_chat(
-    wid: str, body: ConnectedQuestion, request: Request, actor=Depends(user), db=Depends(database)
+    workspaceId: str, body: ConnectedQuestion, request: Request, actor=Depends(user), db=Depends(database)
 ):
     """Retrieve evidence across workspace documents and optionally live Gmail."""
     import re
 
     from .ai import client, ollama_chat
 
-    evidence, document_evidence = collect_connected_evidence(wid, body, actor, db)
+    evidence, document_evidence = collect_connected_evidence(workspaceId, body, actor, db)
     if not evidence:
         return no_evidence_result(body)
     # A local 8k-context model cannot accept all retrieved source bodies at once.
@@ -833,7 +833,7 @@ def connected_chat(
 
 @app.post('/api/workspaces/{wid}/connected-chat/stream')
 def connected_chat_stream(
-    wid: str, body: ConnectedQuestion, request: Request, actor=Depends(user), db=Depends(database)
+    workspaceId: str, body: ConnectedQuestion, request: Request, actor=Depends(user), db=Depends(database)
 ):
     """Stream answer progress and text as newline-delimited JSON events."""
     import json
@@ -846,7 +846,7 @@ def connected_chat_stream(
             + '\n'
         )
         try:
-            evidence, document_evidence = collect_connected_evidence(wid, body, actor, db)
+            evidence, document_evidence = collect_connected_evidence(workspaceId, body, actor, db)
             if not evidence:
                 yield (
                     json.dumps(
@@ -936,8 +936,8 @@ def connected_chat_stream(
 
 
 @app.get('/api/workspaces/{wid}/sources/health')
-def source_health(wid: str, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
+def source_health(workspaceId: str, actor=Depends(user), db=Depends(database)):
+    workspace(workspaceId, actor, db)
     return {
         'checks': [
             {
@@ -953,9 +953,9 @@ def source_health(wid: str, actor=Depends(user), db=Depends(database)):
 
 
 @app.post('/api/workspaces/{wid}/sources/health/check')
-def verify_sources(wid: str, request: Request, actor=Depends(user), db=Depends(database)):
+def verify_sources(workspaceId: str, request: Request, actor=Depends(user), db=Depends(database)):
     """Check real provider access; return only status, account, and match counts."""
-    workspace(wid, actor, db)
+    workspace(workspaceId, actor, db)
     from .drive import access_token as drive_access
     from .drive import drive_search
     from .external_sources import PROVIDERS, read_connection, verify_source_access
@@ -986,10 +986,10 @@ def verify_sources(wid: str, request: Request, actor=Depends(user), db=Depends(d
             except Exception as exc:
                 log.warning('Source verification failed for %s: %s', provider, type(exc).__name__)
                 check['error'] = 'Could not verify access. Check the provider connection and retry.'
-        saved = db.get(SourceHealthCheck, (wid, provider))
+        saved = db.get(SourceHealthCheck, (workspaceId, provider))
         if saved is None:
             saved = SourceHealthCheck(
-                workspace_id=wid,
+                workspace_id=workspaceId,
                 provider=provider,
                 checked_at=check['checked_at'],
                 healthy=check['healthy'],
@@ -1002,11 +1002,11 @@ def verify_sources(wid: str, request: Request, actor=Depends(user), db=Depends(d
         checks.append(check)
 
     for provider in PROVIDERS:
-        row = db.get(ExternalConnection, (wid, provider))
+        row = db.get(ExternalConnection, (workspaceId, provider))
         if row:
 
             def check_external(p=provider):
-                _, token = read_connection(db, actor, wid, p)
+                _, token = read_connection(db, actor, workspaceId, p)
                 return verify_source_access(p, token)
 
             record(provider, True, check_external, row.account)
@@ -1028,7 +1028,7 @@ def verify_sources(wid: str, request: Request, actor=Depends(user), db=Depends(d
     else:
         record('gmail', False, lambda: None)
 
-    drive_row = db.get(ExternalConnection, (wid, 'drive'))
+    drive_row = db.get(ExternalConnection, (workspaceId, 'drive'))
     if drive_row:
 
         def check_drive():
@@ -1043,21 +1043,21 @@ def verify_sources(wid: str, request: Request, actor=Depends(user), db=Depends(d
 
 
 @app.post('/api/workspaces/{wid}/chat')
-def chat(wid: str, body: Question, actor=Depends(user), db=Depends(database)):
-    workspace(wid, actor, db)
+def chat(workspaceId: str, body: Question, actor=Depends(user), db=Depends(database)):
+    workspace(workspaceId, actor, db)
     if not body.question.strip():
         raise HTTPException(422, 'Enter a question.')
     if body.document_ids:
         found = (
             db.query(Document)
-            .filter(Document.workspace_id == wid, Document.id.in_(body.document_ids))
+            .filter(Document.workspace_id == workspaceId, Document.id.in_(body.document_ids))
             .count()
         )
         if found != len(set(body.document_ids)):
             raise HTTPException(404, 'Selected document not found.')
     query = retrieval_query(body.question, body.history)
     try:
-        sources = retrieve(wid, query, body.document_ids)
+        sources = retrieve(workspaceId, query, body.document_ids)
         result = generate(body.question, sources, [t.model_dump() for t in body.history])
     except Exception as exc:
         import logging
@@ -1074,7 +1074,7 @@ def chat(wid: str, body: Question, actor=Depends(user), db=Depends(database)):
     if sources:
         current = (
             db.query(Chunk.id)
-            .filter(Chunk.workspace_id == wid, Chunk.id.in_([s['chunk_id'] for s in sources]))
+            .filter(Chunk.workspace_id == workspaceId, Chunk.id.in_([s['chunk_id'] for s in sources]))
             .count()
         )
         if current != len(sources):

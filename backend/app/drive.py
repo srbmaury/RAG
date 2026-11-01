@@ -98,7 +98,7 @@ def google_token(payload):
 
 
 @router.get('/drive/connect')
-def connect(wid: str, request: Request):
+def connect(workspaceId: str, request: Request):
     configured()
     with Session() as db:
         who = actor(request, db)
@@ -108,7 +108,7 @@ def connect(wid: str, request: Request):
             DriveOAuthState(
                 value=hashlib.sha256(state.encode()).hexdigest(),
                 user_id=who.id,
-                workspace_id=wid,
+                workspace_id=workspaceId,
                 expires=time.time() + 600,
             )
         )
@@ -134,9 +134,9 @@ def callback(state: str = '', code: str = ''):
         item = db.get(DriveOAuthState, hashlib.sha256(state.encode()).hexdigest())
         if not item or item.expires < time.time():
             raise HTTPException(400, 'Drive authorization expired. Start again.')
-        wid = item.workspace_id
+        workspaceId = item.workspace_id
         who = db.get(User, item.user_id)
-        if not who or not db.query(Workspace).filter_by(id=wid, owner_id=who.id).first():
+        if not who or not db.query(Workspace).filter_by(id=workspaceId, owner_id=who.id).first():
             raise HTTPException(400, 'Workspace no longer exists.')
         db.delete(item)
         db.commit()
@@ -163,17 +163,17 @@ def callback(state: str = '', code: str = ''):
             {'fields': 'user(displayName,emailAddress)'},
         )
         account = (identity.get('user') or {}).get('emailAddress') or 'Google Drive'
-        row = db.get(ExternalConnection, (wid, 'drive'))
+        row = db.get(ExternalConnection, (workspaceId, 'drive'))
         encrypted = crypt().encrypt(refresh.encode()).decode()
         if row:
             row.account, row.secret = account, encrypted
         else:
             db.add(
                 ExternalConnection(
-                    workspace_id=wid, provider='drive', account=account, secret=encrypted
+                    workspace_id=workspaceId, provider='drive', account=account, secret=encrypted
                 )
             )
-        health = db.get(SourceHealthCheck, (wid, 'drive'))
+        health = db.get(SourceHealthCheck, (workspaceId, 'drive'))
         if health:
             db.delete(health)
         db.commit()
@@ -182,7 +182,7 @@ def callback(state: str = '', code: str = ''):
 
 def access_token(db, who, wid):
     allowed_workspace(db, who, wid)
-    row = db.get(ExternalConnection, (wid, 'drive'))
+    row = db.get(ExternalConnection, (workspaceId, 'drive'))
     if not row:
         raise HTTPException(409, 'Connect Google Drive first.')
     try:
@@ -300,11 +300,11 @@ class DriveSearch(BaseModel):
 
 
 @router.get('/workspaces/{wid}/drive/status')
-def status(wid: str, request: Request):
+def status(workspaceId: str, request: Request):
     with Session() as db:
         who = actor(request, db)
         allowed_workspace(db, who, wid)
-        row = db.get(ExternalConnection, (wid, 'drive'))
+        row = db.get(ExternalConnection, (workspaceId, 'drive'))
         return {
             'connected': bool(row),
             'account': row.account if row else None,
@@ -313,7 +313,7 @@ def status(wid: str, request: Request):
 
 
 @router.post('/workspaces/{wid}/drive/search')
-def search(wid: str, body: DriveSearch, request: Request):
+def search(workspaceId: str, body: DriveSearch, request: Request):
     with Session() as db:
         who = actor(request, db)
         token = access_token(db, who, wid)
@@ -321,12 +321,12 @@ def search(wid: str, body: DriveSearch, request: Request):
 
 
 @router.delete('/workspaces/{wid}/drive')
-def disconnect(wid: str, request: Request):
+def disconnect(workspaceId: str, request: Request):
     with Session() as db:
         who = actor(request, db)
         allowed_workspace(db, who, wid)
-        db.query(ExternalConnection).filter_by(workspace_id=wid, provider='drive').delete()
-        health = db.get(SourceHealthCheck, (wid, 'drive'))
+        db.query(ExternalConnection).filter_by(workspace_id=workspaceId, provider='drive').delete()
+        health = db.get(SourceHealthCheck, (workspaceId, 'drive'))
         if health:
             db.delete(health)
         db.commit()

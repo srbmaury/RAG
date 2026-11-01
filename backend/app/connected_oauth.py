@@ -85,7 +85,7 @@ def _token_request(provider, payload):
 
 
 @router.get('/{provider}/connect')
-def connect(provider: str, wid: str, request: Request):
+def connect(provider: str, workspaceId: str, request: Request):
     client_id, _, redirect, auth_base, _, scope = _settings(provider)
     with Session() as db:
         who = actor(request, db)
@@ -96,7 +96,7 @@ def connect(provider: str, wid: str, request: Request):
             ConnectedOAuthState(
                 value=hashlib.sha256(state.encode()).hexdigest(),
                 provider=provider,
-                workspace_id=wid,
+                workspace_id=workspaceId,
                 user_id=who.id,
                 verifier=verifier,
                 expires=time.time() + 600,
@@ -126,10 +126,10 @@ def callback(provider: str, state: str = '', code: str = ''):
         item = db.get(ConnectedOAuthState, hashlib.sha256(state.encode()).hexdigest())
         if not item or item.provider != provider or item.expires < time.time():
             raise HTTPException(400, 'Authorization state is invalid or expired.')
-        wid = item.workspace_id
+        workspaceId = item.workspace_id
         verifier = item.verifier
         owner = db.get(User, item.user_id)
-        if not owner or not db.query(Workspace).filter_by(id=wid, owner_id=owner.id).first():
+        if not owner or not db.query(Workspace).filter_by(id=workspaceId, owner_id=owner.id).first():
             raise HTTPException(400, 'Workspace no longer exists.')
         db.delete(item)
         db.commit()
@@ -154,16 +154,16 @@ def callback(provider: str, state: str = '', code: str = ''):
         encrypted = (
             crypt().encrypt(json.dumps({'auth': 'oauth', 'refresh': refresh}).encode()).decode()
         )
-        row = db.get(ExternalConnection, (wid, provider))
+        row = db.get(ExternalConnection, (workspaceId, provider))
         if row:
             row.account, row.secret = account, encrypted
         else:
             db.add(
                 ExternalConnection(
-                    workspace_id=wid, provider=provider, account=account, secret=encrypted
+                    workspace_id=workspaceId, provider=provider, account=account, secret=encrypted
                 )
             )
-        health = db.get(SourceHealthCheck, (wid, provider))
+        health = db.get(SourceHealthCheck, (workspaceId, provider))
         if health:
             db.delete(health)
         db.commit()

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from app.db import Chunk, Document, Session
 
-WID = '4bdfe9c3-987c-49a9-bd9b-86bf6b8ea913'
+workspaceId = '4bdfe9c3-987c-49a9-bd9b-86bf6b8ea913'
 items = []
 
 
@@ -786,7 +786,7 @@ def norm(s):
 def build():
     assert len(items) == 100, len(items)
     with Session() as db:
-        docs = {d.name: d for d in db.query(Document).filter_by(workspace_id=WID, status='ready')}
+        docs = {d.name: d for d in db.query(Document).filter_by(workspace_id=workspaceId, status='ready')}
         for i, item in enumerate(items, 1):
             item['id'] = f'Q{i:03d}'
             names = item['document'] if isinstance(item['document'], list) else [item['document']]
@@ -826,7 +826,7 @@ def build():
             item['evidence'] = evidence
         output = {
             'version': 1,
-            'workspace_id': WID,
+            'workspace_id': workspaceId,
             'scope': 'Nine user-supplied documents visible in the active workspace; excludes the two seeded demo files. Questions and expected answers are curated, not generated from app responses.',
             'questions': items,
         }

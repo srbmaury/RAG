@@ -34,7 +34,7 @@ def ready():
 
 
 @router.get('/workspaces/{wid}/operations')
-def workspace_operations(wid: str, request: Request):
+def workspace_operations(workspaceId: str, request: Request):
     """Authenticated summary for monitoring ingestion and connector health."""
     with Session() as db:
         who = actor(request, db)

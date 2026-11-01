@@ -131,11 +131,11 @@ def verify_source_access(provider, token):
     return account, len(data.get('messages', {}).get('matches', []))
 
 
-def read_connection(db, user, wid, provider):
+def read_connection(db, user, workspaceId, provider):
     if provider not in PROVIDERS:
         raise HTTPException(404, 'Unsupported source provider.')
     allowed_workspace(db, user, wid)
-    row = db.get(ExternalConnection, (wid, provider))
+    row = db.get(ExternalConnection, (workspaceId, provider))
     if not row:
         raise HTTPException(409, f'Connect {provider.title()} first.')
     try:
@@ -151,7 +151,7 @@ def read_connection(db, user, wid, provider):
 
 
 @router.get('/workspaces/{wid}/sources')
-def statuses(wid: str, request: Request):
+def statuses(workspaceId: str, request: Request):
     with Session() as db:
         user = actor(request, db)
         allowed_workspace(db, user, wid)
@@ -164,7 +164,7 @@ def statuses(wid: str, request: Request):
 
 
 @router.post('/workspaces/{wid}/sources/{provider}')
-def connect(wid: str, provider: str, body: ConnectRequest, request: Request):
+def connect(workspaceId: str, provider: str, body: ConnectRequest, request: Request):
     if provider not in PROVIDERS:
         raise HTTPException(404, 'Unsupported source provider.')
     with Session() as db:
@@ -172,16 +172,16 @@ def connect(wid: str, provider: str, body: ConnectRequest, request: Request):
         allowed_workspace(db, user, wid)
         account = profile(provider, body.token)
         encrypted = crypt().encrypt(body.token.encode()).decode()
-        row = db.get(ExternalConnection, (wid, provider))
+        row = db.get(ExternalConnection, (workspaceId, provider))
         if row:
             row.account, row.secret = account, encrypted
         else:
             db.add(
                 ExternalConnection(
-                    workspace_id=wid, provider=provider, account=account, secret=encrypted
+                    workspace_id=workspaceId, provider=provider, account=account, secret=encrypted
                 )
             )
-        health = db.get(SourceHealthCheck, (wid, provider))
+        health = db.get(SourceHealthCheck, (workspaceId, provider))
         if health:
             db.delete(health)
         db.commit()
@@ -189,14 +189,14 @@ def connect(wid: str, provider: str, body: ConnectRequest, request: Request):
 
 
 @router.delete('/workspaces/{wid}/sources/{provider}')
-def disconnect(wid: str, provider: str, request: Request):
+def disconnect(workspaceId: str, provider: str, request: Request):
     if provider not in PROVIDERS:
         raise HTTPException(404, 'Unsupported source provider.')
     with Session() as db:
         user = actor(request, db)
         allowed_workspace(db, user, wid)
-        db.query(ExternalConnection).filter_by(workspace_id=wid, provider=provider).delete()
-        health = db.get(SourceHealthCheck, (wid, provider))
+        db.query(ExternalConnection).filter_by(workspace_id=workspaceId, provider=provider).delete()
+        health = db.get(SourceHealthCheck, (workspaceId, provider))
         if health:
             db.delete(health)
         db.commit()
@@ -794,8 +794,8 @@ def notion_excerpt(text, terms):
 
 
 @router.post('/workspaces/{wid}/sources/{provider}/search')
-def search(wid: str, provider: str, body: SearchRequest, request: Request):
+def search(workspaceId: str, provider: str, body: SearchRequest, request: Request):
     with Session() as db:
         user = actor(request, db)
-        _, token = read_connection(db, user, wid, provider)
+        _, token = read_connection(db, user, workspaceId, provider)
     return {'results': source_search(provider, token, body.query)}

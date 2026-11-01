@@ -136,12 +136,12 @@ def fetch_page(url: str) -> tuple[str, str]:
         raise ValueError('Could not fetch the requested public webpage.') from exc
 
 
-def save_webpage(wid: str, url: str, db) -> dict:
+def save_webpage(workspaceId: str, url: str, db) -> dict:
     title, body = fetch_page(url)
     text = f'# {title}\n\nSource URL: {url}\n\n{body}\n'
     data = text.encode('utf-8')
     digest = hashlib.sha256(data).hexdigest()
-    existing = db.query(Document).filter_by(workspace_id=wid, digest=digest).first()
+    existing = db.query(Document).filter_by(workspace_id=workspaceId, digest=digest).first()
     if existing:
         return {
             'id': existing.id,
@@ -156,7 +156,7 @@ def save_webpage(wid: str, url: str, db) -> dict:
     try:
         path.write_bytes(data)
         doc = Document(
-            id=did, workspace_id=wid, name=f'{title[:170]}.md', size=len(data), digest=digest
+            id=did, workspace_id=workspaceId, name=f'{title[:170]}.md', size=len(data), digest=digest
         )
         db.add(doc)
         db.commit()
@@ -168,7 +168,7 @@ def save_webpage(wid: str, url: str, db) -> dict:
 
 
 @router.post('/workspaces/{wid}/web-pages')
-def add_web_page(wid: str, body: UrlRequest, request: Request):
+def add_web_page(workspaceId: str, body: UrlRequest, request: Request):
     # Import inside handler to avoid circular import with app.main.
     from .gmail import actor, allowed_workspace
 
@@ -176,6 +176,6 @@ def add_web_page(wid: str, body: UrlRequest, request: Request):
         owner = actor(request, db)
         allowed_workspace(db, owner, wid)
         try:
-            return save_webpage(wid, body.url, db)
+            return save_webpage(workspaceId, body.url, db)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc

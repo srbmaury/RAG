@@ -1216,7 +1216,7 @@ def test_source_health_check_distinguishes_unconnected_from_healthy(client, monk
     monkeypatch.setattr(
         external_sources,
         'read_connection',
-        lambda db, who, wid, provider: (db.get(ExternalConnection, (wid, provider)), 'test-token'),
+        lambda db, who, workspaceId, provider: (db.get(ExternalConnection, (workspaceId, provider)), 'test-token'),
     )
     monkeypatch.setattr(
         external_sources, 'verify_source_access', lambda provider, token: ('test-user', 2)

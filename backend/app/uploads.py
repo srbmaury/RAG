@@ -33,7 +33,7 @@ def paths(upload_id):
 
 
 @contextmanager
-def locked(upload_id, wid, owner):
+def locked(upload_id, workspaceId, owner):
     meta, part, lock = paths(upload_id)
     if not meta.exists():
         raise HTTPException(404, 'Upload not found or already completed.')
@@ -43,7 +43,7 @@ def locked(upload_id, wid, owner):
             if not meta.exists():
                 raise HTTPException(404, 'Upload not found or already completed.')
             info = json.loads(meta.read_text())
-            if info['workspace_id'] != wid or info['owner_id'] != owner:
+            if info['workspace_id'] != workspaceId or info['owner_id'] != owner:
                 raise HTTPException(404, 'Upload not found.')
             if time.time() - meta.stat().st_mtime > TTL:
                 raise HTTPException(410, 'Upload expired. Select the file again.')
@@ -52,7 +52,7 @@ def locked(upload_id, wid, owner):
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def start(wid, owner, name, size, max_bytes, supported):
+def start(workspaceId, owner, name, size, max_bytes, supported):
     name = Path(name.replace('\\', '/')).name[:200]
     if Path(name).suffix.lower() not in supported:
         raise HTTPException(422, 'Supported formats: PDF, DOCX, TXT, MD.')
@@ -70,20 +70,20 @@ def start(wid, owner, name, size, max_bytes, supported):
     meta, part, _ = paths(upload_id)
     part.touch(exist_ok=False)
     meta.write_text(
-        json.dumps({'workspace_id': wid, 'owner_id': owner, 'name': name, 'size': size})
+        json.dumps({'workspace_id': workspaceId, 'owner_id': owner, 'name': name, 'size': size})
     )
     return {'id': upload_id, 'offset': 0, 'part_bytes': PART_BYTES}
 
 
-def status(upload_id, wid, owner):
-    with locked(upload_id, wid, owner) as (info, _, part):
+def status(upload_id, workspaceId, owner):
+    with locked(upload_id, workspaceId, owner) as (info, _, part):
         return {'id': upload_id, 'offset': part.stat().st_size, 'size': info['size']}
 
 
-def append(upload_id, wid, owner, offset, data):
+def append(upload_id, workspaceId, owner, offset, data):
     if not data or len(data) > PART_BYTES:
         raise HTTPException(413, 'Upload part must contain 1 byte to 8 MB.')
-    with locked(upload_id, wid, owner) as (info, meta, part):
+    with locked(upload_id, workspaceId, owner) as (info, meta, part):
         with part.open('r+b') as out:
             out.seek(0, 2)
             current = out.tell()
@@ -98,15 +98,15 @@ def append(upload_id, wid, owner, offset, data):
         return {'offset': current + len(data)}
 
 
-def finish(upload_id, wid, owner, db):
-    with locked(upload_id, wid, owner) as (info, meta, part):
+def finish(upload_id, workspaceId, owner, db):
+    with locked(upload_id, workspaceId, owner) as (info, meta, part):
         if part.stat().st_size != info['size']:
             raise HTTPException(409, 'Upload is incomplete. Send the remaining parts first.')
         digest = hashlib.sha256()
         with part.open('rb') as file:
             for block in iter(lambda: file.read(PART_BYTES), b''):
                 digest.update(block)
-        existing = db.query(Document).filter_by(workspace_id=wid, digest=digest.hexdigest()).first()
+        existing = db.query(Document).filter_by(workspace_id=workspaceId, digest=digest.hexdigest()).first()
         if existing:
             part.unlink()
             meta.unlink()
@@ -115,7 +115,7 @@ def finish(upload_id, wid, owner, db):
         destination = DATA / 'files' / did
         doc = Document(
             id=did,
-            workspace_id=wid,
+            workspace_id=workspaceId,
             name=info['name'],
             size=info['size'],
             digest=digest.hexdigest(),
@@ -128,7 +128,7 @@ def finish(upload_id, wid, owner, db):
             db.rollback()
             destination.unlink(missing_ok=True)
             existing = (
-                db.query(Document).filter_by(workspace_id=wid, digest=digest.hexdigest()).first()
+                db.query(Document).filter_by(workspace_id=workspaceId, digest=digest.hexdigest()).first()
             )
             if not existing:
                 raise
@@ -142,8 +142,8 @@ def finish(upload_id, wid, owner, db):
         return doc, False
 
 
-def cancel(upload_id, wid, owner):
-    with locked(upload_id, wid, owner) as (_, meta, part):
+def cancel(upload_id, workspaceId, owner):
+    with locked(upload_id, workspaceId, owner) as (_, meta, part):
         part.unlink(missing_ok=True)
         meta.unlink()
     return {'ok': True}
