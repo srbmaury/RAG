@@ -27,6 +27,7 @@ from .gmail import router as gmail_router
 from .external_sources import router as external_router
 from .drive import router as drive_router
 from .health import router as health_router
+from .web_sources import router as web_router
 from starlette.concurrency import run_in_threadpool
 
 @asynccontextmanager
@@ -47,6 +48,7 @@ app.include_router(gmail_router)
 app.include_router(external_router)
 app.include_router(drive_router)
 app.include_router(health_router)
+app.include_router(web_router)
 log = logging.getLogger('atlas.requests')
 
 @app.middleware('http')
@@ -491,13 +493,22 @@ def connected_sources_for_payload(payload, document_evidence):
     sources = []
     for entry in payload:
         original = document_evidence.get(entry.get('origin_id')) if entry.get('provider') == 'documents' else None
+        origin_url = None
+        if original and original['name'].lower().endswith('.md'):
+            try:
+                original_text = (DATA / 'files' / original['document_id']).read_text(encoding='utf-8')[:4096]
+            except (OSError, UnicodeError):
+                original_text = ''
+            match = re.search(r'(?m)^Source URL: (https?://\\S+)', original_text)
+            if match:
+                origin_url = match.group(1)
         sources.append({
             'chunk_id': original['chunk_id'] if original else str(entry['source_id']),
             'document_id': original['document_id'] if original else '',
             'name': entry['title'], 'page': original['page'] if original else 0,
             'text': entry['text'],
             'location_type': original['location_type'] if original else entry.get('provider', 'source'),
-            'provider': entry.get('provider'), 'url': entry.get('url'),
+            'provider': entry.get('provider'), 'url': origin_url or entry.get('url'),
         })
     return sources
 
@@ -587,7 +598,9 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
     # Preserve positional [n] citations used by the standard chat renderer.
     # Non-document evidence carries a URL so the UI opens the original record.
     sources = connected_sources_for_payload(payload, document_evidence)
-    return {'answer': answer, 'sources': sources, 'mode': 'connected', 'scope': connected_scope(body)}
+    from .citation_audit import audit_citations
+    return {'answer': answer, 'sources': sources, 'mode': 'connected',
+            'citation_audit': audit_citations(answer, payload), 'scope': connected_scope(body)}
 
 
 @app.post('/api/workspaces/{wid}/connected-chat/stream')

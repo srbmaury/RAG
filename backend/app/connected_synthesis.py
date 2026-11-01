@@ -206,4 +206,7 @@ def stream_connected(question, evidence, provider, api_key, model, client_factor
             mode = 'connected'
     if mode == 'connected':
         yield {'type': 'delta', 'text': answer}
-    yield {'type': 'complete', 'answer': answer, 'sources': sources, 'mode': mode}
+    from .citation_audit import audit_citations
+    audit = audit_citations(answer, sources) if mode == 'connected' else None
+    yield {'type': 'complete', 'answer': answer, 'sources': sources, 'mode': mode,
+           'citation_audit': audit}
