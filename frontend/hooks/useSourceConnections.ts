@@ -11,7 +11,7 @@ export function useSourceConnections(){
   const [sourceChecks,setSourceChecks] = useState<Record<string,{healthy:boolean;matches:number|null;error:string|null;checked_at:number}>>({});
   const [sourceChecksBusy,setSourceChecksBusy] = useState(false);
   const [sourceManage,setSourceManage] = useState<string|null>(null);
-  const [sourceProvider,setSourceProvider] = useState<'github'|'notion'|'slack'>('github');
+  const [sourceProvider,setSourceProvider] = useState<'github'|'notion'|'slack'|'calendar'|'linear'|'jira'|'onedrive'|'outlook'>('github');
   const [sourceCredential,setSourceCredential] = useState('');
   const [sourceSearch,setSourceSearch] = useState('');
   const [sourceResults,setSourceResults] = useState<{provider:string;id:string;title:string;excerpt:string;url?:string}[]>([]);
