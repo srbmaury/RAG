@@ -1,6 +1,6 @@
 import time
 import uuid
-from sqlalchemy import Column, String, Text, Integer, Float, Boolean, ForeignKey, JSON, UniqueConstraint, create_engine, event, text
+from sqlalchemy import Column, String, Text, Integer, Float, Boolean, ForeignKey, JSON, UniqueConstraint, create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 from pgvector.sqlalchemy import Vector
 from .config import DATABASE_URL

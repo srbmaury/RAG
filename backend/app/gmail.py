@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 import httpx
 from openai import AuthenticationError, PermissionDeniedError, RateLimitError, BadRequestError, APITimeoutError, APIConnectionError
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DatabaseSession

@@ -10,7 +10,6 @@ import ipaddress
 import re
 import socket
 from html.parser import HTMLParser
-from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
@@ -19,7 +18,6 @@ from pydantic import BaseModel, Field
 
 from .config import DATA, MAX_FILE_BYTES
 from .db import Session, Document, uid
-from .source_contract import Evidence
 
 router = APIRouter(prefix="/api")
 MAX_HTML_BYTES = min(2_000_000, MAX_FILE_BYTES)

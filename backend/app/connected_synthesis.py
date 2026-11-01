@@ -30,22 +30,6 @@ def final_answer_text(raw):
     return text
 
 
-def source_results_answer(sources, limit=12):
-    """Return a cited, honest result list if synthesis is unusable."""
-    shown = sources[:limit]
-    noun = 'result' if len(sources) == 1 else 'results'
-    lines = [f'I found {len(sources)} matching source {noun}. '
-             'I could not produce a reliable summary, so here are the retrieved matches:']
-    for number, item in enumerate(shown, 1):
-        title = ' '.join(str(item.get('title') or 'Untitled result').split())[:180]
-        excerpt = ' '.join(str(item.get('text') or '').split())[:260]
-        detail = f': {excerpt}' if excerpt else ''
-        lines.append(f'- **{title}**{detail} [{number}]')
-    if len(sources) > limit:
-        lines.append(f'Showing the first {limit} of {len(sources)} matches.')
-    return '\n'.join(lines)
-
-
 def source_list_answer(sources, total, limit=12):
     """Format a source listing using only provider-returned titles and excerpts."""
     shown = sources[:limit]

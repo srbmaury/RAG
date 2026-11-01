@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 import pytest
 from app.structured_text import extract_structured
 from app.ingest import extract, SUPPORTED
