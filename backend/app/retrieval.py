@@ -12,7 +12,7 @@ GENERIC_FILENAME_TERMS = set('readme improved improvement improvements document 
 def tokens(value):
     result = []
     for term in re.findall(r'\w+', value.lower()):
-        if term in STOP or len(term) <= 1: continue
+        if term in STOP or len(term) <= 1 or term.isdigit(): continue
         if len(term) > 4 and term.endswith('ies'):
             term = term[:-3] + 'y'
         elif len(term) > 4 and re.search(r'(ches|shes|sses|xes|zes)$', term):
