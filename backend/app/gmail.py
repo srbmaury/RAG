@@ -63,16 +63,16 @@ def actor(request: Request, db: DatabaseSession):
     return db.get(User, found.user_id)
 
 
-def allowed_workspace(db, user, wid):
+def allowed_workspace(db, user, workspaceId):
     workspace = db.query(Workspace).filter_by(id=workspaceId, owner_id=user.id).first()
     if workspace is None:
         raise HTTPException(404, 'Workspace not found.')
     return workspace
 
 
-def connection(db, user, wid):
-    allowed_workspace(db, user, wid)
-    entry = db.query(GmailConnection).filter_by(workspace_id=wid).first()
+def connection(db, user, workspaceId):
+    allowed_workspace(db, user, workspaceId)
+    entry = db.query(GmailConnection).filter_by(workspace_id=workspaceId).first()
     if entry is None:
         raise HTTPException(409, 'Connect Gmail to this workspace first.')
     return entry
@@ -177,8 +177,8 @@ class SummaryRequest(BaseModel):
 def status(workspaceId: str, request: Request):
     with Session() as db:
         user = actor(request, db)
-        allowed_workspace(db, user, wid)
-        entry = db.query(GmailConnection).filter_by(workspace_id=wid).first()
+        allowed_workspace(db, user, workspaceId)
+        entry = db.query(GmailConnection).filter_by(workspace_id=workspaceId).first()
         return {
             'connected': bool(entry),
             'email': entry.email if entry else None,
@@ -191,7 +191,7 @@ def connect(workspaceId: str, request: Request):
     configured()
     with Session() as db:
         user = actor(request, db)
-        allowed_workspace(db, user, wid)
+        allowed_workspace(db, user, workspaceId)
         state = secrets.token_urlsafe(32)
         db.add(
             GmailOAuthState(
@@ -259,7 +259,7 @@ def callback(request: Request, state: str = '', code: str = ''):
             profile = gmail_get(tokens['access_token'], GMAIL_API + '/profile')
         except (httpx.HTTPError, KeyError):
             raise HTTPException(502, 'Could not complete Google authorization.')
-        old = db.query(GmailConnection).filter_by(workspace_id=wid).first()
+        old = db.query(GmailConnection).filter_by(workspace_id=workspaceId).first()
         if old:
             db.delete(old)
             db.flush()
@@ -277,12 +277,12 @@ def callback(request: Request, state: str = '', code: str = ''):
         return RedirectResponse('/?gmail=connected', status_code=303)
 
 
-@router.post('/workspaces/{wid}/gmail/search')
+@router.post('/workspaces/{workspaceId}/gmail/search')
 def search(workspaceId: str, body: SearchRequest, request: Request):
     try:
         with Session() as db:
             user = actor(request, db)
-            entry = connection(db, user, wid)
+            entry = connection(db, user, workspaceId)
             token = access_token(entry, db)
             found = gmail_get(
                 token, GMAIL_API + '/messages', {'q': body.query, 'maxResults': body.limit}
@@ -304,7 +304,7 @@ def search(workspaceId: str, body: SearchRequest, request: Request):
         ) from exc
 
 
-@router.post('/workspaces/{wid}/gmail/summarize')
+@router.post('/workspaces/{workspaceId}/gmail/summarize')
 def summarize(workspaceId: str, body: SummaryRequest, request: Request):
     if not (config.API_KEY or config.AI_PROVIDER == 'ollama'):
         raise HTTPException(409, 'Configure an AI provider to summarize emails.')
@@ -313,7 +313,7 @@ def summarize(workspaceId: str, body: SummaryRequest, request: Request):
     try:
         with Session() as db:
             user = actor(request, db)
-            entry = connection(db, user, wid)
+            entry = connection(db, user, workspaceId)
             token = access_token(entry, db)
             messages = [
                 email_from_json(
@@ -460,7 +460,7 @@ def query_summary_model(messages, instructions, max_tokens=1400):
     raise HTTPException(409, 'Configure an AI provider to summarize Gmail messages.')
 
 
-@router.post('/workspaces/{wid}/gmail/summarize-query')
+@router.post('/workspaces/{workspaceId}/gmail/summarize-query')
 def summarize_query(workspaceId: str, body: QuerySummaryRequest, request: Request):
     """Search Gmail using its query syntax; summarize matches in small batches."""
     if not (config.AI_PROVIDER == 'ollama' or (config.AI_PROVIDER == 'openai' and config.API_KEY)):
@@ -468,7 +468,7 @@ def summarize_query(workspaceId: str, body: QuerySummaryRequest, request: Reques
     try:
         with Session() as db:
             user = actor(request, db)
-            entry = connection(db, user, wid)
+            entry = connection(db, user, workspaceId)
             token = access_token(entry, db)
             ids = []
             page_token = None
@@ -592,12 +592,12 @@ def summarize_query(workspaceId: str, body: QuerySummaryRequest, request: Reques
     }
 
 
-@router.delete('/workspaces/{wid}/gmail')
+@router.delete('/workspaces/{workspaceId}/gmail')
 def disconnect(workspaceId: str, request: Request):
     with Session() as db:
         user = actor(request, db)
-        allowed_workspace(db, user, wid)
-        db.query(GmailConnection).filter_by(workspace_id=wid).delete()
+        allowed_workspace(db, user, workspaceId)
+        db.query(GmailConnection).filter_by(workspace_id=workspaceId).delete()
         health = db.get(SourceHealthCheck, (workspaceId, 'gmail'))
         if health:
             db.delete(health)
