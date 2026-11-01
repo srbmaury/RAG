@@ -56,7 +56,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         setGmailBusy(true);
         setError('');
         try {
-            const value = await api<{ authorization_url: string }>(`/gmail/connect?wid=${encodeURIComponent(wid)}`);
+            const value = await api<{ authorization_url: string }>(`/gmail/connect?wid=${encodeURIComponent(workspaceId)}`);
             window.location.assign(value.authorization_url);
         } catch (e) {
             setError((e as Error).message);
@@ -64,25 +64,25 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         }
     }
     useEffect(() => {
-        if ((tab === 'sources' || tab === 'chat') && wid) {
+        if ((tab === 'sources' || tab === 'chat') && workspaceId) {
             void refreshDrive();
-            void api<{ provider: string; connected: boolean; account: string | null }[]>(`/workspaces/${wid}/sources`)
+            void api<{ provider: string; connected: boolean; account: string | null }[]>(`/workspaces/${workspaceId}/sources`)
                 .then((status) => {
-                    if (scope.current === wid) setSourceStatuses(status);
+                    if (scope.current === workspaceId) setSourceStatuses(status);
                 })
                 .catch((e) => setError((e as Error).message));
             void loadSourceChecks();
         }
-    }, [tab, wid]);
+    }, [tab, workspaceId]);
     async function refreshDrive() {
-        if (!wid) return;
+        if (!workspaceId) return;
         try {
             const status = await api<{
                 connected: boolean;
                 account: string | null;
                 configured: boolean;
-            }>(`/workspaces/${wid}/drive/status`);
-            if (scope.current === wid) setDriveStatus(status);
+            }>(`/workspaces/${workspaceId}/drive/status`);
+            if (scope.current === workspaceId) setDriveStatus(status);
         } catch (e) {
             setError((e as Error).message);
         }
@@ -91,7 +91,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         setDriveBusy(true);
         setError('');
         try {
-            const result = await api<{ authorization_url: string }>(`/drive/connect?wid=${encodeURIComponent(wid)}`);
+            const result = await api<{ authorization_url: string }>(`/drive/connect?wid=${encodeURIComponent(workspaceId)}`);
             window.location.assign(result.authorization_url);
         } catch (e) {
             setError((e as Error).message);
@@ -103,7 +103,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         setDriveBusy(true);
         setError('');
         try {
-            await api(`/workspaces/${wid}/drive`, { method: 'DELETE' });
+            await api(`/workspaces/${workspaceId}/drive`, { method: 'DELETE' });
             await refreshDrive();
             setDriveResults([]);
             setConnectedProviders((old) => old.filter((p) => p !== 'drive'));
@@ -119,7 +119,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         try {
             const data = await api<{
                 results: { id: string; title: string; excerpt: string; url: string }[];
-            }>(`/workspaces/${wid}/drive/search`, {
+            }>(`/workspaces/${workspaceId}/drive/search`, {
                 method: 'POST',
                 body: JSON.stringify({ query: driveQuery }),
             });
@@ -131,7 +131,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         }
     }
     async function refreshConnections() {
-        const target = wid;
+        const target = workspaceId;
         await Promise.all([
             refreshDrive(),
             refreshSourceStatuses(),
@@ -158,8 +158,8 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
                     error: string | null;
                     checked_at: number;
                 }[];
-            }>(`/workspaces/${wid}/sources/health/check`, { method: 'POST' });
-            if (scope.current !== wid) return;
+            }>(`/workspaces/${workspaceId}/sources/health/check`, { method: 'POST' });
+            if (scope.current !== workspaceId) return;
             setSourceChecks(Object.fromEntries(result.checks.map((item) => [item.provider, item])));
             const connected = result.checks.filter((item) => item.connected);
             const healthy = connected.filter((item) => item.healthy).length;
@@ -171,16 +171,16 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         }
     }
     async function refreshSourceStatuses() {
-        if (!wid) return;
+        if (!workspaceId) return;
         try {
-            const status = await api<{ provider: string; connected: boolean; account: string | null }[]>(`/workspaces/${wid}/sources`);
-            if (scope.current === wid) setSourceStatuses(status);
+            const status = await api<{ provider: string; connected: boolean; account: string | null }[]>(`/workspaces/${workspaceId}/sources`);
+            if (scope.current === workspaceId) setSourceStatuses(status);
         } catch (e) {
             setError((e as Error).message);
         }
     }
     async function loadSourceChecks() {
-        if (!wid) return;
+        if (!workspaceId) return;
         try {
             const result = await api<{
                 checks: {
@@ -190,8 +190,8 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
                     error: string | null;
                     checked_at: number;
                 }[];
-            }>(`/workspaces/${wid}/sources/health`);
-            if (scope.current === wid) setSourceChecks(Object.fromEntries(result.checks.map((item) => [item.provider, item])));
+            }>(`/workspaces/${workspaceId}/sources/health`);
+            if (scope.current === workspaceId) setSourceChecks(Object.fromEntries(result.checks.map((item) => [item.provider, item])));
         } catch {
             /* A health check has not been recorded yet. */
         }
@@ -201,7 +201,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         setSourceBusy(true);
         setError('');
         try {
-            const response = await api<{ authorization_url: string }>(`/connected-oauth/${sourceProvider}/connect?wid=${encodeURIComponent(wid)}`);
+            const response = await api<{ authorization_url: string }>(`/connected-oauth/${sourceProvider}/connect?wid=${encodeURIComponent(workspaceId)}`);
             window.location.assign(response.authorization_url);
         } catch (e) {
             setError((e as Error).message);
@@ -213,7 +213,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         setSourceBusy(true);
         setError('');
         try {
-            await api(`/workspaces/${wid}/sources/${sourceProvider}`, {
+            await api(`/workspaces/${workspaceId}/sources/${sourceProvider}`, {
                 method: 'POST',
                 body: JSON.stringify({ token: sourceCredential.trim() }),
             });
@@ -230,7 +230,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         setSourceBusy(true);
         setError('');
         try {
-            await api(`/workspaces/${wid}/sources/${provider}`, { method: 'DELETE' });
+            await api(`/workspaces/${workspaceId}/sources/${provider}`, { method: 'DELETE' });
             await refreshSourceStatuses();
             setSourceResults([]);
             setConnectedProviders((old) => old.filter((p) => p !== provider));
@@ -253,7 +253,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
                     excerpt: string;
                     url?: string;
                 }[];
-            }>(`/workspaces/${wid}/sources/${sourceProvider}/search`, {
+            }>(`/workspaces/${workspaceId}/sources/${sourceProvider}/search`, {
                 method: 'POST',
                 body: JSON.stringify({ query: sourceSearch.trim() }),
             });
@@ -270,7 +270,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         setGmailSelected([]);
         setGmailMobileView('emails');
         try {
-            const result = await api<{ messages: GmailMessage[] }>(`/workspaces/${wid}/gmail/search`, {
+            const result = await api<{ messages: GmailMessage[] }>(`/workspaces/${workspaceId}/gmail/search`, {
                 method: 'POST',
                 body: JSON.stringify({ query: gmailQuery, limit: 20 }),
             });
@@ -288,7 +288,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         setError('');
         setGmailMobileView('summary');
         try {
-            const result = await api<GmailSummary & { count: number; limited: boolean }>(`/workspaces/${wid}/gmail/summarize-query`, {
+            const result = await api<GmailSummary & { count: number; limited: boolean }>(`/workspaces/${workspaceId}/gmail/summarize-query`, {
                 method: 'POST',
                 body: JSON.stringify({
                     query: gmailSummarizeQuery.trim(),
@@ -314,7 +314,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         setError('');
         setGmailMobileView('summary');
         try {
-            const result = await api<GmailSummary>(`/workspaces/${wid}/gmail/summarize`, {
+            const result = await api<GmailSummary>(`/workspaces/${workspaceId}/gmail/summarize`, {
                 method: 'POST',
                 body: JSON.stringify({ message_ids: gmailSelected }),
             });
@@ -333,7 +333,7 @@ export function useConnectedSourcesController({ workspaceId, tab, scope, sourceS
         if (!window.confirm('Disconnect Gmail from this workspace?')) return;
         setGmailBusy(true);
         try {
-            await api(`/workspaces/${wid}/gmail`, { method: 'DELETE' });
+            await api(`/workspaces/${workspaceId}/gmail`, { method: 'DELETE' });
             setGmailStatus({ connected: false, email: null, configured: true });
             setGmailMessages([]);
             setGmailSelected([]);
