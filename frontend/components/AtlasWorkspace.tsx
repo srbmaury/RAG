@@ -1,5 +1,6 @@
 'use client';
 import {IntegrationsGallery} from './sources/IntegrationsGallery';
+import {SourceConnectionDialog} from './sources/SourceConnectionDialog';
 import {GmailWorkspaceView} from './sources/gmail/GmailWorkspaceView';
 
 import {Children, useEffect, useRef, useState, useCallback, type ReactNode} from 'react';
@@ -49,7 +50,8 @@ export function AtlasWorkspace() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
   const {messages,chatId,setMessages,setChatId,activeChat,chatMessages,chatTitle} = useConversation();
-  const {driveStatus,setDriveStatus,driveQuery,setDriveQuery,driveResults,setDriveResults,driveBusy,setDriveBusy,sourceStatuses,setSourceStatuses,sourceChecks,setSourceChecks,sourceChecksBusy,setSourceChecksBusy,sourceManage,setSourceManage,sourceProvider,setSourceProvider,sourceCredential,setSourceCredential,sourceSearch,setSourceSearch,sourceResults,setSourceResults,sourceBusy,setSourceBusy,connectedGmail,setConnectedGmail,connectedProviders,setConnectedProviders,connectedGmailQuery,setConnectedGmailQuery} = useSourceConnections();
+  const sourceState=useSourceConnections();
+  const {driveStatus,setDriveStatus,driveQuery,setDriveQuery,driveResults,setDriveResults,driveBusy,setDriveBusy,sourceStatuses,setSourceStatuses,sourceChecks,setSourceChecks,sourceChecksBusy,setSourceChecksBusy,sourceManage,setSourceManage,sourceProvider,setSourceProvider,sourceCredential,setSourceCredential,sourceSearch,setSourceSearch,sourceResults,setSourceResults,sourceBusy,setSourceBusy,connectedGmail,setConnectedGmail,connectedProviders,setConnectedProviders,connectedGmailQuery,setConnectedGmailQuery} = sourceState;
   useEffect(()=>{setConnectedProviders([]);setConnectedGmail(false);setIncludeDocuments(true);setSourceManage(null);setDriveStatus(null);setSourceStatuses([]);setSourceChecks({});setDriveResults([]);setSourceResults([]);setSourceCredential('');setSourceSearch('');setQuery('');setFilter('');setGlobalQuery('');},[wid]);
   const gmailState=useGmailWorkspace();
   const {gmailStatus,setGmailStatus,gmailMessages,setGmailMessages,gmailQuery,setGmailQuery,gmailSummarizeQuery,setGmailSummarizeQuery,gmailQueryLimit,setGmailQueryLimit,gmailQuerySummaryLabel,setGmailQuerySummaryLabel,gmailSelected,setGmailSelected,gmailSummary,setGmailSummary,gmailBusy,setGmailBusy,gmailSummarizing,setGmailSummarizing,gmailSummaryIds,setGmailSummaryIds,gmailMobileView,setGmailMobileView,gmailPreview,setGmailPreview,gmailSummaryHeading} = gmailState;
@@ -553,31 +555,7 @@ export function AtlasWorkspace() {
           <IntegrationsGallery gmailStatus={gmailStatus} driveStatus={driveStatus} sourceStatuses={sourceStatuses} sourceChecks={sourceChecks} onOpen={provider=>{setSourceManage(provider);if(provider==='gmail')window.scrollTo({top:0,behavior:'instant'});if(['github','notion','slack'].includes(provider)){setSourceProvider(provider as 'github'|'notion'|'slack');setSourceResults([]);}}}/>
           </div>}
         {sourceManage==='gmail' && <GmailWorkspaceView state={gmailState} onBack={()=>{setSourceManage(null);window.scrollTo({top:0,behavior:'instant'});}} onDisconnect={()=>void disconnectGmail()} onConnect={()=>void connectGmail()} onSearch={()=>void searchGmail()} onSummarizeQuery={()=>void summarizeGmailQuery()} onSummarizeSelected={()=>void summarizeGmail()} onNotice={setNotice} onError={setError}/>}
-          {sourceManage&&sourceManage!=='gmail'&&<Dialog title="Manage source connection" onClose={()=>{setSourceManage(null);setSourceCredential('');}} className="source-dialog">
-          {sourceManage==='drive'&&<div className="connected-card" id="drive-connection">
-            <h2>Google Drive</h2>
-            <p className="caption">Authorize read-only access to browse and search Drive. Atlas fetches selected content on demand.</p>
-            {driveStatus?.connected?<><p className="caption">Connected: {driveStatus.account}</p>
-              <div className="source-search-controls"><input className="connected-field" value={driveQuery} onChange={e=>setDriveQuery(e.target.value)} placeholder="Search Drive file names or text" aria-label="Search Drive"/><button className="btn" disabled={driveBusy} onClick={()=>void searchDrive()}>Search Drive</button><button className="btn" disabled={driveBusy} onClick={()=>void disconnectDrive()}>Disconnect</button></div>
-              {driveResults.map(x=><div className="connected-evidence" key={x.id}><strong>{x.title}</strong><p>{x.excerpt}</p><a href={x.url} target="_blank" rel="noopener noreferrer">Open in Drive <ArrowUpRight size={14}/></a></div>)}
-            </>:<button className="btn primary" disabled={driveBusy||!driveStatus?.configured} onClick={()=>void connectDrive()}>Connect Google Drive</button>}
-            {!driveStatus?.configured&&<p className="caption">Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_DRIVE_REDIRECT_URI on the server to enable Drive.</p>}
-          </div>}
-          {sourceManage!==null&&sourceManage!=='drive'&&<div className="connected-card">
-            <h2>{sourceProvider==='github'?'GitHub':sourceProvider==='notion'?'Notion':'Slack'} connection</h2>
-            <p className="caption">{sourceProvider==='notion'?'Provide a Notion integration token, then share the pages Atlas should read with that integration. Atlas cannot access unshared workspace pages.':sourceProvider==='slack'?'Slack message search needs a user-scoped token with search:read. Bot tokens can authenticate, but Slack does not allow them to search messages.':'Provide a read-only provider-issued token. Atlas validates it and stores it encrypted on the server. This setup is not yet one-click OAuth.'}</p>
-            <form onSubmit={e=>{e.preventDefault();void connectSource()}}>
-              <input className="connected-field" type="password" autoComplete="off" aria-label="Provider access token" value={sourceCredential} onChange={e=>setSourceCredential(e.target.value)} placeholder="Paste read-only access token"/>
-              <button type="submit" className="btn primary" disabled={sourceBusy||!sourceCredential.trim()}>{sourceBusy?'Connecting…':'Connect account'}</button>
-            </form>
-            {sourceStatuses.some(x=>x.provider===sourceProvider&&x.connected)&&<>
-              <div className="source-search-controls"><input className="connected-field" value={sourceSearch} onChange={e=>setSourceSearch(e.target.value)} placeholder={sourceProvider==='github'?'Search issues and PRs':sourceProvider==='notion'?'Search page titles':'Search messages'} aria-label="Search connected provider"/>
-              <button className="btn" disabled={sourceBusy||!sourceSearch.trim()} onClick={()=>void searchSource()}>Search</button>
-              <button className="btn" disabled={sourceBusy} onClick={()=>void disconnectSource(sourceProvider)}>Disconnect</button></div>
-              {sourceResults.map(x=><div className="connected-evidence" key={x.id}><strong>{x.title}</strong><p>{x.excerpt}</p>{x.url&&<a href={x.url} target="_blank" rel="noopener noreferrer">Open source <ArrowUpRight size={14}/></a>}</div>)}
-            </>}
-          </div>}
-          </Dialog>}
+          <SourceConnectionDialog state={sourceState} onClose={()=>{setSourceManage(null);setSourceCredential('');}} onSearchDrive={()=>void searchDrive()} onDisconnectDrive={()=>void disconnectDrive()} onConnectDrive={()=>void connectDrive()} onConnectSource={()=>void connectSource()} onSearchSource={()=>void searchSource()} onDisconnectSource={provider=>void disconnectSource(provider)}/>
           <p className="caption">All connections are scoped to this workspace. Source content is accessed on demand; you can disconnect accounts at any time.</p>
         </section>}
       </div>
