@@ -2,7 +2,7 @@
 import {ArrowUpRight,LoaderCircle,Copy,CheckCircle2,RotateCcw,FileText,X} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {useGmailWorkspace} from '../../hooks/useGmailWorkspace';
+import {useGmailWorkspace} from '../../../hooks/useGmailWorkspace';
 type State=ReturnType<typeof useGmailWorkspace>;
 export function GmailWorkspaceView({state,onBack,onDisconnect,onConnect,onSearch,onSummarizeQuery,onSummarizeSelected,onNotice,onError}:{state:State;onBack:()=>void;onDisconnect:()=>void;onConnect:()=>void;onSearch:()=>void;onSummarizeQuery:()=>void;onSummarizeSelected:()=>void;onNotice:(text:string)=>void;onError:(text:string)=>void}){
 const {gmailStatus,setGmailStatus,gmailMessages,setGmailMessages,gmailQuery,setGmailQuery,gmailSummarizeQuery,setGmailSummarizeQuery,gmailQueryLimit,setGmailQueryLimit,gmailQuerySummaryLabel,setGmailQuerySummaryLabel,gmailSelected,setGmailSelected,gmailSummary,setGmailSummary,gmailBusy,setGmailBusy,gmailSummarizing,setGmailSummarizing,gmailSummaryIds,setGmailSummaryIds,gmailMobileView,setGmailMobileView,gmailPreview,setGmailPreview,gmailSummaryHeading}=state;
