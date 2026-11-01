@@ -19,11 +19,12 @@ from .db import Session, ConnectedOAuthState, ExternalConnection, SourceHealthCh
 from .gmail import actor, allowed_workspace, crypt
 
 router = APIRouter(prefix="/api/connected-oauth")
-PROVIDERS = {"calendar", "onedrive", "outlook"}
+PROVIDERS = {"calendar", "onedrive", "outlook", "sharepoint"}
 GOOGLE_SCOPES = "https://www.googleapis.com/auth/calendar.readonly"
 MS_SCOPES = {
     "onedrive": "openid profile offline_access User.Read Files.Read",
     "outlook": "openid profile offline_access User.Read Mail.Read",
+    "sharepoint": "openid profile offline_access User.Read Sites.Read.All Files.Read.All",
 }
 
 
