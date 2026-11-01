@@ -58,6 +58,7 @@ import { ResearchAnswer } from './chat/ResearchAnswer';
 import { EvidenceInspector } from './chat/EvidenceInspector';
 import { WorkspaceSearchDialog } from './layout/WorkspaceSearchDialog';
 import { WorkspaceManagerDialog } from './layout/WorkspaceManagerDialog';
+import { WebPageImportForm } from './documents/WebPageImportForm';
 import { ConversationHistory } from './chat/ConversationHistory';
 import { ResearchSourceSelector } from './chat/ResearchSourceSelector';
 import { DocumentsView } from './documents/DocumentsView';
@@ -1094,36 +1095,12 @@ export function AtlasWorkspace() {
             <DocumentsView
               uploadButton={uploadButton}
               webImport={
-                <form
-                  onSubmit={(e) => void importWebPage(e)}
-                  style={{
-                    display: 'flex',
-                    gap: 8,
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    margin: '18px 0',
-                  }}
-                >
-                  <label htmlFor="atlas-web-url">Save public web page</label>
-                  <input
-                    id="atlas-web-url"
-                    type="url"
-                    required
-                    value={webUrl}
-                    onChange={(e) => setWebUrl(e.target.value)}
-                    placeholder="https://example.com/article"
-                    style={{
-                      minWidth: 260,
-                      flex: 1,
-                      padding: 10,
-                      borderRadius: 8,
-                      border: '1px solid var(--border, #999)',
-                    }}
-                  />
-                  <button className="btn" type="submit" disabled={webBusy}>
-                    {webBusy ? 'Importing…' : 'Add URL'}
-                  </button>
-                </form>
+                <WebPageImportForm
+                  url={webUrl}
+                  busy={webBusy}
+                  onUrlChange={setWebUrl}
+                  onSubmit={(event) => void importWebPage(event)}
+                />
               }
               totalDocuments={docs.length}
               readyDocuments={ready.length}
