@@ -6,6 +6,7 @@ from sqlalchemy import text
 from .db import Session, Chunk, Document, engine
 from .ai import embed, enabled, embedding_model_id
 from . import config
+from .source_contract import normalize_evidence
 
 STOP = set('a an the is are was were of to in and or for on with what which how does do did can could would should please tell me about it this that from many there my documents document uploaded upload source sources file files any have write wrote lines line sentences sentence paragraph paragraphs words word short brief describe description give ten five three two one overview'.split())
 GENERIC_FILENAME_TERMS = set('readme improved improvement improvements document documents project projects file files pdf docx txt md guide note notes review brief product summary overview gateway payment option'.split())
@@ -87,7 +88,7 @@ def diversify_ranked_chunks(ranked, limit, per_document=3):
     return chosen
 
 def source(chunk, name):
-    return {'chunk_id': chunk.id, 'document_id': chunk.document_id, 'name': name, 'page': chunk.page, 'text': chunk.text, 'location_type': 'page' if name.lower().endswith('.pdf') else 'section'}
+    return {**{'chunk_id': chunk.id, 'document_id': chunk.document_id, 'name': name, 'page': chunk.page, 'text': chunk.text, 'location_type': 'page' if name.lower().endswith('.pdf') else 'section'}, 'provider': 'documents', 'source_id': chunk.id}
 
 def retrieve(workspace_id, query, document_ids=None, limit=8):
     with Session() as db:
