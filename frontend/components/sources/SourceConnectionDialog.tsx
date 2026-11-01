@@ -1,0 +1,33 @@
+'use client';
+import {ArrowUpRight} from 'lucide-react';
+import {Dialog} from '../ui/WorkspacePrimitives';
+import {useSourceConnections} from '../../hooks/useSourceConnections';
+type State=ReturnType<typeof useSourceConnections>;
+export function SourceConnectionDialog({state,onClose,onSearchDrive,onDisconnectDrive,onConnectDrive,onConnectSource,onSearchSource,onDisconnectSource}:{state:State;onClose:()=>void;onSearchDrive:()=>void;onDisconnectDrive:()=>void;onConnectDrive:()=>void;onConnectSource:()=>void;onSearchSource:()=>void;onDisconnectSource:(provider:'github'|'notion'|'slack')=>void}){
+const {driveStatus,setDriveStatus,driveQuery,setDriveQuery,driveResults,setDriveResults,driveBusy,setDriveBusy,sourceStatuses,setSourceStatuses,sourceChecks,setSourceChecks,sourceChecksBusy,setSourceChecksBusy,sourceManage,setSourceManage,sourceProvider,setSourceProvider,sourceCredential,setSourceCredential,sourceSearch,setSourceSearch,sourceResults,setSourceResults,sourceBusy,setSourceBusy,connectedGmail,setConnectedGmail,connectedProviders,setConnectedProviders,connectedGmailQuery,setConnectedGmailQuery}=state;
+return {sourceManage&&sourceManage!=='gmail'&&<Dialog title="Manage source connection" onClose={()=>{onClose();}} className="source-dialog">
+          {sourceManage==='drive'&&<div className="connected-card" id="drive-connection">
+            <h2>Google Drive</h2>
+            <p className="caption">Authorize read-only access to browse and search Drive. Atlas fetches selected content on demand.</p>
+            {driveStatus?.connected?<><p className="caption">Connected: {driveStatus.account}</p>
+              <div className="source-search-controls"><input className="connected-field" value={driveQuery} onChange={e=>setDriveQuery(e.target.value)} placeholder="Search Drive file names or text" aria-label="Search Drive"/><button className="btn" disabled={driveBusy} onClick={()=>onSearchDrive()}>Search Drive</button><button className="btn" disabled={driveBusy} onClick={()=>onDisconnectDrive()}>Disconnect</button></div>
+              {driveResults.map(x=><div className="connected-evidence" key={x.id}><strong>{x.title}</strong><p>{x.excerpt}</p><a href={x.url} target="_blank" rel="noopener noreferrer">Open in Drive <ArrowUpRight size={14}/></a></div>)}
+            </>:<button className="btn primary" disabled={driveBusy||!driveStatus?.configured} onClick={()=>onConnectDrive()}>Connect Google Drive</button>}
+            {!driveStatus?.configured&&<p className="caption">Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_DRIVE_REDIRECT_URI on the server to enable Drive.</p>}
+          </div>}
+          {sourceManage!==null&&sourceManage!=='drive'&&<div className="connected-card">
+            <h2>{sourceProvider==='github'?'GitHub':sourceProvider==='notion'?'Notion':'Slack'} connection</h2>
+            <p className="caption">{sourceProvider==='notion'?'Provide a Notion integration token, then share the pages Atlas should read with that integration. Atlas cannot access unshared workspace pages.':sourceProvider==='slack'?'Slack message search needs a user-scoped token with search:read. Bot tokens can authenticate, but Slack does not allow them to search messages.':'Provide a read-only provider-issued token. Atlas validates it and stores it encrypted on the server. This setup is not yet one-click OAuth.'}</p>
+            <form onSubmit={e=>{e.preventDefault();onConnectSource()}}>
+              <input className="connected-field" type="password" autoComplete="off" aria-label="Provider access token" value={sourceCredential} onChange={e=>setSourceCredential(e.target.value)} placeholder="Paste read-only access token"/>
+              <button type="submit" className="btn primary" disabled={sourceBusy||!sourceCredential.trim()}>{sourceBusy?'Connecting…':'Connect account'}</button>
+            </form>
+            {sourceStatuses.some(x=>x.provider===sourceProvider&&x.connected)&&<>
+              <div className="source-search-controls"><input className="connected-field" value={sourceSearch} onChange={e=>setSourceSearch(e.target.value)} placeholder={sourceProvider==='github'?'Search issues and PRs':sourceProvider==='notion'?'Search page titles':'Search messages'} aria-label="Search connected provider"/>
+              <button className="btn" disabled={sourceBusy||!sourceSearch.trim()} onClick={()=>onSearchSource()}>Search</button>
+              <button className="btn" disabled={sourceBusy} onClick={()=>onDisconnectSource(sourceProvider)}>Disconnect</button></div>
+              {sourceResults.map(x=><div className="connected-evidence" key={x.id}><strong>{x.title}</strong><p>{x.excerpt}</p>{x.url&&<a href={x.url} target="_blank" rel="noopener noreferrer">Open source <ArrowUpRight size={14}/></a>}</div>)}
+            </>}
+          </div>}
+          </Dialog>};
+}
