@@ -17,7 +17,7 @@ flowchart LR
   Proxy --> API["FastAPI<br/>backend/app/main.py"]
   API --> DB[("SQLite in local dev<br/>PostgreSQL / pgvector in Compose")]
   API --> Files[("Original uploaded files")]
-  API --> Conn["On-demand provider adapters<br/>Gmail · Drive · GitHub · Notion · Slack"]
+  API --> Conn["On-demand provider adapters<br/>Google · Microsoft · GitHub · Notion · Slack · Jira · Linear"]
   Conn --> Providers["External provider APIs"]
   API --> Retrieval["Keyword / vector retrieval<br/>backend/app/retrieval.py"]
   Retrieval --> DB
@@ -139,7 +139,7 @@ Generate an encryption key for connected-source credentials:
 .venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-Copy the printed value into `.env` as `GMAIL_TOKEN_ENCRYPTION_KEY=...`. This key is required for Gmail, Google Drive, GitHub, Notion, and Slack connections. Keep it private and back it up: Atlas cannot decrypt saved credentials if the key is lost or changed.
+Copy the printed value into `.env` as `GMAIL_TOKEN_ENCRYPTION_KEY=...`. This key is required for encrypted connected-source credentials. Keep it private and back it up: Atlas cannot decrypt saved credentials if the key is lost or changed.
 
 Start the API in one terminal:
 
@@ -205,6 +205,9 @@ With OpenAI selected, document passages and selected connected-source excerpts a
 Set `AI_PROVIDER=none` and leave `OPENAI_API_KEY` empty. Atlas returns matching source excerpts instead of a synthesized answer.
 
 ## Connect data sources
+
+Google Calendar, OneDrive, Outlook and SharePoint OAuth setup is described in [Connected source setup](docs/FIVE_SOURCE_CONNECTORS.md). Their integrations remain read-only, and live consent flows require provider configuration.
+
 
 Connections are workspace-scoped and retrieved on demand. Connect a provider in **Sources**, then select it above the prompt in **Ask Atlas**. Source data is not automatically copied into the document library. Disconnecting removes Atlas's saved credential; revoke the token or app authorization at the provider as well when appropriate.
 
