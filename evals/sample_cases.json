@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "question": "What was the launch deadline?",
+      "candidates": [
+        {
+          "id": "a",
+          "text": "The launch deadline is October 12."
+        },
+        {
+          "id": "b",
+          "text": "The support team added two members."
+        },
+        {
+          "id": "c",
+          "text": "The database runs on PostgreSQL."
+        }
+      ],
+      "relevant_ids": [
+        "a"
+      ]
+    },
+    {
+      "question": "Which database supports vectors?",
+      "candidates": [
+        {
+          "id": "a",
+          "text": "Marketing owns the product announcement."
+        },
+        {
+          "id": "b",
+          "text": "PostgreSQL with pgvector stores embeddings and supports vector search."
+        }
+      ],
+      "relevant_ids": [
+        "b"
+      ]
+    }
+  ]
+}
