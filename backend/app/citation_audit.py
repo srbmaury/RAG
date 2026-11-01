@@ -5,15 +5,15 @@ A passing heuristic is never proof of semantic entailment.
 import re
 from .retrieval import tokens
 
-REFERENCE = re.compile(r"\\[(\\d+)\\]")
-NUMBER = re.compile(r"(?<![\\w])(?:\\d{1,4}(?:[,.]\\d{3})*(?:\\.\\d+)?%?)(?![\\w])")
+REFERENCE = re.compile(r"\[(\d+)\]")
+NUMBER = re.compile(r"(?<![\w])(?:\d{1,4}(?:[,.]\d{3})*(?:\.\d+)?%?)(?![\w])")
 NEGATIONS = {"not", "never", "no", "without", "neither", "cannot", "n't"}
 
 
 def audit_citations(answer: str, sources: list[dict], *, threshold: float = 0.35) -> dict:
     findings = []
     # Keep citations attached to the preceding clause rather than splitting on decimals.
-    statements = [s.strip() for s in re.split(r"(?<=[.!?])\\s+(?=[A-Z*#])|\\n+", answer)
+    statements = [s.strip() for s in re.split(r"(?<=[.!?])\s+(?=[A-Z*#])|\n+", answer)
                   if s.strip() and re.search(r"[A-Za-z]", s)]
     for statement in statements:
         ids = [int(n) for n in REFERENCE.findall(statement)]
@@ -26,8 +26,8 @@ def audit_citations(answer: str, sources: list[dict], *, threshold: float = 0.35
         numbers = set(NUMBER.findall(claim))
         evidence_numbers = set(NUMBER.findall(evidence))
         # Check for a conspicuous negation mismatch, but do not interpret it as proof.
-        negation_mismatch = bool(NEGATIONS & set(re.findall(r"\\b[\\w']+\\b", claim.lower()))) != bool(
-            NEGATIONS & set(re.findall(r"\\b[\\w']+\\b", evidence.lower())))
+        negation_mismatch = bool(NEGATIONS & set(re.findall(r"\b[\w']+\b", claim.lower()))) != bool(
+            NEGATIONS & set(re.findall(r"\b[\w']+\b", evidence.lower())))
         if not ids:
             status = "missing_citation"
         elif len(valid) != len(ids):
