@@ -345,3 +345,16 @@
 @media(max-width:790px){
   .atlas-v3 .chat-workspace .chat-pane{height:clamp(470px,calc(100dvh - 210px),900px)}
 }
+
+/* Accessible route recovery and loading placeholders. */
+.app-recovery{min-height:100dvh;display:grid;place-items:center;padding:28px;background:var(--bg,#fff);color:var(--text,#0f172a)}
+.app-recovery-panel{max-width:470px;padding:38px;border:1px solid var(--line,#e2e8f0);border-radius:16px;background:var(--panel,#fff)}
+.app-recovery-panel h1{font-size:22px;margin:15px 0 8px;letter-spacing:-.025em}
+.app-recovery-panel p{color:var(--sub,#64748b);line-height:1.6;margin-bottom:24px}
+.app-loading{min-height:100dvh;display:grid;grid-template-columns:245px minmax(0,1fr);background:var(--bg,#fff)}
+.loading-sidebar{background:var(--sidebar,#f8fafc);border-right:1px solid var(--line,#e2e8f0);padding:35px 24px;display:flex;flex-direction:column;gap:27px}
+.loading-main{padding:56px max(30px,7vw);display:flex;flex-direction:column;gap:25px}
+.loading-bar{height:16px;border-radius:7px;background:var(--line,#e2e8f0);opacity:.8;animation:atlas-loading 1.4s ease-in-out infinite alternate}
+@keyframes atlas-loading{from{opacity:.45}to{opacity:.9}}
+@media(prefers-reduced-motion:reduce){.loading-bar{animation:none}}
+@media(max-width:790px){.app-loading{grid-template-columns:1fr}.loading-sidebar{display:none}.loading-main{padding:38px 20px}}
