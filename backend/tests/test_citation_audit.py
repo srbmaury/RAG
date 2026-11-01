@@ -13,3 +13,14 @@ def test_citation_audit_flags_unrelated_evidence():
     result = audit_citations("The production system runs on Mars [1].",
                              [{"text": "Launch dates are tentative."}])
     assert result["needs_review"] == 1
+
+def test_numeric_claim_requires_matching_number():
+    result = audit_citations("The release is scheduled for 2027 [1].",
+                             [{"text": "The release is scheduled for 2026."}])
+    assert result["claims"][0]["status"] == "number_mismatch"
+
+
+def test_negated_claim_needs_review():
+    result = audit_citations("The feature is not available [1].",
+                             [{"text": "The feature is available."}])
+    assert result["claims"][0]["status"] == "possible_negation_mismatch"
