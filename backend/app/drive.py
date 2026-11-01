@@ -102,7 +102,7 @@ def connect(workspaceId: str, request: Request):
     configured()
     with Session() as db:
         who = actor(request, db)
-        allowed_workspace(db, who, wid)
+        allowed_workspace(db, who, workspaceId)
         state = secrets.token_urlsafe(32)
         db.add(
             DriveOAuthState(
@@ -180,8 +180,8 @@ def callback(state: str = '', code: str = ''):
     return RedirectResponse('/?drive=connected', status_code=303)
 
 
-def access_token(db, who, wid):
-    allowed_workspace(db, who, wid)
+def access_token(db, who, workspaceId):
+    allowed_workspace(db, who, workspaceId)
     row = db.get(ExternalConnection, (workspaceId, 'drive'))
     if not row:
         raise HTTPException(409, 'Connect Google Drive first.')
@@ -299,11 +299,11 @@ class DriveSearch(BaseModel):
     query: str = Field(default='', max_length=180)
 
 
-@router.get('/workspaces/{wid}/drive/status')
+@router.get('/workspaces/{workspaceId}/drive/status')
 def status(workspaceId: str, request: Request):
     with Session() as db:
         who = actor(request, db)
-        allowed_workspace(db, who, wid)
+        allowed_workspace(db, who, workspaceId)
         row = db.get(ExternalConnection, (workspaceId, 'drive'))
         return {
             'connected': bool(row),
@@ -312,19 +312,19 @@ def status(workspaceId: str, request: Request):
         }
 
 
-@router.post('/workspaces/{wid}/drive/search')
+@router.post('/workspaces/{workspaceId}/drive/search')
 def search(workspaceId: str, body: DriveSearch, request: Request):
     with Session() as db:
         who = actor(request, db)
-        token = access_token(db, who, wid)
+        token = access_token(db, who, workspaceId)
     return {'results': drive_search(token, body.query)}
 
 
-@router.delete('/workspaces/{wid}/drive')
+@router.delete('/workspaces/{workspaceId}/drive')
 def disconnect(workspaceId: str, request: Request):
     with Session() as db:
         who = actor(request, db)
-        allowed_workspace(db, who, wid)
+        allowed_workspace(db, who, workspaceId)
         db.query(ExternalConnection).filter_by(workspace_id=workspaceId, provider='drive').delete()
         health = db.get(SourceHealthCheck, (workspaceId, 'drive'))
         if health:
