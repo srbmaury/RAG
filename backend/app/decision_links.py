@@ -34,8 +34,8 @@ def related_sources(sources, *, max_links=20):
                     return matched
     return matched
 
-DATE = re.compile(r"(?<!\\d)(20\\d{2})-(0[1-9]|1[0-2])-([0-2]\\d|3[01])(?!\\d)")
-EVENT = re.compile(r"\\b(proposed|approved|rejected|implemented|merged|deployed|rolled back)\\b", re.I)
+DATE = re.compile(r"(?<!\d)(20\d{2})-(0[1-9]|1[0-2])-([0-2]\d|3[01])(?!\d)")
+EVENT = re.compile(r"\b(proposed|approved|rejected|implemented|merged|deployed|rolled back)\b", re.I)
 
 
 def decision_timeline(sources, *, limit=30):
