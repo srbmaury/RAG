@@ -1,4 +1,7 @@
 /** Shared frontend API contracts for workspace, research and connected sources. */
+import type { ExternalSourceProvider } from './providers';
+export type { ExternalSourceProvider, IntegrationProvider, ResearchProvider } from './providers';
+
 export type User = { id: string; email: string; mode: string; max_file_bytes: number };
 export type Workspace = { id: string; name: string };
 export type Doc = {
@@ -23,6 +26,7 @@ export type Source = {
     location_type: string;
     provider?: string;
     url?: string;
+    date?: string;
 };
 export type Answer = {
     answer: string;
@@ -51,6 +55,49 @@ export type GmailMessage = {
     url: string;
 };
 export type GmailStatus = { connected: boolean; email: string | null; configured: boolean };
+export type OAuthAuthorizationResponse = { authorization_url: string };
+export type DriveConnectionStatus = {
+    connected: boolean;
+    account: string | null;
+    configured: boolean;
+};
+export type DriveSearchResult = {
+    id: string;
+    title: string;
+    excerpt: string;
+    url: string;
+};
+export type DriveSearchResponse = { results: DriveSearchResult[] };
+export type ConnectedSourceSearchResult = {
+    provider: ExternalSourceProvider;
+    id: string;
+    title: string;
+    excerpt: string;
+    url?: string;
+};
+export type ConnectedSourceSearchResponse = { results: ConnectedSourceSearchResult[] };
+export type ConnectedSourceStatus = {
+    provider: ExternalSourceProvider;
+    connected: boolean;
+    account: string | null;
+};
+export type SourceHealth = {
+    healthy: boolean;
+    matches: number | null;
+    error: string | null;
+    checked_at: number;
+};
+export type SourceHealthEntry = SourceHealth & {
+    provider: ExternalSourceProvider;
+};
+export type SourceHealthCheck = SourceHealthEntry & {
+    connected: boolean;
+    account: string | null;
+};
+export type SourceHealthListResponse = { checks: SourceHealthEntry[] };
+export type SourceHealthCheckResponse = { checks: SourceHealthCheck[] };
+export type GmailSearchResponse = { messages: GmailMessage[] };
+export type GmailQuerySummary = GmailSummary & { count: number; limited: boolean };
 export type GmailSummary = {
     summary: string;
     sources: { number: number; id: string; subject: string; url: string }[];

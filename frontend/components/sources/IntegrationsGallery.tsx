@@ -1,20 +1,14 @@
 'use client';
 import { Mail, HardDrive, Github, NotebookPen, Hash, CalendarDays, ListTodo, Ticket, Cloud, Inbox, Building2 } from 'lucide-react';
 import { IntegrationTile } from '../IntegrationTile';
-type Health = {
-    healthy: boolean;
-    matches: number | null;
-    error: string | null;
-    checked_at: number;
-};
-type SourceStatus = { provider: string; connected: boolean; account: string | null };
+import type { ConnectedSourceStatus, IntegrationProvider, SourceHealth } from '../../lib/types';
 
 interface IntegrationsGalleryProps {
     gmailStatus: { connected: boolean; email: string | null } | null;
     driveStatus: { connected: boolean; account: string | null } | null;
-    sourceStatuses: SourceStatus[];
-    sourceChecks: Record<string, Health>;
-    onOpen: (provider: string) => void;
+    sourceStatuses: ConnectedSourceStatus[];
+    sourceChecks: Record<string, SourceHealth>;
+    onOpen: (provider: IntegrationProvider) => void;
 }
 
 export function IntegrationsGallery({ gmailStatus, driveStatus, sourceStatuses, sourceChecks, onOpen }: IntegrationsGalleryProps) {

@@ -7,9 +7,10 @@ from sqlalchemy import text
 
 from .ai import embed, embedding_model_id, enabled
 from .db import Chunk, Document, Session, engine
+from .research_queries import QUERY_STOPWORDS
 
-STOP = set(
-    'a an the is are was were of to in and or for on with what which how does do did can could would should please tell me about it this that from many there my documents document uploaded upload source sources file files any have write wrote lines line sentences sentence paragraph paragraphs words word short brief describe description give ten five three two one overview'.split()
+STOP = QUERY_STOPWORDS | set(
+    'many write wrote lines line sentences sentence paragraph paragraphs words word short brief describe description ten five three two one overview'.split()
 )
 GENERIC_FILENAME_TERMS = set(
     'readme improved improvement improvements document documents project projects file files pdf docx txt md guide note notes review brief product summary overview gateway payment option'.split()
@@ -18,7 +19,7 @@ GENERIC_FILENAME_TERMS = set(
 
 def tokens(value):
     result = []
-    for term in re.findall(r'\w+', value.lower()):
+    for term in re.findall(r'\w+', value.lower().replace('_', ' ')):
         if term in STOP or len(term) <= 1 or term.isdigit():
             continue
         if len(term) > 4 and term.endswith('ies'):

@@ -1,6 +1,9 @@
 'use client';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { LoaderCircle, Check, AlertCircle, X } from 'lucide-react';
+import { fileExtension } from '../../utils/utils';
+
+const knownExtensions = new Set(['pdf', 'docx', 'doc', 'txt', 'md', 'csv', 'json', 'html', 'htm', 'xlsx', 'xls', 'pptx', 'ppt']);
 export function AtlasMark() {
     return (
         <span className="mark" aria-hidden="true">
@@ -12,8 +15,7 @@ export function AtlasMark() {
     );
 }
 export function FileBadge({ name }: { name: string }) {
-    const knownExtensions = new Set(['pdf', 'docx', 'doc', 'txt', 'md', 'csv', 'json', 'html', 'htm', 'xlsx', 'xls', 'pptx', 'ppt']);
-    const suffix = name.split('.').pop()?.toLowerCase() || '';
+    const suffix = fileExtension(name);
     const extension = knownExtensions.has(suffix) ? suffix : 'source';
     return (
         <span className={`file ${extension}`} aria-hidden="true">
@@ -57,7 +59,7 @@ export function Dialog({
         const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         const dialog = ref.current;
         dialog?.showModal();
-        dialog?.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+        dialog?.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
         return () => {
             dialog?.close();
             if (opener?.isConnected) opener.focus();

@@ -890,7 +890,7 @@ def test_local_connected_synthesis_timeout_does_not_masquerade_as_answer(monkeyp
     def fake_stream(*args, **kwargs):
         yield Response()
 
-    ticks = iter([0, 46])
+    ticks = iter([0, 0, 241])
     monkeypatch.setattr(connected_synthesis.httpx, 'stream', fake_stream)
     monkeypatch.setattr(connected_synthesis.time, 'monotonic', lambda: next(ticks))
     events = list(
@@ -1250,7 +1250,7 @@ def test_github_search_query_preserves_filters_and_simplifies_questions():
     assert github_search_query('repo:owner/project bug') == 'repo:owner/project bug is:issue'
     assert (
         github_search_query('What issues discuss a payment timeout?')
-        == 'discuss a payment timeout is:issue'
+        == 'discuss payment timeout is:issue'
     )
     assert len(github_search_query('what ' * 100 + 'bug')) <= 240
     assert (
@@ -1315,6 +1315,31 @@ def test_drive_search_builds_safe_query(monkeypatch):
     assert drive.drive_search('test-token', "client's notes") == []
     assert "client\\'s notes" in captured['q']
     assert 'trashed = false' in captured['q']
+
+
+def test_drive_evidence_keeps_title_when_file_has_no_extractable_text(monkeypatch):
+    from app import drive
+
+    monkeypatch.setattr(
+        drive,
+        'request_google',
+        lambda *args, **kwargs: b'%PDF scanned image' if kwargs.get('binary') else '',
+    )
+    monkeypatch.setattr(drive, 'extract_drive_binary', lambda *_args: '')
+    results = drive.drive_evidence(
+        'token',
+        [
+            {
+                'id': 'resume-1',
+                'title': 'Resume 2026.pdf',
+                'excerpt': 'Resume 2026.pdf',
+                'mimeType': 'application/pdf',
+            }
+        ],
+    )
+
+    assert len(results) == 1
+    assert results[0]['excerpt'] == 'Resume 2026.pdf'
 
 
 def test_connected_chat_uses_standard_chat_citation_contract(client, monkeypatch):

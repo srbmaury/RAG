@@ -4,6 +4,7 @@ import hashlib
 import io
 import logging
 import os
+import re
 import secrets
 import time
 from typing import Annotated
@@ -202,10 +203,25 @@ def access_token(db, who, workspaceId):
 
 
 def drive_search(token, query):
-    term = query.strip().replace('\\', '\\\\').replace("'", "\\'")
+    raw_terms = re.findall(r"[A-Za-z0-9][A-Za-z0-9_'’-]*", query.lower())
+    terms = list(
+        dict.fromkeys(term.strip("_'’- ") for term in raw_terms if len(term.strip("_'’- ")) >= 2)
+    )[:8]
+    phrase = query.strip().replace('\\', '\\\\').replace("'", "\\'")
     q = 'trashed = false'
-    if term:
-        q += " and (name contains '" + term[:100] + "' or fullText contains '" + term[:100] + "')"
+    if phrase:
+        alternatives = [
+            "(name contains '" + phrase[:100] + "' or fullText contains '" + phrase[:100] + "')"
+        ]
+        alternatives.extend(
+            "(name contains '"
+            + term.replace("'", "\\'")
+            + "' or fullText contains '"
+            + term.replace("'", "\\'")
+            + "')"
+            for term in terms
+        )
+        q += ' and (' + ' or '.join(alternatives) + ')'
     data = request_google(
         DRIVE_API,
         token,
@@ -216,7 +232,7 @@ def drive_search(token, query):
             'orderBy': 'modifiedTime desc',
         },
     )
-    return [
+    results = [
         {
             'provider': 'drive',
             'id': item['id'],
@@ -229,6 +245,17 @@ def drive_search(token, query):
         for item in data.get('files', [])
         if item.get('id')
     ]
+    if terms:
+
+        def relevance(item):
+            name = str(item.get('title') or '').lower()
+            description = str(item.get('excerpt') or '').lower()
+            return sum(3 for term in terms if term in name) + sum(
+                1 for term in terms if term in description
+            )
+
+        results.sort(key=relevance, reverse=True)
+    return results
 
 
 def extract_drive_binary(body, mime):
@@ -289,8 +316,10 @@ def drive_evidence(token, items):
                 body = extract_drive_binary(binary, mime)
             else:
                 continue
-            if body.strip():
-                results.append({**item, 'excerpt': body[:1500]})
+            excerpt = (
+                (body or '').strip() or item.get('excerpt') or item.get('title') or 'Drive file'
+            )
+            results.append({**item, 'excerpt': str(excerpt)[:1500]})
         except (HTTPException, ValueError, pdfium.PdfiumError):
             log.warning('Skipping inaccessible or unreadable Drive file %s', item['id'])
     return results

@@ -2,6 +2,7 @@
 import { type ReactNode, type RefObject } from 'react';
 import { ArrowUpRight, LoaderCircle } from 'lucide-react';
 import type { Message, Answer } from '../../lib/types';
+import { SOURCE_LABELS } from '../../lib/providers';
 import { AtlasMark } from '../ui/WorkspacePrimitives';
 
 interface ChatMessagesProps {
@@ -70,9 +71,7 @@ export function ConversationTranscript({ messages, busy, readyCount, uploadButto
                                               : m.result?.mode === 'insufficient_evidence'
                                                 ? 'No matching evidence'
                                                 : 'Evidence check'}
-                                    {m.result?.scope?.length
-                                        ? ` · ${m.result.scope.map((source) => (source === 'documents' ? 'Documents' : source === 'drive' ? 'Drive' : source === 'github' ? 'GitHub' : source === 'notion' ? 'Notion' : source === 'slack' ? 'Slack' : 'Gmail')).join(' + ')}`
-                                        : ''}
+                                    {m.result?.scope?.length ? ` · ${m.result.scope.map((source) => SOURCE_LABELS[source as keyof typeof SOURCE_LABELS] ?? source).join(' + ')}` : ''}
                                 </span>
                             </div>
                             {m.result ? renderAnswer(m.result) : <p>{m.content}</p>}

@@ -238,6 +238,12 @@
     outline: 2px solid var(--brand);
     outline-offset: 3px;
 }
+.atlas-v3 :is(.modal-search, .library-search-row) input:focus-visible {
+    outline: none;
+    outline-offset: 0;
+    box-shadow: none;
+    border-color: transparent;
+}
 @media (pointer: coarse) {
     .atlas-v3 .icon-button,
     .atlas-v3 .chat-history-action {

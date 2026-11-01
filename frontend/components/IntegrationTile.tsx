@@ -1,6 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import { ArrowUpRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import type { SourceHealth } from '../lib/types';
 
 type Props = {
     name: string;
@@ -10,7 +11,7 @@ type Props = {
     icon: ReactNode;
     onClick: () => void;
     disabled?: boolean;
-    health?: { healthy: boolean; matches: number | null; error: string | null; checked_at: number };
+    health?: SourceHealth;
 };
 
 export function IntegrationTile({ name, description, connected, account, icon, onClick, disabled, health }: Props) {

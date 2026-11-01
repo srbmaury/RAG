@@ -73,7 +73,7 @@ export function DocumentsView({
                 <div className="library-search-row">
                     <label>
                         <Search size={17} />
-                        <input type="search" aria-label="Search documents" placeholder="Search your documents…" value={filter} onChange={(e) => onFilter(e.target.value)} />
+                        <input type="search" autoFocus aria-label="Search documents" placeholder="Search your documents…" value={filter} onChange={(e) => onFilter(e.target.value)} />
                     </label>
                 </div>
                 {documentTable}
