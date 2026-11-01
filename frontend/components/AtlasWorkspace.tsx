@@ -56,6 +56,7 @@ import { ConversationTranscript } from './chat/ConversationTranscript';
 import { ResearchComposer } from './chat/ResearchComposer';
 import { ResearchAnswer } from './chat/ResearchAnswer';
 import { EvidenceInspector } from './chat/EvidenceInspector';
+import { WorkspaceSearchDialog } from './layout/WorkspaceSearchDialog';
 import { ConversationHistory } from './chat/ConversationHistory';
 import { ResearchSourceSelector } from './chat/ResearchSourceSelector';
 import { DocumentsView } from './documents/DocumentsView';
@@ -1264,65 +1265,22 @@ export function AtlasWorkspace() {
         </div>
       </main>
       {searchOpen && (
-        <Dialog
-          title="Search your workspace"
+        <WorkspaceSearchDialog
+          query={globalQuery}
+          onQueryChange={setGlobalQuery}
           onClose={() => setSearchOpen(false)}
-          className="search-dialog"
-        >
-          <div className="modal-search">
-            <Search />
-            <input
-              autoFocus
-              data-autofocus
-              aria-label="Search your workspace"
-              placeholder="Find a document or ask a question…"
-              value={globalQuery}
-              onChange={(e) => setGlobalQuery(e.target.value)}
-            />
-          </div>
-          {globalQuery.trim() && (
-            <button
-              className="search-question"
-              disabled={busy || !hasAskSources}
-              onClick={() => {
-                setSearchOpen(false);
-                void ask(globalQuery, true);
-                setGlobalQuery('');
-              }}
-            >
-              <Sparkles />
-              <span>Ask Atlas: {globalQuery}</span>
-              <ArrowUpRight />
-            </button>
-          )}
-          <div className="search-results">
-            {docs
-              .filter((d) => d.name.toLowerCase().includes(globalQuery.toLowerCase()))
-              .slice(0, 12)
-              .map((d) => (
-                <button
-                  className="doc-item"
-                  key={d.id}
-                  onClick={() => {
-                    setSearchOpen(false);
-                    void inspect(d);
-                  }}
-                >
-                  <FileBadge name={d.name} />
-                  <span className="doc-item-info">
-                    <strong>{d.name}</strong>
-                    <small>
-                      {prettyBytes(d.size)} · {d.chunk_count} passages
-                    </small>
-                  </span>
-                  <ChevronRight />
-                </button>
-              ))}
-            {!docs.some((d) => d.name.toLowerCase().includes(globalQuery.toLowerCase())) && (
-              <p className="evidence-empty">No matching documents.</p>
-            )}
-          </div>
-        </Dialog>
+          onAsk={(question) => {
+            setSearchOpen(false);
+            void ask(question, true);
+            setGlobalQuery('');
+          }}
+          onInspect={(doc) => {
+            setSearchOpen(false);
+            void inspect(doc);
+          }}
+          documents={docs}
+          canAsk={!busy && hasAskSources}
+        />
       )}
       {scopeOpen && (
         <Dialog title="Choose your sources" onClose={() => setScopeOpen(false)}>
