@@ -1,0 +1,35 @@
+name: Temporary frontend format fix
+on:
+  push:
+    branches: [codex/repository-code-style]
+    paths: ['.github/workflows/temporary-format.yml']
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/repository-code-style
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Format frontend with repository Prettier
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run format
+          npm run format:check
+      - name: Commit formatting only to feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend
+          if ! git diff --cached --quiet; then
+            git commit -m "style(frontend): apply Prettier formatting"
+            git push origin HEAD:codex/repository-code-style
+          fi
