@@ -3,6 +3,7 @@
 data/
 node_modules/
 .next/
+frontend/test-results/
 __pycache__/
 .pytest_cache/
 *.pyc

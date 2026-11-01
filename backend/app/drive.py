@@ -14,7 +14,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
-from .db import Session, User, Workspace, ExternalConnection, DriveOAuthState
+from .db import Session, User, Workspace, ExternalConnection, DriveOAuthState, SourceHealthCheck
 from .gmail import actor, allowed_workspace, crypt
 
 router = APIRouter(prefix='/api')
@@ -117,6 +117,8 @@ def callback(state: str='', code: str=''):
             row.account,row.secret=account,encrypted
         else:
             db.add(ExternalConnection(workspace_id=wid,provider='drive',account=account,secret=encrypted))
+        health=db.get(SourceHealthCheck,(wid,'drive'))
+        if health: db.delete(health)
         db.commit()
     return RedirectResponse('/?drive=connected',status_code=303)
 
@@ -213,5 +215,7 @@ def disconnect(wid:str,request:Request):
         who=actor(request,db)
         allowed_workspace(db,who,wid)
         db.query(ExternalConnection).filter_by(workspace_id=wid,provider='drive').delete()
+        health=db.get(SourceHealthCheck,(wid,'drive'))
+        if health: db.delete(health)
         db.commit()
     return {'ok':True}

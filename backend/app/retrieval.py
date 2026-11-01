@@ -7,7 +7,7 @@ from .db import Session, Chunk, Document, engine
 from .ai import embed, enabled, embedding_model_id
 from . import config
 
-STOP = set('a an the is are was were of to in and or for on with what which how does do did can could would should please tell me about it this that from many there'.split())
+STOP = set('a an the is are was were of to in and or for on with what which how does do did can could would should please tell me about it this that from many there my documents document uploaded upload source sources file files any have'.split())
 GENERIC_FILENAME_TERMS = set('readme improved improvement improvements document documents project projects file files pdf docx txt md guide note notes review brief product summary overview gateway payment option'.split())
 def tokens(value):
     result = []
@@ -38,6 +38,28 @@ def bm25(query, chunks):
             score += idf * count * 2.5 / (count + 1.5 * (.25 + .75 * length / average))
         if score > 0: scored.append((c, score))
     return sorted(scored, key=lambda x: x[1], reverse=True)[:60]
+
+
+def minimum_query_overlap(query):
+    """Require direct support for multiple concepts in specific questions."""
+    count = len(set(tokens(query)))
+    if count <= 2:
+        return 1
+    return min(3, math.ceil(count * .5))
+
+
+def has_query_support(query, text, title=''):
+    terms = set(tokens(query))
+    if not terms:
+        return True
+    overlap = terms & set(tokens(f'{title}\n{text}'))
+    return len(overlap) >= minimum_query_overlap(query)
+
+
+def cosine_similarity(left, right):
+    norm_left = math.sqrt(sum(value * value for value in left)) or 1
+    norm_right = math.sqrt(sum(value * value for value in right)) or 1
+    return sum(a * b for a, b in zip(left, right)) / (norm_left * norm_right)
 
 def diversify_ranked_chunks(ranked, limit, per_document=3):
     """Preserve diverse evidence while retaining high-scoring results.
@@ -85,24 +107,26 @@ def retrieve(workspace_id, query, document_ids=None, limit=8):
             if named:
                 base = base.filter(Chunk.document_id.in_(named))
         semantic = []
+        semantic_scores = {}
         if engine.dialect.name == 'postgresql':
             search = "plainto_tsquery('english', :query)"
             lexical = base.filter(text(f"to_tsvector('english', chunks.text) @@ {search}")).order_by(text(f"ts_rank_cd(to_tsvector('english', chunks.text), {search}) DESC")).params(query=query).limit(60).all()
             if enabled():
                 vector = embed([query])[0]
                 semantic = base.filter(Chunk.embedding_model == embedding_model_id(), Chunk.embedding.isnot(None), Chunk.embedding.cosine_distance(vector) < .8).order_by(Chunk.embedding.cosine_distance(vector)).limit(60).all()
+                semantic_scores = {c.id: cosine_similarity(vector, c.embedding) for c in semantic}
         else:
             chunks = base.all()
             lexical = [c for c, _ in bm25(query, chunks)]
             if enabled():
                 vector = embed([query])[0]
-                norm = math.sqrt(sum(v*v for v in vector)) or 1
                 ranked = []
                 for c in chunks:
                     if c.embedding is not None and c.embedding_model == embedding_model_id():
-                        similarity = sum(a*b for a,b in zip(vector, c.embedding)) / (norm * (math.sqrt(sum(v*v for v in c.embedding)) or 1))
+                        similarity = cosine_similarity(vector, c.embedding)
                         if similarity > .2: ranked.append((c, similarity))
                 semantic = [c for c, _ in sorted(ranked, key=lambda x:x[1], reverse=True)[:60]]
+                semantic_scores = {c.id: score for c, score in ranked}
         # Weight exact lexical matches more strongly for precise facts; semantic ranks
         # still recover paraphrases and vocabulary that does not overlap the query.
         scores, candidates = {}, {}
@@ -111,7 +135,10 @@ def retrieve(workspace_id, query, document_ids=None, limit=8):
                 scores[c.id] = scores.get(c.id, 0) + weight / (60 + rank + 1)
                 candidates[c.id] = c
         terms = set(tokens(query))
-        ranked = sorted(candidates.values(), key=lambda c: scores[c.id] + .001 * len(terms & set(tokens(c.text))) / max(len(terms), 1), reverse=True)
-        selected = diversify_ranked_chunks(ranked, limit)
         names = {d.id: d.name for d in db.query(Document).filter(Document.workspace_id == workspace_id)}
+        ranked = [c for c in candidates.values()
+                  if has_query_support(query, c.text, names.get(c.document_id, ''))
+                  or semantic_scores.get(c.id, 0) >= .68]
+        ranked.sort(key=lambda c: scores[c.id] + .001 * len(terms & set(tokens(c.text))) / max(len(terms), 1), reverse=True)
+        selected = diversify_ranked_chunks(ranked, limit)
         return [source(c, names[c.document_id]) for c in selected]

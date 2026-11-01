@@ -4,8 +4,9 @@ import {Children, useEffect, useRef, useState, useCallback, type ReactNode} from
 import {ArrowUp, ArrowUpRight, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, FileText, FolderOpen, Layers3, LogOut, Plus, Search, ShieldCheck, Sparkles, Trash2, Upload, X, LoaderCircle, RotateCcw, Download, MessageSquare, Mail, Github, HardDrive, Hash, Lightbulb, Clock3, Moon, Sun, Home as HomeIcon, PanelLeftClose, PanelLeftOpen, Menu, Copy, SlidersHorizontal, CheckCircle2, AlertCircle, NotebookPen, ArrowDownToLine} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import {conversationPlan} from '../lib/conversation';
+import {requestedConnectedSource} from '../lib/query-routing';
 import {useConversation} from '../hooks/useConversation';
-import {api} from '../lib/api';
+import {api,apiStream} from '../lib/api';
 import type {User,Workspace,Doc,Source,Answer,Message,GmailMessage,GmailStatus,GmailSummary,ChatSummary,SavedChat} from '../lib/types';
 import {DocumentPassage} from '../components/DocumentPassage';
 import './rebuild.css';
@@ -39,6 +40,7 @@ export default function Home() {
   const [tab, setTab] = useState<'overview' | 'documents' | 'chat' | 'sources'>('chat');
   const [historyOpen,setHistoryOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [includeDocuments,setIncludeDocuments] = useState(true);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
   const {messages,chatId,setMessages,setChatId,activeChat,chatMessages,chatTitle} = useConversation();
@@ -47,6 +49,8 @@ export default function Home() {
   const [driveResults,setDriveResults] = useState<{id:string;title:string;excerpt:string;url:string}[]>([]);
   const [driveBusy,setDriveBusy] = useState(false);
   const [sourceStatuses,setSourceStatuses] = useState<{provider:string;connected:boolean;account:string|null}[]>([]);
+  const [sourceChecks,setSourceChecks] = useState<Record<string,{healthy:boolean;matches:number|null;error:string|null;checked_at:number}>>({});
+  const [sourceChecksBusy,setSourceChecksBusy] = useState(false);
   const [sourceManage,setSourceManage] = useState<string|null>(null);
   const [sourceProvider,setSourceProvider] = useState<'github'|'notion'|'slack'>('github');
   const [sourceCredential,setSourceCredential] = useState('');
@@ -56,7 +60,7 @@ export default function Home() {
   const [connectedGmail,setConnectedGmail] = useState(false);
   const [connectedProviders,setConnectedProviders] = useState<string[]>([]);
   const [connectedGmailQuery,setConnectedGmailQuery] = useState('newer_than:30d');
-  useEffect(()=>{setConnectedProviders([]);setConnectedGmail(false);setSourceManage(null);},[wid]);
+  useEffect(()=>{setConnectedProviders([]);setConnectedGmail(false);setIncludeDocuments(true);setSourceManage(null);setDriveStatus(null);setSourceStatuses([]);setSourceChecks({});setDriveResults([]);setSourceResults([]);setSourceCredential('');setSourceSearch('');setQuery('');setFilter('');setGlobalQuery('');},[wid]);
   const [gmailStatus,setGmailStatus] = useState<GmailStatus|null>(null);
   const [gmailMessages,setGmailMessages] = useState<GmailMessage[]>([]);
   const [gmailQuery,setGmailQuery] = useState('in:inbox newer_than:30d');
@@ -74,6 +78,8 @@ export default function Home() {
   const [chats, setChats] = useState<ChatSummary[]>([]);
 
   const [busy, setBusy] = useState(false);
+  const [answerProgress,setAnswerProgress] = useState('');
+  const askController = useRef<AbortController|null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [error, setError] = useState('');
@@ -89,11 +95,9 @@ export default function Home() {
   const [deletingWorkspace, setDeletingWorkspace] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [evidenceTab, setEvidenceTab] = useState<'sources' | 'notes' | 'related'>('sources');
   const [scopeOpen, setScopeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [globalQuery, setGlobalQuery] = useState('');
-  const [notes, setNotes] = useState('');
   const [copied, setCopied] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const chatEnd = useRef<HTMLDivElement>(null);
@@ -118,10 +122,10 @@ export default function Home() {
     setSelected(old => old.filter(id => documents.some(d => d.id === id)));
   }, [wid]);
   useEffect(() => {
-    setNotes(''); setDocs([]); setMessages([]); setChatId(null); activeChat.current=null; chatMessages.current=[]; setChats([]); setSelected([]); setPreview(null); setSource(null); setError(''); setNotice(''); setUploadSummary(null);
+    setDocs([]); setMessages([]); setChatId(null); activeChat.current=null; chatMessages.current=[]; setChats([]); setSelected([]); setPreview(null); setSource(null); setError(''); setNotice(''); setUploadSummary(null);
     setGmailMessages([]);setGmailSelected([]);setGmailSummary(null);setGmailSummaryIds([]);setGmailStatus(null);setGmailMobileView('emails');setGmailPreview(null);
     if (wid) {
-      void api<GmailStatus>(`/gmail/status?wid=${encodeURIComponent(wid)}`).then(setGmailStatus).catch(()=>undefined);
+      void api<GmailStatus>(`/gmail/status?wid=${encodeURIComponent(wid)}`).then(status => {if(scope.current===wid)setGmailStatus(status);}).catch(()=>undefined);
       void api<ChatSummary[]>(`/workspaces/${wid}/conversations`).then(list => {if(scope.current===wid) setChats(list);}).catch(e=>setError(e.message));
     }
     void refresh().catch(e => setError(e.message));
@@ -202,14 +206,27 @@ export default function Home() {
     try {
       const item = await api<SavedChat>(`/workspaces/${wid}/conversations/${id}`);
       if (scope.current !== wid) return;
+      const answer=[...item.messages].reverse().find(message=>message.role==='assistant'&&message.result)?.result;
+      if(answer?.scope){
+        setIncludeDocuments(answer.scope.includes('documents'));
+        setConnectedGmail(answer.scope.includes('gmail'));
+        setConnectedProviders(answer.scope.filter(provider=>['drive','github','notion','slack'].includes(provider)));
+      }else if(answer){
+        const providers=[...new Set(answer.sources.map(source=>source.provider).filter((provider):provider is string=>!!provider&&provider!=='documents'))];
+        setIncludeDocuments(answer.sources.some(source=>!source.provider||source.provider==='documents'));
+        setConnectedGmail(providers.includes('gmail'));
+        setConnectedProviders(providers.filter(provider=>provider!=='gmail'));
+      }
       activeChat.current=id; setChatId(id); chatTitle.current=item.title;
-      chatMessages.current=item.messages; setMessages(item.messages); setSource(null); setEvidenceTab('sources'); navigate('chat');
+      chatMessages.current=item.messages; setMessages(item.messages); setSource(null); navigate('chat');
     } catch(e) {setError((e as Error).message);}
   }
   function newChat() {
     if (busy) return;
     activeChat.current=null;setChatId(null);chatTitle.current='New chat';chatMessages.current=[];
-    setMessages([]);setNotes('');setQuery('');setSource(null);setEvidenceTab('sources');navigate('chat');
+    setMessages([]);setQuery('');setSource(null);
+    setIncludeDocuments(true);setConnectedGmail(false);setConnectedProviders([]);
+    navigate('chat');
   }
   async function renameChat(item: ChatSummary) {
     const name=window.prompt('Conversation name',item.title)?.trim();
@@ -229,16 +246,25 @@ export default function Home() {
     }catch(e){setError((e as Error).message);}
   }
   async function ask(question = query, startNewConversation = false) {
-    if (!question.trim() || busy) return;
+    if (!wid || !question.trim() || busy) return;
+    const requestedSource=requestedConnectedSource(question);
+    const githubConnected=sourceStatuses.some(source=>source.provider==='github'&&source.connected);
+    if(requestedSource==='github'){
+      if(!githubConnected){setError('This question needs GitHub. Connect GitHub in Sources, then ask again.');return;}
+      // A personal PR request is source-specific: do not let similarly worded
+      // passages in uploaded documents override connected GitHub records.
+      setIncludeDocuments(false);setConnectedGmail(false);setConnectedProviders(['github']);
+    }else if(!hasAskSources)return;
+    const controller=new AbortController();askController.current=controller;
     const target=wid;
     // Home is a new research entry point, never a follow-up to a previously opened chat.
     if (startNewConversation) {
       activeChat.current=null;setChatId(null);chatTitle.current='New chat';
-      chatMessages.current=[];setMessages([]);setNotes('');setSource(null);setEvidenceTab('sources');
+      chatMessages.current=[];setMessages([]);setSource(null);
     }
     const plan=conversationPlan(startNewConversation?'new':'followup',activeChat.current,chatMessages.current,question);
     const history=plan.history;
-    setQuery('');setTab('chat');setError('');setBusy(true);
+    setQuery('');setTab('chat');setError('');setBusy(true);setAnswerProgress('Searching your sources…');
     const title=startNewConversation||chatTitle.current==='New chat'?question.trim().slice(0,100):chatTitle.current;
     const pending: Message[]=plan.pending;
     chatMessages.current=pending;setMessages(pending);
@@ -249,24 +275,43 @@ export default function Home() {
         id=created.id;activeChat.current=id;setChatId(id);chatTitle.current=title;
         setChats(old=>[{id:created.id,title,updated:created.updated},...old]);
       }
-      const useConnected=connectedGmail||connectedProviders.length>0;
-      const result=useConnected
-        ? await api<Answer>(`/workspaces/${target}/connected-chat`,{method:'POST',body:JSON.stringify({question,history,document_ids:selected,include_gmail:connectedGmail,gmail_query:connectedGmailQuery,providers:connectedProviders})})
-        : await api<Answer>(`/workspaces/${target}/chat`,{method:'POST',body:JSON.stringify({question,history,document_ids:selected})});
+      const scopedProviders=requestedSource==='github'?['github']:connectedProviders;
+      const scopedDocuments=requestedSource==='github'?false:includeDocuments;
+      const scopedGmail=requestedSource==='github'?false:connectedGmail;
+      const useConnected=scopedGmail||scopedProviders.length>0||user?.mode==='ai';
+      const answerBody={question,history,document_ids:selected,include_documents:scopedDocuments,include_gmail:scopedGmail,gmail_query:connectedGmailQuery,providers:scopedProviders};
+      let result:Answer;
+      if(useConnected){
+        let draft='';
+        result=await apiStream<Answer>(`/workspaces/${target}/connected-chat/stream`,answerBody,event=>{
+          if(event.type==='status')setAnswerProgress(event.text);
+          if(event.type==='delta'){
+            draft+=event.text;
+            const live:Message[]=[...pending,{role:'assistant',content:draft}];
+            chatMessages.current=live;setMessages(live);
+          }
+        },controller.signal);
+      }else{
+        result=await api<Answer>(`/workspaces/${target}/chat`,{method:'POST',body:JSON.stringify({question,history,document_ids:selected}),signal:controller.signal});
+        result.scope=['documents'];
+      }
       if(scope.current!==target)return;
       const completed:Message[]=[...pending,{role:'assistant',content:result.answer,result}];
-      chatMessages.current=completed;setMessages(completed);setEvidenceTab('sources');
+      chatMessages.current=completed;setMessages(completed);
       const saved=await api<SavedChat>(`/workspaces/${target}/conversations/${id}`,{method:'PUT',body:JSON.stringify({title,messages:completed})});
       setChats(old=>[{id:saved.id,title:saved.title,updated:saved.updated},...old.filter(c=>c.id!==saved.id)]);
     } catch(e) {
       if(scope.current===target) {
-        setError((e as Error).message);
+        const cancelled=(e as Error).name==='AbortError';
+        chatMessages.current=pending;setMessages(pending);
+        if(cancelled)setNotice('Answer stopped. You can ask the question again when ready.');
+        else setError((e as Error).message);
         if(id) {
           // Preserve the submitted question if generation failed.
           await api(`/workspaces/${target}/conversations/${id}`,{method:'PUT',body:JSON.stringify({title,messages:pending})}).catch(()=>undefined);
         }
       }
-    } finally {setBusy(false);}
+    } finally {askController.current=null;setAnswerProgress('');setBusy(false);}
   }
   async function remove(doc: Doc) {
     if (!confirm(`Delete “${doc.name}” and its indexed content?`)) return;
@@ -321,10 +366,10 @@ export default function Home() {
       window.location.assign(value.authorization_url);
     }catch(e){setError((e as Error).message);setGmailBusy(false);}
   }
-  useEffect(()=>{if((tab==='sources'||tab==='chat')&&wid){void refreshDrive();void api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`).then(setSourceStatuses).catch(e=>setError((e as Error).message));}},[tab,wid]);
+  useEffect(()=>{if((tab==='sources'||tab==='chat')&&wid){void refreshDrive();void api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`).then(status => {if(scope.current===wid)setSourceStatuses(status);}).catch(e=>setError((e as Error).message));void loadSourceChecks();}},[tab,wid]);
   async function refreshDrive(){
     if(!wid)return;
-    try{setDriveStatus(await api<{connected:boolean;account:string|null;configured:boolean}>(`/workspaces/${wid}/drive/status`));}
+    try{const status=await api<{connected:boolean;account:string|null;configured:boolean}>(`/workspaces/${wid}/drive/status`);if(scope.current===wid)setDriveStatus(status);}
     catch(e){setError((e as Error).message);}
   }
   async function connectDrive(){
@@ -335,7 +380,7 @@ export default function Home() {
   async function disconnectDrive(){
     if(!window.confirm('Disconnect Google Drive from this workspace?'))return;
     setDriveBusy(true);setError('');
-    try{await api(`/workspaces/${wid}/drive`,{method:'DELETE'});await refreshDrive();setDriveResults([]);}
+    try{await api(`/workspaces/${wid}/drive`,{method:'DELETE'});await refreshDrive();setDriveResults([]);setConnectedProviders(old=>old.filter(p=>p!=='drive'));}
     catch(e){setError((e as Error).message);}
     finally{setDriveBusy(false);}
   }
@@ -345,10 +390,34 @@ export default function Home() {
     catch(e){setError((e as Error).message);}
     finally{setDriveBusy(false);}
   }
+  async function refreshConnections(){
+    const target=wid;
+    await Promise.all([refreshDrive(),refreshSourceStatuses(),loadSourceChecks(),api<GmailStatus>(`/gmail/status?wid=${encodeURIComponent(target)}`).then(status=>{if(scope.current===target)setGmailStatus(status);}).catch(e=>setError(e.message))]);
+  }
+  async function verifySourceConnections(){
+    if(!wid||sourceChecksBusy)return;
+    setSourceChecksBusy(true);setError('');
+    try{
+      const result=await api<{checks:{provider:string;connected:boolean;healthy:boolean;account:string|null;matches:number|null;error:string|null;checked_at:number}[]}>(`/workspaces/${wid}/sources/health/check`,{method:'POST'});
+      if(scope.current!==wid)return;
+      setSourceChecks(Object.fromEntries(result.checks.map(item=>[item.provider,item])));
+      const connected=result.checks.filter(item=>item.connected);
+      const healthy=connected.filter(item=>item.healthy).length;
+      setNotice(connected.length?`Verified ${healthy} of ${connected.length} connected sources.`:'No connected sources to check.');
+    }catch(e){setError((e as Error).message);}
+    finally{setSourceChecksBusy(false);}
+  }
   async function refreshSourceStatuses(){
     if(!wid)return;
-    try {setSourceStatuses(await api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`));}
+    try {const status=await api<{provider:string;connected:boolean;account:string|null}[]>(`/workspaces/${wid}/sources`);if(scope.current===wid)setSourceStatuses(status);}
     catch(e){setError((e as Error).message);}
+  }
+  async function loadSourceChecks(){
+    if(!wid)return;
+    try{
+      const result=await api<{checks:{provider:string;healthy:boolean;matches:number|null;error:string|null;checked_at:number}[]}>(`/workspaces/${wid}/sources/health`);
+      if(scope.current===wid)setSourceChecks(Object.fromEntries(result.checks.map(item=>[item.provider,item])));
+    }catch{/* A health check has not been recorded yet. */}
   }
   async function connectSource(){
     if(!sourceCredential.trim())return;
@@ -362,7 +431,7 @@ export default function Home() {
   async function disconnectSource(provider:string){
     if(!window.confirm(`Disconnect ${provider} from this workspace?`))return;
     setSourceBusy(true);setError('');
-    try{await api(`/workspaces/${wid}/sources/${provider}`,{method:'DELETE'});await refreshSourceStatuses();setSourceResults([]);}
+    try{await api(`/workspaces/${wid}/sources/${provider}`,{method:'DELETE'});await refreshSourceStatuses();setSourceResults([]);setConnectedProviders(old=>old.filter(p=>p!==provider));}
     catch(e){setError((e as Error).message);}
     finally{setSourceBusy(false);}
   }
@@ -427,28 +496,25 @@ export default function Home() {
   useEffect(() => {
     function shortcuts(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {event.preventDefault(); setSearchOpen(true);}
-      if (event.key === 'Escape') {setSearchOpen(false); setScopeOpen(false); setNewWorkspace(false); setSource(null); setPreview(null); setSidebarOpen(false);}
+      if (event.key === 'Escape') {setSearchOpen(false); setScopeOpen(false); setNewWorkspace(false); setSourceManage(null); setSourceCredential(''); setGmailPreview(null); setSource(null); setPreview(null); setSidebarOpen(false);}
     }
     window.addEventListener('keydown', shortcuts);
     return () => window.removeEventListener('keydown', shortcuts);
   }, []);
 
   const ready = docs.filter(d => d.status === 'ready');
+  const hasAskSources=(includeDocuments&&ready.length>0)||connectedGmail||connectedProviders.length>0;
   const filtered = docs.filter(d => d.name.toLowerCase().includes(filter.toLowerCase()));
   const workspace = workspaces.find(w => w.id === wid);
   const totalChunks = docs.reduce((sum,d) => sum + d.chunk_count, 0);
   const storage = docs.reduce((sum,d) => sum + d.size, 0);
-  const latestAnswer = [...messages].reverse().find(m => m.result)?.result;
   // Only passages actually cited in the answer count as supporting evidence.
   // Preserve original retrieval indices so [3] always opens source 3.
   const visibleEvidence = (result: Answer | undefined) => {
-    if (!result || !['ai', 'local_excerpts','connected'].includes(result.mode)) return [];
+    if (!result || !['ai', 'local_excerpts','connected','source_results'].includes(result.mode)) return [];
     const cited = new Set(Array.from(result.answer.matchAll(/\[(\d+)\]/g), m => Number(m[1])));
     return result.sources.flatMap((source, index) => cited.has(index + 1) ? [{source, number: index + 1}] : []);
   };
-  const evidenceItems = visibleEvidence(latestAnswer);
-  const sources = evidenceItems.map(item => item.source);
-  const related = Array.from(new Map(messages.flatMap(m => m.result?.sources || []).filter(s => !sources.some(latest => latest.document_id === s.document_id)).map(s => [s.document_id,s])).values());
   const title = messages.find(m => m.role === 'user')?.content || 'New research';
   const initials = user?.email.slice(0,2).toUpperCase() || 'A';
   const uploadedDocs = uploadSummary ? docs.filter(d => uploadSummary.ids.includes(d.id)) : [];
@@ -484,7 +550,7 @@ export default function Home() {
       <div className="brand-row"><AtlasMark/><span>Atlas</span><button className="sidebar-collapse" aria-label="Collapse sidebar" onClick={()=>{setSidebarCollapsed(true);setSidebarOpen(false);}}><PanelLeftClose/></button></div>
       <button className="workspace-btn" onClick={()=>setNewWorkspace(true)}><span className="ws-avatar">{workspace?.name[0]?.toUpperCase() || 'A'}</span><span><strong>{workspace?.name || 'Choose workspace'}</strong><small>{workspaces.length} workspace{workspaces.length===1?'':'s'}</small></span><ChevronDown/></button>
       <nav className="nav" aria-label="Main navigation">{([{id:'overview',label:'Home',icon:HomeIcon},{id:'chat',label:'Ask Atlas',icon:Search},{id:'documents',label:'Documents',icon:FileText},{id:'sources',label:'Sources',icon:FolderOpen}] as const).map(item=><button key={item.id} className={tab===item.id?'active':''} title={item.label} aria-current={tab===item.id?'page':undefined} onClick={()=>navigate(item.id)}><item.icon/><span>{item.label}</span></button>)}</nav>
-      <div className="sidebar-research" aria-label="Recent conversations"><div className="section-label">RECENT CHATS</div>{chats.slice(0,4).map(item=><button key={item.id} className="workspace-stat" onClick={()=>void loadChat(item.id)} title={item.title}><MessageSquare/><span>{item.title}</span></button>)}<button className="workspace-stat" onClick={()=>{navigate('chat');void refreshChats();}}><Clock3/><span>All conversations ({chats.length})</span></button></div>
+      <div className="sidebar-research" aria-label="Recent conversations"><div className="section-label">RECENT CHATS</div>{chats.slice(0,4).map(item=><button key={item.id} className="workspace-stat" onClick={()=>void loadChat(item.id)} title={item.title}><MessageSquare/><span>{item.title}</span></button>)}<button className="workspace-stat" onClick={()=>{navigate('chat');setHistoryOpen(true);void refreshChats();}}><Clock3/><span>All conversations ({chats.length})</span></button></div>
       <div className="bottom"><div className="usage" title={`${ready.length} documents ready · ${storage ? prettyBytes(storage) : '0 KB'} stored`}><span>Storage</span><strong>{storage ? prettyBytes(storage) : '0 KB'}</strong></div><div className="profile"><span className="avatar">{initials}</span><div><strong>{user.email.split('@')[0]}</strong><small>{user.email}</small></div><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={()=>void signOut()}><LogOut/></button></div></div>
     </aside>
     <main className="main">
@@ -502,12 +568,12 @@ export default function Home() {
           </div>
           <div className="home-prompt-panel"><div className="home-prompt-top"><Sparkles size={17}/><span>Ask Atlas</span><span className="home-prompt-hint">Search your knowledge</span></div>
             <form onSubmit={e=>{e.preventDefault();void ask(query,true);}}>
-              <textarea aria-label="Ask Atlas" placeholder="What would you like to understand?" value={query} maxLength={4000} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(ready.length||connectedGmail||connectedProviders.length)void ask(query,true);}}}/>
-              <div className="home-prompt-bottom"><div className="home-scope-summary"><FileText size={15}/>{ready.length} ready documents <span>·</span> <button type="button" onClick={()=>navigate('sources')}>Manage sources <ArrowUpRight size={13}/></button></div><button className="home-send" aria-label="Ask Atlas" disabled={busy||!query.trim()||(!ready.length&&!connectedGmail&&!connectedProviders.length)}>{busy?<LoaderCircle size={18} className="spin"/>:<ArrowUp size={18}/>}</button></div>
+              <textarea aria-label="Ask Atlas" placeholder="What would you like to understand?" value={query} maxLength={4000} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(hasAskSources)void ask(query,true);}}}/>
+              <div className="home-prompt-bottom"><div className="home-scope-summary"><FileText size={15}/>{includeDocuments?`${ready.length} ready documents`:'No documents selected'} <span>·</span> <button type="button" onClick={()=>navigate('sources')}>Manage sources <ArrowUpRight size={13}/></button></div><button className="home-send" aria-label="Ask Atlas" disabled={busy||!query.trim()||!hasAskSources}>{busy?<LoaderCircle size={18} className="spin"/>:<ArrowUp size={18}/>}</button></div>
             </form></div>
           <div className="home-section-header"><div><span className="section-kicker">PICK UP WHERE YOU LEFT OFF</span><h2>Your workspace</h2></div><button className="text-action" onClick={()=>navigate('sources')}>Connected sources <ArrowUpRight size={15}/></button></div>
           <div className="home-activity-grid">
-            <div className="home-activity-card"><div className="home-card-head"><div><span className="home-card-icon"><MessageSquare size={18}/></span><h3>Recent conversations</h3></div><button aria-label="Open conversations" onClick={()=>{navigate('chat');void refreshChats();}}><ArrowUpRight size={18}/></button></div>
+            <div className="home-activity-card"><div className="home-card-head"><div><span className="home-card-icon"><MessageSquare size={18}/></span><h3>Recent conversations</h3></div><button aria-label="Open conversations" onClick={()=>{navigate('chat');setHistoryOpen(true);void refreshChats();}}><ArrowUpRight size={18}/></button></div>
               {chats.length?<div className="home-activity-list">{chats.slice(0,4).map(item=><button key={item.id} onClick={()=>void loadChat(item.id)}><span><strong>{item.title}</strong><small>{new Date(item.updated*1000).toLocaleDateString()}</small></span><ChevronRight size={16}/></button>)}</div>:<div className="home-card-empty"><p>Every good question starts a conversation.</p><button onClick={()=>{newChat();navigate('chat');}}>Start researching <ArrowUpRight size={14}/></button></div>}
             </div>
             <div className="home-activity-card"><div className="home-card-head"><div><span className="home-card-icon"><FileText size={18}/></span><h3>Recent documents</h3></div><button aria-label="Open document library" onClick={()=>navigate('documents')}><ArrowUpRight size={18}/></button></div>
@@ -521,7 +587,7 @@ export default function Home() {
         {wid && tab==='chat' && <section>
           <div className="crumb">Ask Atlas<span>›</span><span className="crumb-title">{title}</span></div><div className="heading-row"><div className="research-heading"><span className="eyebrow">RESEARCH ASSISTANT</span><h1 title={title}>{title}</h1><p className="subtitle">Answers grounded in your documents, with evidence you can inspect.</p></div><div className="actions"><button className="btn" onClick={()=>setHistoryOpen(v=>!v)}><MessageSquare size={15}/>{historyOpen?'Hide history':'History'}</button><button className="btn hide-small" disabled={!messages.length} onClick={()=>void copyConversation()}>{copied?<Check/>:<Copy/>}{copied?'Copied':'Copy chat'}</button><button className="btn primary" disabled={busy} onClick={newChat}><Plus/><span>New chat</span></button></div></div>
           <div className="filters"><button className="filter" onClick={()=>setScopeOpen(true)}><FileText/>{selected.length?`${selected.length} selected documents`:'All documents'}<ChevronDown/></button><span className="research-mode"><i/>{user.mode==='ai'?'AI research':'Source search'} · {ready.length} ready documents</span></div>
-          <div className="unified-sources"><span className="unified-sources-label">Search sources</span><label><input type="checkbox" checked readOnly/> Documents</label>
+          <div className="unified-sources"><span className="unified-sources-label">Search sources</span><label><input type="checkbox" checked={includeDocuments} onChange={e=>setIncludeDocuments(e.target.checked)}/> Documents</label>
             <label><input type="checkbox" disabled={!gmailStatus?.connected} checked={connectedGmail} onChange={e=>setConnectedGmail(e.target.checked)}/> Gmail</label>
             {(['drive','github','notion','slack'] as const).map(p=><label key={p} title={p==='drive'?(driveStatus?.connected?'':'Connect Drive in Sources first'):(sourceStatuses.find(x=>x.provider===p)?.connected?'':'Connect this source in Sources first')}><input type="checkbox" disabled={p==='drive'?!driveStatus?.connected:!sourceStatuses.some(x=>x.provider===p&&x.connected)} checked={connectedProviders.includes(p)} onChange={e=>setConnectedProviders(old=>e.target.checked?[...old,p]:old.filter(x=>x!==p))}/>{p==='drive'?'Drive':p==='github'?'GitHub':p==='notion'?'Notion':'Slack'}</label>)}
             <button type="button" className="unified-source-manage" onClick={()=>navigate('sources')}>Manage connections <ArrowUpRight size={13}/></button>
@@ -531,15 +597,11 @@ export default function Home() {
           {user.mode !== 'ai' && <div className="feedback" role="status"><CircleHelp/><span><strong>Source search only.</strong> Atlas can find relevant passages, but it cannot write synthesized answers until an AI provider is configured. Set <code>AI_PROVIDER=openai</code> with <code>OPENAI_API_KEY</code>, or use <code>AI_PROVIDER=ollama</code>, then restart the API.</span></div>}
           <div className={`chat-workspace ${historyOpen?'history-visible':''}`}><aside className="chat-history"><div className="chat-history-header"><strong>Conversations</strong><button type="button" onClick={()=>void refreshChats()} title="Refresh saved conversations" aria-label="Refresh saved conversations"><RotateCcw size={15}/></button><button type="button" onClick={newChat} title="New conversation" aria-label="New conversation"><Plus size={16}/></button></div><div className="chat-history-list">{chats.map(item=><div className={`chat-history-item ${chatId===item.id?'current':''}`} key={item.id}><button className="chat-history-open" onClick={()=>void loadChat(item.id)} disabled={busy} title={item.title}><MessageSquare size={15}/><span>{item.title}</span></button><button className="chat-history-action" onClick={()=>void renameChat(item)} disabled={busy} aria-label={`Rename ${item.title}`} title="Rename">✎</button><button className="chat-history-action" onClick={()=>void deleteChat(item)} disabled={busy} aria-label={`Delete ${item.title}`} title="Delete"><Trash2 size={14}/></button></div>)}{!chats.length&&<p className="caption chat-history-empty">Your saved conversations will appear here.</p>}</div></aside><div className="research"><div className="chat-pane"><div className="thread" ref={chatThread}>
             {!messages.length && <div className="research-welcome"><span className="welcome-mark"><AtlasMark/></span><span className="eyebrow">ASK YOUR KNOWLEDGE</span><h2>Ask across your knowledge.</h2><p>{ready.length?'Find a specific detail, compare documents, or follow an idea back to its source.':'Add your first documents to explore them with Atlas.'}</p>{!ready.length?uploadButton:<div className="starter-questions">{prompts.map(p=><button key={p} onClick={()=>void ask(p)}>{p}<ArrowUpRight/></button>)}</div>}</div>}
-            {messages.map((m,i)=>m.role==='user'?<div className="user-message" key={i}><div className="bubble-row"><span className="circle">{initials}</span><div className="bubble">{m.content}</div></div></div>:<div className="answer-row" key={i}><span className="assistant-mark">A</span><div className="answer"><div className="answer-head"><strong>Atlas</strong><span>{m.result?.mode==='ai'?'AI synthesis':m.result?.mode==='connected'?'Cross-source research':m.result?.mode==='local_excerpts'?'Source excerpts':'Evidence check'}</span></div>{m.result?renderAnswer(m.result):<p>{m.content}</p>}</div></div>)}
-            {busy && <div className="thinking" role="status"><LoaderCircle className="spin"/><span>Reading the relevant evidence…</span></div>}<div ref={chatEnd}/>
-          </div>{messages.length>0 && <div className="prompt-row">{['What are the key risks?','What should be built first?','Summarize the next steps'].map(p=><button key={p} disabled={busy || !ready.length} onClick={()=>void ask(p)}>{p}</button>)}</div>}
-          <form className="composer" onSubmit={e=>{e.preventDefault();void ask();}}><button className="icon-button" type="button" aria-label="Add documents" disabled={uploading} onClick={()=>input.current?.click()}><Plus/></button><textarea aria-label="Your question" placeholder={messages.length?'Ask a follow-up question…':'Ask a question across your sources…'} rows={1} maxLength={4000} value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(ready.length||connectedGmail||connectedProviders.length)void ask();}}}/><button className="send" aria-label="Send question" disabled={busy || !query.trim() || (!ready.length&&!connectedGmail&&!connectedProviders.length)}>{busy?<LoaderCircle className="spin"/>:<ArrowUp/>}</button></form><p className="caption composer-caption">{messages.length?'Follow-ups use this conversation’s context. ':''}Review supporting passages before relying on an answer.</p></div>
-          <aside className="evidence-panel"><div className="tabs" role="tablist" aria-label="Research evidence">{(['sources','notes','related'] as const).map(t=><button key={t} role="tab" aria-selected={evidenceTab===t} aria-controls={`evidence-${t}`} id={`tab-${t}`} className={evidenceTab===t?'selected':''} onClick={()=>setEvidenceTab(t)}>{t[0].toUpperCase()+t.slice(1)}{t==='sources'&&sources.length>0&&<span className="tab-count">{sources.length}</span>}</button>)}</div><div role="tabpanel" id={`evidence-${evidenceTab}`} aria-labelledby={`tab-${evidenceTab}`}>
-            {evidenceTab==='sources' && (sources.length?evidenceItems.map(({source:s,number})=><button className="doc-item" key={s.chunk_id} onClick={()=>s.url?window.open(s.url,'_blank','noopener,noreferrer'):setSource(s)}><FileBadge name={s.name}/><span className="doc-item-info"><strong>{s.name}</strong><small>{latestAnswer?.mode==='local_excerpts'?'Search match':'Citation'} [{number}] · {s.location_type==='page'?'Page':'Section'} {s.page}</small></span><ChevronRight/></button>):<div className="evidence-placeholder"><FileText/><h3>Your evidence, alongside</h3><p>Only passages cited in the answer appear here. Ask a question to see its evidence.</p></div>)}
-            {evidenceTab==='notes' && <div className="research-notes"><label htmlFor="research-notes">Your research notes</label><textarea id="research-notes" placeholder="Capture a finding, a question, or something to revisit…" value={notes} onChange={e=>setNotes(e.target.value)}/><p className="caption">Notes stay in this research session.</p><button className="btn" disabled={!notes.trim()} onClick={()=>{const url=URL.createObjectURL(new Blob([notes],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='atlas-research-notes.txt';a.click();URL.revokeObjectURL(url);}}><Download/>Export notes</button></div>}
-            {evidenceTab==='related' && <><p className="panel-caption">Sources from earlier answers in this conversation.</p>{related.length?related.map(s=><button className="doc-item" key={s.document_id} onClick={()=>setSource(s)}><FileBadge name={s.name}/><span className="doc-item-info"><strong>{s.name}</strong><small>Previously referenced</small></span><ChevronRight/></button>):<div className="evidence-placeholder"><Layers3/><h3>Keep connecting the dots</h3><p>Earlier sources will collect here as your conversation explores more documents.</p></div>}</>}
-          </div></aside></div></div>
+            {messages.map((m,i)=>m.role==='user'?<div className="user-message" key={i}><div className="bubble-row"><span className="circle">{initials}</span><div className="bubble">{m.content}</div></div></div>:<div className="answer-row" key={i}><span className="assistant-mark">A</span><div className="answer"><div className="answer-head"><strong>Atlas</strong><span>{m.result?.mode==='ai'?'AI synthesis':m.result?.mode==='connected'?'Cross-source research':m.result?.mode==='local_excerpts'?'Source excerpts':m.result?.mode==='source_results'?'Live source results':m.result?.mode==='insufficient_evidence'?'No matching evidence':'Evidence check'}{m.result?.scope?.length?` · ${m.result.scope.map(source=>source==='documents'?'Documents':source==='drive'?'Drive':source==='github'?'GitHub':source==='notion'?'Notion':source==='slack'?'Slack':'Gmail').join(' + ')}`:''}</span></div>{m.result?renderAnswer(m.result):<p>{m.content}</p>}</div></div>)}
+            {busy && <div className="thinking" role="status" aria-live="polite"><LoaderCircle className="spin"/><span>{answerProgress||'Reading the relevant evidence…'}</span><button type="button" className="btn" onClick={()=>askController.current?.abort()}>Stop</button></div>}<div ref={chatEnd}/>
+          </div>{messages.length>0 && <div className="prompt-row">{['What are the key risks?','What should be built first?','Summarize the next steps'].map(p=><button key={p} disabled={busy || !hasAskSources} onClick={()=>void ask(p)}>{p}</button>)}</div>}
+          <form className="composer" onSubmit={e=>{e.preventDefault();void ask();}}><button className="icon-button" type="button" aria-label="Add documents" disabled={uploading} onClick={()=>input.current?.click()}><Plus/></button><textarea aria-label="Your question" placeholder={messages.length?'Ask a follow-up question…':'Ask a question across your sources…'} rows={1} maxLength={4000} value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(hasAskSources)void ask();}}}/><button className="send" aria-label="Send question" disabled={busy || !query.trim() || !hasAskSources}>{busy?<LoaderCircle className="spin"/>:<ArrowUp/>}</button></form><p className="caption composer-caption">{messages.length?'Follow-ups use this conversation’s context. ':''}Review supporting passages before relying on an answer.</p></div>
+          </div></div>
         </section>}
         {wid && tab==='documents' && <section className="document-library-v3">
           <div className="crumb">Workspace<span>›</span>Library</div>
@@ -555,14 +617,14 @@ export default function Home() {
         {wid && tab==='sources' && <section className="connected-page">
           {sourceManage!=='gmail' && <div className="sources-overview">
           <div className="crumb">Workspace<span>›</span>Sources</div><div className="heading-row"><div><span className="eyebrow">YOUR INTEGRATIONS</span><h1>Connected sources</h1><p className="subtitle">Connect external services to your research workspace. Access stays read-only.</p></div>
-          <button className="btn" onClick={()=>void refreshSourceStatuses()}>Refresh connections</button></div>
+          <div className="source-header-actions"><button className="btn" onClick={()=>void refreshConnections()}>Refresh list</button><button className="btn primary" disabled={sourceChecksBusy} onClick={()=>void verifySourceConnections()}>{sourceChecksBusy?<><LoaderCircle className="spin"/>Checking access…</>:'Check source access'}</button></div></div>
           <div className="integration-overview"><div><h2>Your integrations</h2><p>Choose a service to connect or manage its access.</p></div><span>{[gmailStatus?.connected,driveStatus?.connected,...sourceStatuses.map(x=>x.connected)].filter(Boolean).length} connected</span></div>
           <div className="integrations-grid">
-            <IntegrationTile name="Gmail" description="Search conversations and summarize email." icon={<Mail size={23}/>} connected={!!gmailStatus?.connected} account={gmailStatus?.email} onClick={()=>{setSourceManage('gmail');window.scrollTo({top:0,behavior:'instant'});}}/>
-            <IntegrationTile name="Google Drive" description="Explore documents and cloud files." icon={<HardDrive size={23}/>} connected={!!driveStatus?.connected} account={driveStatus?.account} onClick={()=>setSourceManage('drive')}/>
-            <IntegrationTile name="GitHub" description="Find issues, pull requests and decisions." icon={<Github size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='github')?.connected} account={sourceStatuses.find(x=>x.provider==='github')?.account} onClick={()=>{setSourceProvider('github');setSourceManage('github');setSourceResults([]);}}/>
-            <IntegrationTile name="Notion" description="Search shared pages and knowledge." icon={<NotebookPen size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='notion')?.connected} account={sourceStatuses.find(x=>x.provider==='notion')?.account} onClick={()=>{setSourceProvider('notion');setSourceManage('notion');setSourceResults([]);}}/>
-            <IntegrationTile name="Slack" description="Find team conversations and updates." icon={<Hash size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='slack')?.connected} account={sourceStatuses.find(x=>x.provider==='slack')?.account} onClick={()=>{setSourceProvider('slack');setSourceManage('slack');setSourceResults([]);}}/>
+            <IntegrationTile name="Gmail" description="Search conversations and summarize email." icon={<Mail size={23}/>} connected={!!gmailStatus?.connected} account={gmailStatus?.email} health={sourceChecks.gmail} onClick={()=>{setSourceManage('gmail');window.scrollTo({top:0,behavior:'instant'});}}/>
+            <IntegrationTile name="Google Drive" description="Explore documents and cloud files." icon={<HardDrive size={23}/>} connected={!!driveStatus?.connected} account={driveStatus?.account} health={sourceChecks.drive} onClick={()=>setSourceManage('drive')}/>
+            <IntegrationTile name="GitHub" description="Find issues, pull requests and decisions." icon={<Github size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='github')?.connected} account={sourceStatuses.find(x=>x.provider==='github')?.account} health={sourceChecks.github} onClick={()=>{setSourceProvider('github');setSourceManage('github');setSourceResults([]);}}/>
+            <IntegrationTile name="Notion" description="Search shared pages and knowledge." icon={<NotebookPen size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='notion')?.connected} account={sourceStatuses.find(x=>x.provider==='notion')?.account} health={sourceChecks.notion} onClick={()=>{setSourceProvider('notion');setSourceManage('notion');setSourceResults([]);}}/>
+            <IntegrationTile name="Slack" description="Find team conversations and updates." icon={<Hash size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='slack')?.connected} account={sourceStatuses.find(x=>x.provider==='slack')?.account} health={sourceChecks.slack} onClick={()=>{setSourceProvider('slack');setSourceManage('slack');setSourceResults([]);}}/>
           </div>
           </div>}
         {sourceManage==='gmail' && <section className="gmail-page gmail-integrated">
@@ -636,7 +698,7 @@ export default function Home() {
           </>}
         </section>}
 
-          {sourceManage&&sourceManage!=='gmail'&&<div className="source-dialog-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setSourceManage(null)}}><div className="source-dialog" role="dialog" aria-modal="true" aria-label="Manage source connection"><button className="source-dialog-close" aria-label="Close connection details" onClick={()=>setSourceManage(null)}><X size={18}/></button>
+          {sourceManage&&sourceManage!=='gmail'&&<Dialog title="Manage source connection" onClose={()=>{setSourceManage(null);setSourceCredential('');}} className="source-dialog">
           {sourceManage==='drive'&&<div className="connected-card" id="drive-connection">
             <h2>Google Drive</h2>
             <p className="caption">Authorize read-only access to browse and search Drive. Atlas fetches selected content on demand.</p>
@@ -648,7 +710,7 @@ export default function Home() {
           </div>}
           {sourceManage!==null&&sourceManage!=='drive'&&<div className="connected-card">
             <h2>{sourceProvider==='github'?'GitHub':sourceProvider==='notion'?'Notion':'Slack'} connection</h2>
-            <p className="caption">Provide a read-only provider-issued token. Atlas validates it and stores it encrypted on the server. This setup is not yet one-click OAuth.</p>
+            <p className="caption">{sourceProvider==='notion'?'Provide a Notion integration token, then share the pages Atlas should read with that integration. Atlas cannot access unshared workspace pages.':sourceProvider==='slack'?'Slack message search needs a user-scoped token with search:read. Bot tokens can authenticate, but Slack does not allow them to search messages.':'Provide a read-only provider-issued token. Atlas validates it and stores it encrypted on the server. This setup is not yet one-click OAuth.'}</p>
             <form onSubmit={e=>{e.preventDefault();void connectSource()}}>
               <input className="connected-field" type="password" autoComplete="off" aria-label="Provider access token" value={sourceCredential} onChange={e=>setSourceCredential(e.target.value)} placeholder="Paste read-only access token"/>
               <button type="submit" className="btn primary" disabled={sourceBusy||!sourceCredential.trim()}>{sourceBusy?'Connecting…':'Connect account'}</button>
@@ -660,12 +722,12 @@ export default function Home() {
               {sourceResults.map(x=><div className="connected-evidence" key={x.id}><strong>{x.title}</strong><p>{x.excerpt}</p>{x.url&&<a href={x.url} target="_blank" rel="noopener noreferrer">Open source <ArrowUpRight size={14}/></a>}</div>)}
             </>}
           </div>}
-          </div></div>}
+          </Dialog>}
           <p className="caption">All connections are scoped to this workspace. Source content is accessed on demand; you can disconnect accounts at any time.</p>
         </section>}
       </div>
     </main>
-    {searchOpen && <Dialog title="Search your workspace" onClose={()=>setSearchOpen(false)} className="search-dialog"><div className="modal-search"><Search/><input autoFocus aria-label="Search your workspace" placeholder="Find a document or ask a question…" value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)}/></div>{globalQuery.trim()&&<button className="search-question" disabled={busy || !ready.length} onClick={()=>{setSearchOpen(false);void ask(globalQuery);setGlobalQuery('');}}><Sparkles/><span>Ask Atlas: {globalQuery}</span><ArrowUpRight/></button>}<div className="search-results">{docs.filter(d=>d.name.toLowerCase().includes(globalQuery.toLowerCase())).slice(0,12).map(d=><button className="doc-item" key={d.id} onClick={()=>{setSearchOpen(false);void inspect(d);}}><FileBadge name={d.name}/><span className="doc-item-info"><strong>{d.name}</strong><small>{prettyBytes(d.size)} · {d.chunk_count} passages</small></span><ChevronRight/></button>)}{!docs.some(d=>d.name.toLowerCase().includes(globalQuery.toLowerCase()))&&<p className="evidence-empty">No matching documents.</p>}</div></Dialog>}
+    {searchOpen && <Dialog title="Search your workspace" onClose={()=>setSearchOpen(false)} className="search-dialog"><div className="modal-search"><Search/><input autoFocus data-autofocus aria-label="Search your workspace" placeholder="Find a document or ask a question…" value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)}/></div>{globalQuery.trim()&&<button className="search-question" disabled={busy || !hasAskSources} onClick={()=>{setSearchOpen(false);void ask(globalQuery,true);setGlobalQuery('');}}><Sparkles/><span>Ask Atlas: {globalQuery}</span><ArrowUpRight/></button>}<div className="search-results">{docs.filter(d=>d.name.toLowerCase().includes(globalQuery.toLowerCase())).slice(0,12).map(d=><button className="doc-item" key={d.id} onClick={()=>{setSearchOpen(false);void inspect(d);}}><FileBadge name={d.name}/><span className="doc-item-info"><strong>{d.name}</strong><small>{prettyBytes(d.size)} · {d.chunk_count} passages</small></span><ChevronRight/></button>)}{!docs.some(d=>d.name.toLowerCase().includes(globalQuery.toLowerCase()))&&<p className="evidence-empty">No matching documents.</p>}</div></Dialog>}
     {scopeOpen && <Dialog title="Choose your sources" onClose={()=>setScopeOpen(false)}><p className="dialog-intro">Ask across all ready documents, or choose a focused set.</p><button className="btn" onClick={()=>setSelected([])}><Layers3/>Use all documents</button><div className="scope-list">{ready.map(d=><label key={d.id}><input type="checkbox" checked={selected.includes(d.id)} onChange={e=>setSelected(old=>e.target.checked?[...old,d.id]:old.filter(id=>id!==d.id))}/><FileBadge name={d.name}/><span>{d.name}</span></label>)}</div><div className="dialog-footer"><span className="caption">{selected.length?`${selected.length} selected`:'All ready documents included'}</span><button className="btn primary" onClick={()=>setScopeOpen(false)}>Done<Check/></button></div></Dialog>}
     {newWorkspace && <Dialog title="Your workspaces" onClose={()=>{setNewWorkspace(false);setDeleteWorkspaceId(null);}}><p className="dialog-intro">Manage your workspaces and their saved conversations.</p><div className="workspace-list">{workspaces.map(w=><div className="workspace-manage-row" key={w.id}><button className={w.id===wid?'selected':''} disabled={busy || uploading || deletingWorkspace} onClick={()=>{setWid(w.id);setNewWorkspace(false);}}><span className="ws-avatar">{w.name[0].toUpperCase()}</span><strong>{w.name}</strong>{w.id===wid?<Check/>:<ChevronRight/>}</button><button className="workspace-delete" type="button" title={`Delete ${w.name}`} aria-label={`Delete workspace ${w.name}`} onClick={()=>{setDeleteWorkspaceId(w.id);setConfirmWorkspaceName('');}}><Trash2 size={16}/></button></div>)}</div>{deleteWorkspaceId && <div className="workspace-delete-confirm" role="group" aria-label="Confirm workspace deletion"><strong>Delete “{workspaces.find(w=>w.id===deleteWorkspaceId)?.name}”?</strong><p>This permanently deletes its documents, indexed passages, and saved chats. Type the workspace name to confirm.</p><input aria-label="Type workspace name to confirm" autoComplete="off" value={confirmWorkspaceName} onChange={e=>setConfirmWorkspaceName(e.target.value)} placeholder="Exact workspace name"/><div className="dialog-actions"><button className="btn" type="button" onClick={()=>setDeleteWorkspaceId(null)}>Cancel</button><button className="btn danger" type="button" disabled={deletingWorkspace || busy || uploading || confirmWorkspaceName!==workspaces.find(w=>w.id===deleteWorkspaceId)?.name} onClick={()=>void removeWorkspace()}>{deletingWorkspace?'Deleting…':'Delete workspace'}</button></div></div>}<form className="workspace-form" onSubmit={addWorkspace}><label>New workspace<input required maxLength={100} value={workspaceName} onChange={e=>setWorkspaceName(e.target.value)} placeholder="e.g. Product research"/></label><button className="btn primary"><Plus/>Create workspace</button></form></Dialog>}
     {(source || preview) && <><button className="drawer-cover open" aria-label="Close source preview" onClick={()=>{setSource(null);setPreview(null);}}/><aside className="drawer open" role="dialog" aria-modal="true" aria-label={source?'Source passage':'Document preview'}><div className="drawer-header"><div><div className="caption">{source?'SUPPORTING EVIDENCE':'DOCUMENT PREVIEW'}</div><h2>{source?.name || preview?.document.name}</h2><div className="caption">{source?`${source.location_type==='page'?'Page':'Section'} ${source.page}`:`${preview?.document.chunk_count} passages · ${preview?.document.status}`}</div></div><button autoFocus className="icon-button" aria-label="Close preview" onClick={()=>{setSource(null);setPreview(null);}}><X/></button></div><div className="drawer-body">{source?<div className="highlight"><DocumentPassage name={source.name} text={source.text}/></div>:preview&&<>{preview.document.error&&<p className="feedback error">{preview.document.error}</p>}{preview.chunks.map(c=><section className="preview-chunk" key={c.id}><span className="caption">{preview.document.name.toLowerCase().endsWith('.pdf')?'Page':'Section'} {c.page}</span><DocumentPassage name={preview.document.name} text={c.text}/></section>)}{!preview.chunks.length&&<p className="evidence-empty">No indexed passages yet.</p>}{preview.document.chunk_count>preview.chunks.length&&<button className="btn" onClick={async()=>{try{const next=await api<typeof preview>(`/workspaces/${wid}/documents/${preview.document.id}/chunks?offset=${preview.chunks.length}`);if(next)setPreview({...preview,chunks:[...preview.chunks,...next.chunks]});}catch(e){setError((e as Error).message);}}}>Load more passages</button>}</>}</div><div className="drawer-footer"><a className="btn" href={`/api/workspaces/${wid}/documents/${source?.document_id || preview?.document.id}/original`}><Download/>Download original</a><button className="btn" onClick={()=>{setSource(null);setPreview(null);}}>Close</button></div></aside></>}
@@ -678,11 +740,16 @@ export default function Home() {
 }
 
 function AtlasMark() {return <span className="mark" aria-hidden="true"><svg viewBox="0 0 30 30"><path d="M9 3c2 0 4 2 5.2 5l5.6 13c1 2.5-.2 5.2-2.9 6-2.5.7-4.6-.5-5.6-3L5.9 11C4.6 7.7 6 3 9 3Z"/><path d="M21 7c2.4 0 4 3.4 4 6l-1 10c-.3 3.5-4 5-6.5 3.2-1.8-1.2-2-3-1.3-5l3.1-10C19.8 9 20 7 21 7Z" fill="#67af88"/></svg></span>;}
-function FileBadge({name}: {name:string}) {const extension=name.split('.').pop()?.toLowerCase()||'txt';return <span className={`file ${extension}`}>{extension.toUpperCase()}</span>;}
+function FileBadge({name}: {name:string}) {
+  const knownExtensions=new Set(['pdf','docx','doc','txt','md','csv','json','html','htm','xlsx','xls','pptx','ppt']);
+  const suffix=name.split('.').pop()?.toLowerCase()||'';
+  const extension=knownExtensions.has(suffix)?suffix:'source';
+  return <span className={`file ${extension}`} aria-hidden="true">{extension==='source'?'SRC':extension.toUpperCase()}</span>;
+}
 function Status({status}: {status:string}) {return <span className={`status status-${status}`}>{['queued','processing'].includes(status)?<LoaderCircle className="spin"/>:status==='ready'?<Check/>:status==='failed'?<AlertCircle/>:null}{status==='ready'?'Ready':status[0].toUpperCase()+status.slice(1)}</span>;}
 function EmptyState({icon,title,text,action}: {icon:ReactNode;title:string;text:string;action?:ReactNode}) {return <div className="empty-state"><span>{icon}</span><h3>{title}</h3><p>{text}</p>{action}</div>;}
 function Dialog({title,onClose,children,className=''}: {title:string;onClose:()=>void;children:ReactNode;className?:string}) {
   const ref=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{ref.current?.showModal();const dialog=ref.current;return()=>dialog?.close();},[]);
+  useEffect(()=>{ref.current?.showModal();const dialog=ref.current;dialog?.querySelector<HTMLElement>('[data-autofocus]')?.focus();return()=>dialog?.close();},[]);
   return <dialog ref={ref} className={`dialog ${className}`} aria-label={title} onCancel={onClose} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div className="dialog-heading"><h2>{title}</h2><button className="icon-button" aria-label="Close dialog" onClick={onClose}><X/></button></div>{children}</dialog>;
 }
