@@ -33,17 +33,17 @@ def ready():
     return {'status': 'ready'}
 
 
-@router.get('/workspaces/{wid}/operations')
+@router.get('/workspaces/{workspaceId}/operations')
 def workspace_operations(workspaceId: str, request: Request):
     """Authenticated summary for monitoring ingestion and connector health."""
     with Session() as db:
         who = actor(request, db)
-        allowed_workspace(db, who, wid)
-        documents = db.query(Document.status).filter_by(workspace_id=wid).all()
+        allowed_workspace(db, who, workspaceId)
+        documents = db.query(Document.status).filter_by(workspace_id=workspaceId).all()
         counts = {}
         for (status,) in documents:
             counts[status] = counts.get(status, 0) + 1
-        checks = db.query(SourceHealthCheck).filter_by(workspace_id=wid).all()
+        checks = db.query(SourceHealthCheck).filter_by(workspace_id=workspaceId).all()
         return {
             'documents': {'total': len(documents), 'by_status': counts},
             'sources': {
