@@ -192,17 +192,16 @@ def stream_connected(question, evidence, provider, api_key, model, client_factor
                 raise RuntimeError('The answer provider could not finish the response.')
     answer = '' if timed_out else final_answer_text(''.join(answer_parts))
     if not answer:
-        if timed_out:
-            yield {'type': 'status', 'text': 'Local synthesis took too long; showing retrieved source matches.'}
-        answer = source_results_answer(sources)
-        sources = sources[:12]
-        mode = 'source_results'
+        answer = ('The local AI model timed out before it could write an answer. Try again or select fewer sources.'
+                  if timed_out else 'The AI model did not return an answer. Please retry or check the configured model.')
+        sources = []
+        mode = 'generation_failed'
     else:
         refs = {int(value) for value in re.findall(r'\[(\d+)\]', answer)}
         if not refs or any(number < 1 or number > len(sources) for number in refs):
-            answer = source_results_answer(sources)
-            sources = sources[:12]
-            mode = 'source_results'
+            answer = 'The model returned an answer without usable source citations. Please retry; no unverified answer is shown.'
+            sources = []
+            mode = 'citation_check_failed'
         else:
             mode = 'connected'
     if mode == 'connected':
