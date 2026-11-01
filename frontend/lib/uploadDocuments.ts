@@ -20,10 +20,10 @@ export async function uploadDocument(
     return result.documents;
   }
 
-  const job = await api<{ id: string; part_bytes: number }>(
-    `/workspaces/${workspaceId}/uploads`,
-    { method: 'POST', body: JSON.stringify({ name: file.name, size: file.size }) },
-  );
+  const job = await api<{ id: string; part_bytes: number }>(`/workspaces/${workspaceId}/uploads`, {
+    method: 'POST',
+    body: JSON.stringify({ name: file.name, size: file.size }),
+  });
   let staged = true;
   try {
     let offset = 0;

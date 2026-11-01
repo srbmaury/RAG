@@ -8,8 +8,8 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "format": "prettier --write \"{app,components,hooks,lib,tests}/**/*.{ts,tsx,js,jsx,mjs,css}\"",
-    "format:check": "prettier --check \"{app,components,hooks,lib,tests}/**/*.{ts,tsx,js,jsx,mjs,css}\""
+    "format": "prettier --write \"{app,components,hooks,lib,tests,utils}/**/*.{ts,tsx,js,jsx,mjs,css}\"",
+    "format:check": "prettier --check \"{app,components,hooks,lib,tests,utils}/**/*.{ts,tsx,js,jsx,mjs,css}\""
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

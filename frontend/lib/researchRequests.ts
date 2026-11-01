@@ -20,8 +20,15 @@ export async function requestResearchAnswer(
   onDelta: (text: string) => void,
 ): Promise<Answer> {
   const {
-    workspaceId, question, history, documentIds,
-    includeDocuments, includeGmail, gmailQuery, providers, useConnected,
+    workspaceId,
+    question,
+    history,
+    documentIds,
+    includeDocuments,
+    includeGmail,
+    gmailQuery,
+    providers,
+    useConnected,
   } = request;
   if (useConnected) {
     return apiStream<Answer>(

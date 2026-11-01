@@ -1,22 +1,25 @@
 'use client';
+import {
+  bootWorkspace,
+  refreshWorkspaceMetadata,
+  createSessionActions,
+} from '../utils/sessionActions';
+import { refreshDocuments, createDocumentActions } from '../utils/documentActions';
+import { createConversationActions } from '../utils/conversationActions';
 import { IntegrationsGallery } from './sources/IntegrationsGallery';
 import { SourceConnectionDialog } from './sources/SourceConnectionDialog';
 import { GmailWorkspaceView } from './sources/gmail/GmailWorkspaceView';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  ArrowUpRight,
   Check,
   ChevronDown,
-  ChevronRight,
   CircleHelp,
   FileText,
   FolderOpen,
   Layers3,
   Plus,
   Search,
-  Sparkles,
-  Trash2,
   Upload,
   X,
   LoaderCircle,
@@ -29,76 +32,56 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
-import { conversationPlan } from '../lib/conversation';
-import { requestedConnectedSource } from '../lib/query-routing';
-import { useConversation } from '../hooks/useConversation';
-import { useAtlasTheme } from '../hooks/useAtlasTheme';
-import { useSourceConnections } from '../hooks/useSourceConnections';
-import { useGmailWorkspace } from '../hooks/useGmailWorkspace';
-import { useConnectedSourcesController } from '../hooks/useConnectedSourcesController';
-import { api } from '../lib/api';
-import { requestResearchAnswer, persistConversation } from '../lib/researchRequests';
-import { uploadDocument } from '../lib/uploadDocuments';
+
 import type {
   User,
   Workspace,
   Doc,
   Source,
   Answer,
-  Message,
-  GmailStatus,
   ChatSummary,
-  SavedChat,
+  DocumentPreview,
 } from '../lib/types';
-import { DocumentPassage } from '../components/DocumentPassage';
+
+import { useConversation } from '../hooks/useConversation';
+import { useAtlasTheme } from '../hooks/useAtlasTheme';
+import { useSourceConnections } from '../hooks/useSourceConnections';
+import { useGmailWorkspace } from '../hooks/useGmailWorkspace';
+import { useConnectedSourcesController } from '../hooks/useConnectedSourcesController';
+
 import '../app/rebuild.css';
 import { ConversationTranscript } from './chat/ConversationTranscript';
 import { ResearchComposer } from './chat/ResearchComposer';
 import { ResearchAnswer } from './chat/ResearchAnswer';
 import { EvidenceInspector } from './chat/EvidenceInspector';
-import { WorkspaceSearchDialog } from './layout/WorkspaceSearchDialog';
-import { WorkspaceManagerDialog } from './layout/WorkspaceManagerDialog';
-import { WebPageImportForm } from './documents/WebPageImportForm';
 import { ConversationHistory } from './chat/ConversationHistory';
 import { ResearchSourceSelector } from './chat/ResearchSourceSelector';
+
+import { WorkspaceSearchDialog } from './layout/WorkspaceSearchDialog';
+import { WorkspaceManagerDialog } from './layout/WorkspaceManagerDialog';
+import { WorkspaceSidebar } from './layout/WorkspaceSidebar';
+
+import { WebPageImportForm } from './documents/WebPageImportForm';
 import { DocumentsView } from './documents/DocumentsView';
 import { DocumentTable } from './documents/DocumentTable';
+
 import { HomeView } from './home/HomeView';
 import { AuthView } from './auth/AuthView';
-import { WorkspaceSidebar } from './layout/WorkspaceSidebar';
+
 import { AtlasMark, FileBadge, EmptyState, Dialog } from './ui/WorkspacePrimitives';
 import { flushSync } from 'react-dom';
 
-const prettyBytes = (n: number) =>
-  n < 1024 * 1024
-    ? `${Math.max(1, Math.round(n / 1024))} KB`
-    : `${(n / 1024 / 1024).toFixed(1)} MB`;
-const prompts = [
-  'What are the key takeaways?',
-  'What risks should I be aware of?',
-  'Compare the main findings across documents',
-  'Which decisions still need to be made?',
-];
+import { prettyBytes, prompts } from '../utils/utils';
 
 export function AtlasWorkspace() {
   const { theme, toggleTheme } = useAtlasTheme();
-  const themeButton = (
-    <button
-      type="button"
-      className="icon-button"
-      aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
-      onClick={toggleTheme}
-    >
-      {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
-    </button>
-  );
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [register, setRegister] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [wid, setWid] = useState('');
+  const [workspaceId, setWorkspaceId] = useState('');
   const [docs, setDocs] = useState<Doc[]>([]);
   const [tab, setTab] = useState<'overview' | 'documents' | 'chat' | 'sources'>('chat');
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -109,6 +92,8 @@ export function AtlasWorkspace() {
   const { messages, chatId, setMessages, setChatId, activeChat, chatMessages, chatTitle } =
     useConversation();
   const sourceState = useSourceConnections();
+  const gmailState = useGmailWorkspace();
+
   const {
     driveStatus,
     setDriveStatus,
@@ -131,6 +116,7 @@ export function AtlasWorkspace() {
     connectedGmailQuery,
     setConnectedGmailQuery,
   } = sourceState;
+
   useEffect(() => {
     setConnectedProviders([]);
     setConnectedGmail(false);
@@ -146,8 +132,8 @@ export function AtlasWorkspace() {
     setQuery('');
     setFilter('');
     setGlobalQuery('');
-  }, [wid]);
-  const gmailState = useGmailWorkspace();
+  }, [workspaceId]);
+
   const {
     gmailStatus,
     setGmailStatus,
@@ -158,8 +144,8 @@ export function AtlasWorkspace() {
     setGmailMobileView,
     setGmailPreview,
   } = gmailState;
-  const [chats, setChats] = useState<ChatSummary[]>([]);
 
+  const [chats, setChats] = useState<ChatSummary[]>([]);
   const [busy, setBusy] = useState(false);
   const [answerProgress, setAnswerProgress] = useState('');
   const askController = useRef<AbortController | null>(null);
@@ -173,10 +159,7 @@ export function AtlasWorkspace() {
     null,
   );
   const [source, setSource] = useState<Source | null>(null);
-  const [preview, setPreview] = useState<{
-    document: Doc;
-    chunks: { id: string; page: number; text: string }[];
-  } | null>(null);
+  const [preview, setPreview] = useState<DocumentPreview | null>(null);
   const [dragging, setDragging] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('');
   const [newWorkspace, setNewWorkspace] = useState(false);
@@ -193,31 +176,31 @@ export function AtlasWorkspace() {
   const chatEnd = useRef<HTMLDivElement>(null);
   const chatThread = useRef<HTMLDivElement>(null);
   const scope = useRef('');
-  scope.current = wid;
+  scope.current = workspaceId;
 
-  const boot = useCallback(async () => {
-    try {
-      const actor = await api<User>('/me');
-      const list = await api<Workspace[]>('/workspaces');
-      setUser(actor);
-      setWorkspaces(list);
-      setWid(list[0]?.id || '');
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const themeButton = (
+    <button
+      type="button"
+      className="icon-button"
+      aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+      onClick={toggleTheme}
+    >
+      {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
+    </button>
+  );
+
+  const boot = useCallback(
+    () => bootWorkspace({ setUser, setWorkspaces, setWorkspaceId, setLoading }),
+    [],
+  );
+
   useEffect(() => {
     void boot();
   }, [boot]);
-  const refresh = useCallback(async () => {
-    if (!wid) return;
-    const documents = await api<Doc[]>(`/workspaces/${wid}/documents`);
-    if (scope.current !== wid) return;
-    setDocs(documents);
-    setSelected((old) => old.filter((id) => documents.some((d) => d.id === id)));
-  }, [wid]);
+  const refresh = useCallback(
+    () => refreshDocuments({ workspaceId, scope, setDocs, setSelected }),
+    [workspaceId],
+  );
   useEffect(() => {
     setDocs([]);
     setMessages([]);
@@ -238,18 +221,7 @@ export function AtlasWorkspace() {
     setGmailStatus(null);
     setGmailMobileView('emails');
     setGmailPreview(null);
-    if (wid) {
-      void api<GmailStatus>(`/gmail/status?wid=${encodeURIComponent(wid)}`)
-        .then((status) => {
-          if (scope.current === wid) setGmailStatus(status);
-        })
-        .catch(() => undefined);
-      void api<ChatSummary[]>(`/workspaces/${wid}/conversations`)
-        .then((list) => {
-          if (scope.current === wid) setChats(list);
-        })
-        .catch((e) => setError(e.message));
-    }
+    void refreshWorkspaceMetadata({ workspaceId, scope, setGmailStatus, setChats, setError });
     void refresh().catch((e) => setError(e.message));
     const timer = setInterval(() => {
       void refresh().catch((e) => setError(e.message));
@@ -261,136 +233,6 @@ export function AtlasWorkspace() {
       chatThread.current.scrollTo({ top: chatThread.current.scrollHeight, behavior: 'smooth' });
   }, [messages.length, busy, tab]);
 
-  async function authenticate(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError('');
-    try {
-      await api(`/auth/${register ? 'register' : 'login'}`, {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
-      await boot();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function importWebPage(event: React.FormEvent) {
-    event.preventDefault();
-    if (!wid || webBusy || !webUrl.trim()) return;
-    const target = wid;
-    setWebBusy(true);
-    setError('');
-    setNotice('');
-    try {
-      const result = await api<{ name: string; duplicate: boolean }>(
-        `/workspaces/${target}/web-pages`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ url: webUrl.trim() }),
-        },
-      );
-      if (scope.current === target) {
-        setWebUrl('');
-        setNotice(
-          result.duplicate
-            ? 'Web page already exists in this workspace.'
-            : `Added ${result.name} to your library for indexing.`,
-        );
-        await refresh();
-      }
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setWebBusy(false);
-    }
-  }
-  async function upload(files: FileList | File[]) {
-    if (!files.length || uploading) return;
-    const target = wid;
-    setUploading(true);
-    setError('');
-    setNotice('');
-    setUploadSummary(null);
-    const added: string[] = [];
-    let duplicates = 0;
-    const problems: string[] = [];
-    const list = Array.from(files);
-    try {
-      for (let index = 0; index < list.length; index++) {
-        if (scope.current !== target) break;
-        const file = list[index];
-        try {
-          if (file.size > user!.max_file_bytes)
-            throw new Error(`Exceeds the ${Math.round(user!.max_file_bytes / 1024 / 1024)} MB file limit.`);
-          setUploadProgress(`Uploading ${index + 1} of ${list.length}: ${file.name} · 0%`);
-          const documents = await uploadDocument(target, file, (percent) => {
-            setUploadProgress(`Uploading ${index + 1} of ${list.length}: ${file.name} · ${percent}%`);
-          });
-          for (const doc of documents) {
-            if (!doc.id) problems.push(`${doc.name}: ${doc.error}`);
-            else if (doc.duplicate) duplicates++;
-            else added.push(doc.id);
-          }
-        } catch (error) {
-          problems.push(`${file.name}: ${(error as Error).message}`);
-}
-        if (scope.current === target) {
-          setUploadSummary({ ids: [...added], duplicates });
-          await refresh().catch(() => undefined);
-        }
-      }
-      if (scope.current === target && problems.length) setError(problems.join(' '));
-    } finally {
-      setUploading(false);
-      setUploadProgress('');
-      if (input.current) input.current.value = '';
-    }
-  }
-
-  async function loadChat(id: string) {
-    if (busy) return;
-    try {
-      const item = await api<SavedChat>(`/workspaces/${wid}/conversations/${id}`);
-      if (scope.current !== wid) return;
-      const answer = [...item.messages]
-        .reverse()
-        .find((message) => message.role === 'assistant' && message.result)?.result;
-      if (answer?.scope) {
-        setIncludeDocuments(answer.scope.includes('documents'));
-        setConnectedGmail(answer.scope.includes('gmail'));
-        setConnectedProviders(
-          answer.scope.filter((provider) =>
-            ['drive', 'github', 'notion', 'slack'].includes(provider),
-          ),
-        );
-      } else if (answer) {
-        const providers = [
-          ...new Set(
-            answer.sources
-              .map((source) => source.provider)
-              .filter((provider): provider is string => !!provider && provider !== 'documents'),
-          ),
-        ];
-        setIncludeDocuments(
-          answer.sources.some((source) => !source.provider || source.provider === 'documents'),
-        );
-        setConnectedGmail(providers.includes('gmail'));
-        setConnectedProviders(providers.filter((provider) => provider !== 'gmail'));
-      }
-      activeChat.current = id;
-      setChatId(id);
-      chatTitle.current = item.title;
-      chatMessages.current = item.messages;
-      setMessages(item.messages);
-      setSource(null);
-      navigate('chat');
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
   function newChat() {
     if (busy) return;
     activeChat.current = null;
@@ -405,176 +247,7 @@ export function AtlasWorkspace() {
     setConnectedProviders([]);
     navigate('chat');
   }
-  async function renameChat(item: ChatSummary) {
-    const name = window.prompt('Conversation name', item.title)?.trim();
-    if (!name || name === item.title) return;
-    try {
-      await api(`/workspaces/${wid}/conversations/${item.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ title: name }),
-      });
-      setChats((old) => old.map((c) => (c.id === item.id ? { ...c, title: name } : c)));
-      if (activeChat.current === item.id) chatTitle.current = name;
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-  async function deleteChat(item: ChatSummary) {
-    if (busy || !window.confirm(`Delete “${item.title}”?`)) return;
-    try {
-      await api(`/workspaces/${wid}/conversations/${item.id}`, { method: 'DELETE' });
-      setChats((old) => old.filter((c) => c.id !== item.id));
-      if (activeChat.current === item.id) newChat();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-  async function ask(question = query, startNewConversation = false) {
-    if (!wid || !question.trim() || busy) return;
-    const requestedSource = requestedConnectedSource(question);
-    const githubConnected = sourceStatuses.some(
-      (source) => source.provider === 'github' && source.connected,
-    );
-    if (requestedSource === 'github') {
-      if (!githubConnected) {
-        setError('This question needs GitHub. Connect GitHub in Sources, then ask again.');
-        return;
-      }
-      // A personal PR request is source-specific: do not let similarly worded
-      // passages in uploaded documents override connected GitHub records.
-      setIncludeDocuments(false);
-      setConnectedGmail(false);
-      setConnectedProviders(['github']);
-    } else if (!hasAskSources) return;
-    const controller = new AbortController();
-    askController.current = controller;
-    const target = wid;
-    // Home is a new research entry point, never a follow-up to a previously opened chat.
-    if (startNewConversation) {
-      activeChat.current = null;
-      setChatId(null);
-      chatTitle.current = 'New chat';
-      chatMessages.current = [];
-      setMessages([]);
-      setSource(null);
-    }
-    const plan = conversationPlan(
-      startNewConversation ? 'new' : 'followup',
-      activeChat.current,
-      chatMessages.current,
-      question,
-    );
-    const history = plan.history;
-    setQuery('');
-    setTab('chat');
-    setError('');
-    setBusy(true);
-    setAnswerProgress('Searching your sources…');
-    const title =
-      startNewConversation || chatTitle.current === 'New chat'
-        ? question.trim().slice(0, 100)
-        : chatTitle.current;
-    const pending: Message[] = plan.pending;
-    chatMessages.current = pending;
-    setMessages(pending);
-    let id = plan.id;
-    try {
-      if (!id) {
-        const created = await persistConversation(target, null, title, pending);
-        id = created.id;
-        activeChat.current = id;
-        setChatId(id);
-        chatTitle.current = title;
-        setChats((old) => [{ id: created.id, title, updated: created.updated }, ...old]);
-      }
-      const scopedProviders = requestedSource === 'github' ? ['github'] : connectedProviders;
-      const scopedDocuments = requestedSource === 'github' ? false : includeDocuments;
-      const scopedGmail = requestedSource === 'github' ? false : connectedGmail;
-      const useConnected = scopedGmail || scopedProviders.length > 0 || user?.mode === 'ai';
-      let draft = '';
-      const result = await requestResearchAnswer(
-        {
-          workspaceId: target,
-          question,
-          history,
-          documentIds: selected,
-          includeDocuments: scopedDocuments,
-          includeGmail: scopedGmail,
-          gmailQuery: connectedGmailQuery,
-          providers: scopedProviders,
-          useConnected,
-        },
-        controller.signal,
-        setAnswerProgress,
-        (delta) => {
-          draft += delta;
-          const live: Message[] = [...pending, { role: 'assistant', content: draft }];
-          chatMessages.current = live;
-          setMessages(live);
-        },
-      );
-      if (scope.current !== target) return;
-      const completed: Message[] = [
-        ...pending,
-        { role: 'assistant', content: result.answer, result },
-      ];
-      chatMessages.current = completed;
-      setMessages(completed);
-      const saved = await persistConversation(target, id, title, completed);
-      setChats((old) => [
-        { id: saved.id, title: saved.title, updated: saved.updated },
-        ...old.filter((c) => c.id !== saved.id),
-      ]);
-    } catch (e) {
-      if (scope.current === target) {
-        const cancelled = (e as Error).name === 'AbortError';
-        chatMessages.current = pending;
-        setMessages(pending);
-        if (cancelled) setNotice('Answer stopped. You can ask the question again when ready.');
-        else setError((e as Error).message);
-        if (id) {
-          // Preserve the submitted question if generation failed.
-          await api(`/workspaces/${target}/conversations/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ title, messages: pending }),
-          }).catch(() => undefined);
-        }
-      }
-    } finally {
-      askController.current = null;
-      setAnswerProgress('');
-      setBusy(false);
-    }
-  }
-  async function remove(doc: Doc) {
-    if (!confirm(`Delete “${doc.name}” and its indexed content?`)) return;
-    try {
-      await api(`/workspaces/${wid}/documents/${doc.id}`, { method: 'DELETE' });
-      setSource(null);
-      setPreview(null);
-      setUploadSummary(null);
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-  async function retry(doc: Doc) {
-    try {
-      await api(`/workspaces/${wid}/documents/${doc.id}/retry`, { method: 'POST' });
-      setSource(null);
-      setPreview(null);
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-  async function inspect(doc: Doc) {
-    try {
-      setPreview(await api(`/workspaces/${wid}/documents/${doc.id}/chunks`));
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
+
   function navigate(next: typeof tab) {
     flushSync(() => {
       setTab(next);
@@ -582,53 +255,6 @@ export function AtlasWorkspace() {
     });
   }
 
-  async function addWorkspace(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      const value = await api<Workspace>('/workspaces', {
-        method: 'POST',
-        body: JSON.stringify({ name: workspaceName }),
-      });
-      setWorkspaces((old) => [...old, value]);
-      setWid(value.id);
-      setNewWorkspace(false);
-      setWorkspaceName('');
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-  async function removeWorkspace() {
-    const target = workspaces.find((w) => w.id === deleteWorkspaceId);
-    if (!target || target.name !== confirmWorkspaceName || deletingWorkspace || uploading || busy)
-      return;
-    setDeletingWorkspace(true);
-    try {
-      await api(`/workspaces/${target.id}`, {
-        method: 'DELETE',
-        body: JSON.stringify({ name: confirmWorkspaceName }),
-      });
-      const remaining = workspaces.filter((w) => w.id !== target.id);
-      setWorkspaces(remaining);
-      if (wid === target.id) setWid(remaining[0]?.id || '');
-      setDeleteWorkspaceId(null);
-      setConfirmWorkspaceName('');
-      setNewWorkspace(false);
-      setNotice(`Workspace “${target.name}” deleted.`);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setDeletingWorkspace(false);
-    }
-  }
-  async function refreshChats() {
-    const target = wid;
-    try {
-      const items = await api<ChatSummary[]>(`/workspaces/${target}/conversations`);
-      if (scope.current === target) setChats(items);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
   const {
     connectGmail,
     connectDrive,
@@ -645,7 +271,7 @@ export function AtlasWorkspace() {
     summarizeGmail,
     disconnectGmail,
   } = useConnectedSourcesController({
-    wid,
+    wid: workspaceId,
     tab,
     scope,
     sourceState,
@@ -653,20 +279,6 @@ export function AtlasWorkspace() {
     setError,
     setNotice,
   });
-  async function signOut() {
-    try {
-      await api('/auth/logout', { method: 'POST' });
-      setUser(null);
-      setPassword('');
-      setDocs([]);
-      setMessages([]);
-      setWid('');
-      setPreview(null);
-      setSource(null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
 
   useEffect(() => {
     function shortcuts(event: KeyboardEvent) {
@@ -694,7 +306,7 @@ export function AtlasWorkspace() {
   const hasAskSources =
     (includeDocuments && ready.length > 0) || connectedGmail || connectedProviders.length > 0;
   const filtered = docs.filter((d) => d.name.toLowerCase().includes(filter.toLowerCase()));
-  const workspace = workspaces.find((w) => w.id === wid);
+  const workspace = workspaces.find((w) => w.id === workspaceId);
 
   const storage = docs.reduce((sum, d) => sum + d.size, 0);
   // Only passages actually cited in the answer count as supporting evidence.
@@ -721,21 +333,97 @@ export function AtlasWorkspace() {
   function renderAnswer(result: Answer) {
     return <ResearchAnswer result={result} onOpenSource={setSource} />;
   }
-  async function copyConversation() {
-    try {
-      await navigator.clipboard.writeText(
-        messages.map((m) => `${m.role === 'user' ? 'You' : 'Atlas'}\n${m.content}`).join('\n\n'),
-      );
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setError('Could not copy the conversation.');
-    }
-  }
+
+  const { authenticate, addWorkspace, removeWorkspace, signOut } = createSessionActions({
+    register,
+    email,
+    password,
+    workspaceId,
+    workspaceName,
+    workspaces,
+    deleteWorkspaceId,
+    confirmWorkspaceName,
+    deletingWorkspace,
+    uploading,
+    busy,
+    boot,
+    setUser,
+    setWorkspaces,
+    setWorkspaceId,
+    setBusy,
+    setError,
+    setNotice,
+    setPassword,
+    setDocs,
+    setMessages,
+    setPreview,
+    setSource,
+    setNewWorkspace,
+    setWorkspaceName,
+    setDeletingWorkspace,
+    setDeleteWorkspaceId,
+    setConfirmWorkspaceName,
+  });
+  const { importWebPage, upload, remove, retry, inspect } = createDocumentActions({
+    workspaceId,
+    webUrl,
+    webBusy,
+    uploading,
+    user,
+    scope,
+    input,
+    refresh,
+    setWebBusy,
+    setWebUrl,
+    setError,
+    setNotice,
+    setUploading,
+    setUploadProgress,
+    setUploadSummary,
+    setSource,
+    setPreview,
+  });
+  const { loadChat, renameChat, deleteChat, ask, refreshChats, copyConversation } =
+    createConversationActions({
+      workspaceId,
+      query,
+      busy,
+      hasAskSources,
+      user,
+      sourceStatuses,
+      includeDocuments,
+      connectedGmail,
+      connectedProviders,
+      connectedGmailQuery,
+      selected,
+      messages,
+      scope,
+      askController,
+      activeChat,
+      chatMessages,
+      chatTitle,
+      setChatId,
+      setMessages,
+      setChats,
+      setSource,
+      setIncludeDocuments,
+      setConnectedGmail,
+      setConnectedProviders,
+      setQuery,
+      setTab,
+      setError,
+      setNotice,
+      setBusy,
+      setAnswerProgress,
+      setCopied,
+      navigate,
+      newChat,
+    });
+
   const uploadButton = (
     <button
       className="btn primary"
-      disabled={uploading || !wid}
+      disabled={uploading || !workspaceId}
       onClick={() => input.current?.click()}
     >
       {uploading ? <LoaderCircle className="spin" /> : <Plus />}
@@ -896,7 +584,7 @@ export function AtlasWorkspace() {
               </button>
             </div>
           )}
-          {!wid && (
+          {!workspaceId && (
             <EmptyState
               icon={<FolderOpen />}
               title="A new space for your knowledge"
@@ -909,7 +597,7 @@ export function AtlasWorkspace() {
               }
             />
           )}
-          {wid && tab === 'overview' && (
+          {workspaceId && tab === 'overview' && (
             <HomeView
               query={query}
               onQueryChange={setQuery}
@@ -943,7 +631,7 @@ export function AtlasWorkspace() {
               formatSize={prettyBytes}
             />
           )}
-          {wid && tab === 'chat' && (
+          {workspaceId && tab === 'chat' && (
             <section>
               <div className="crumb">
                 Ask Atlas<span>›</span>
@@ -1091,7 +779,7 @@ export function AtlasWorkspace() {
               </div>
             </section>
           )}
-          {wid && tab === 'documents' && (
+          {workspaceId && tab === 'documents' && (
             <DocumentsView
               uploadButton={uploadButton}
               webImport={
@@ -1117,7 +805,7 @@ export function AtlasWorkspace() {
                   onInspect={(d) => void inspect(d)}
                   onRetry={(d) => void retry(d)}
                   onRemove={(d) => void remove(d)}
-                  downloadUrl={(d) => `/api/workspaces/${wid}/documents/${d.id}/original`}
+                  downloadUrl={(d) => `/api/workspaces/${workspaceId}/documents/${d.id}/original`}
                   formatSize={prettyBytes}
                 />
               }
@@ -1129,7 +817,7 @@ export function AtlasWorkspace() {
               onBrowse={() => input.current?.click()}
             />
           )}
-          {wid && tab === 'sources' && (
+          {workspaceId && tab === 'sources' && (
             <section className="connected-page">
               {sourceManage !== 'gmail' && (
                 <div className="sources-overview">
@@ -1298,16 +986,25 @@ export function AtlasWorkspace() {
       {newWorkspace && (
         <WorkspaceManagerDialog
           workspaces={workspaces}
-          activeId={wid}
+          activeId={workspaceId}
           busy={busy}
           uploading={uploading}
           deleting={deletingWorkspace}
           deleteId={deleteWorkspaceId}
           confirmation={confirmWorkspaceName}
           name={workspaceName}
-          onClose={() => { setNewWorkspace(false); setDeleteWorkspaceId(null); }}
-          onSelect={(id) => { setWid(id); setNewWorkspace(false); }}
-          onSelectDelete={(id) => { setDeleteWorkspaceId(id); setConfirmWorkspaceName(''); }}
+          onClose={() => {
+            setNewWorkspace(false);
+            setDeleteWorkspaceId(null);
+          }}
+          onSelect={(id) => {
+            setWorkspaceId(id);
+            setNewWorkspace(false);
+          }}
+          onSelectDelete={(id) => {
+            setDeleteWorkspaceId(id);
+            setConfirmWorkspaceName('');
+          }}
           onConfirmation={setConfirmWorkspaceName}
           onCancelDelete={() => setDeleteWorkspaceId(null)}
           onDelete={() => void removeWorkspace()}
@@ -1316,10 +1013,13 @@ export function AtlasWorkspace() {
         />
       )}
       <EvidenceInspector
-        wid={wid}
+        wid={workspaceId}
         source={source}
         preview={preview}
-        onClose={() => { setSource(null); setPreview(null); }}
+        onClose={() => {
+          setSource(null);
+          setPreview(null);
+        }}
         onPreviewChange={setPreview}
         onError={setError}
       />
