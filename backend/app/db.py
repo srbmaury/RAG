@@ -1,6 +1,6 @@
 import time
 import uuid
-from sqlalchemy import Column, String, Text, Integer, Float, ForeignKey, JSON, UniqueConstraint, create_engine, event, text
+from sqlalchemy import Column, String, Text, Integer, Float, Boolean, ForeignKey, JSON, UniqueConstraint, create_engine, event, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from pgvector.sqlalchemy import Vector
 from .config import DATABASE_URL
@@ -67,6 +67,15 @@ class ExternalConnection(Base):
     provider = Column(String, primary_key=True)
     account = Column(String, nullable=False)
     secret = Column(Text, nullable=False)
+
+class SourceHealthCheck(Base):
+    __tablename__ = 'source_health_checks'
+    workspace_id = Column(String, ForeignKey('workspaces.id', ondelete='CASCADE'), primary_key=True)
+    provider = Column(String, primary_key=True)
+    checked_at = Column(Float, nullable=False)
+    healthy = Column(Boolean, nullable=False)
+    matches = Column(Integer)
+    error = Column(String(500))
 
 class GmailConnection(Base):
     __tablename__ = 'gmail_connections'

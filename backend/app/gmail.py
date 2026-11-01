@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DatabaseSession
-from .db import Session, GmailConnection, GmailOAuthState, Workspace, Login, User
+from .db import Session, GmailConnection, GmailOAuthState, Workspace, Login, User, SourceHealthCheck
 from .ai import client, ollama_chat
 from . import config
 
@@ -179,6 +179,8 @@ def callback(request: Request, state: str='', code: str=''):
         if old: db.delete(old);db.flush()
         db.add(GmailConnection(workspace_id=wid,email=profile.get('emailAddress',''),
             refresh_token=crypt().encrypt(refresh.encode()).decode()))
+        health=db.get(SourceHealthCheck,(wid,'gmail'))
+        if health: db.delete(health)
         db.commit()
         return RedirectResponse('/?gmail=connected',status_code=303)
 
@@ -282,7 +284,7 @@ class QuerySummaryRequest(BaseModel):
 
 def query_summary_model(messages, instructions, max_tokens=1400):
     if config.AI_PROVIDER == 'ollama':
-        return ollama_chat(messages, max_tokens=max_tokens)
+        return ollama_chat(messages)
     if config.AI_PROVIDER == 'openai' and config.API_KEY:
         return client().responses.create(
             model=config.CHAT_MODEL, instructions=instructions,
@@ -337,7 +339,7 @@ def summarize_query(wid: str, body: QuerySummaryRequest, request: Request):
             payload = [{'role': 'system', 'content': instructions},
                        {'role': 'user', 'content': json.dumps(excerpts, ensure_ascii=False)}]
             if config.AI_PROVIDER == 'ollama':
-                partials.append(ollama_chat(payload, max_tokens=1800))
+                partials.append(ollama_chat(payload))
             else:
                 partials.append(client().responses.create(
                     model=config.CHAT_MODEL, instructions=instructions,
@@ -351,7 +353,7 @@ def summarize_query(wid: str, body: QuerySummaryRequest, request: Request):
             answer = partials[0]
         elif config.AI_PROVIDER == 'ollama':
             answer = ollama_chat([{'role': 'system', 'content': combine},
-                {'role': 'user', 'content': json.dumps(partials, ensure_ascii=False)}], max_tokens=2400)
+                {'role': 'user', 'content': json.dumps(partials, ensure_ascii=False)}])
         else:
             answer = client().responses.create(
                 model=config.CHAT_MODEL, instructions=combine,
@@ -378,5 +380,7 @@ def disconnect(wid: str, request: Request):
         user=actor(request,db)
         allowed_workspace(db,user,wid)
         db.query(GmailConnection).filter_by(workspace_id=wid).delete()
+        health=db.get(SourceHealthCheck,(wid,'gmail'))
+        if health: db.delete(health)
         db.commit()
     return {'ok':True}

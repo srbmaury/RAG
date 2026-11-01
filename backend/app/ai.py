@@ -12,8 +12,16 @@ def enabled():
 def embedding_model_id():
     return 'ollama:' + config.OLLAMA_EMBED_MODEL if config.AI_PROVIDER == 'ollama' else config.EMBED_MODEL
 
-def ollama_chat(messages, schema=None, max_tokens=1200):
-    payload = {'model':config.OLLAMA_CHAT_MODEL, 'messages':messages, 'stream':False, 'think':False, 'keep_alive':'30m', 'options':{'num_ctx':8192, 'temperature':0, 'num_predict':max_tokens}}
+def ollama_chat(messages, schema=None):
+    # Older Ollama releases may ignore the top-level `think` switch. Qwen3 also
+    # recognizes /no_think in the user turn, which keeps local generation focused
+    # on the answer instead of spending time on a hidden reasoning trace.
+    request_messages = [dict(message) for message in messages]
+    for message in reversed(request_messages):
+        if message.get('role') == 'user':
+            message['content'] = message.get('content', '') + '\n/no_think'
+            break
+    payload = {'model':config.OLLAMA_CHAT_MODEL, 'messages':request_messages, 'stream':False, 'think':False, 'keep_alive':'30m', 'options':{'num_ctx':8192, 'temperature':0, 'num_predict':-1}}
     if schema: payload['format'] = schema
     response = httpx.post(config.OLLAMA_URL+'/api/chat', json=payload, timeout=240)
     response.raise_for_status()

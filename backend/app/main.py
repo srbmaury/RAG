@@ -2,6 +2,7 @@ import hashlib
 import logging
 import hmac
 import os
+import re
 import secrets
 import threading
 import time
@@ -9,11 +10,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, DriveOAuthState, uid
+from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, DriveOAuthState, SourceHealthCheck, uid
 from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
 from . import config
 from .ingest import SUPPORTED
@@ -376,15 +377,64 @@ def delete_conversation(wid: str, cid: str, actor=Depends(user), db=Depends(data
     return {'ok': True}
 
 class ConnectedQuestion(Question):
+    include_documents: bool = True
     include_gmail: bool = False
     gmail_query: str = Field(default='newer_than:30d', max_length=400)
     providers: List[str] = Field(default_factory=list, max_length=4)
 
 
-@app.post('/api/workspaces/{wid}/connected-chat')
-def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
-                   actor=Depends(user), db=Depends(database)):
-    """Retrieve evidence across workspace documents and optionally live Gmail."""
+QUERY_STOPWORDS = {'what','which','where','when','why','how','can','could','would','should',
+                   'please','find','list','show','tell','me','about','the','and','or','from',
+                   'my','their','in','on','for','are','is','was','were','does','did','with','give',
+                   'summarize','summary','latest','recent','recently','exact','file','files','name','names','source','sources',
+                   'any','there','have','google','drive','gmail','github','notion','slack','email','emails'}
+
+
+def natural_search_terms(question):
+    import re
+    terms = []
+    for word in re.findall(r"[A-Za-z0-9_+.#-]{2,}", question):
+        word = word.strip('._-+#')
+        if not word:
+            continue
+        if word.lower() not in QUERY_STOPWORDS and word.lower() not in terms:
+            terms.append(word.lower())
+    return terms[:8]
+
+
+def gmail_query_for_question(scope, question):
+    terms = natural_search_terms(question)
+    return ' '.join([scope.strip(), *terms]).strip()
+
+
+def is_credit_card_offer_question(question):
+    terms = set(natural_search_terms(question))
+    has_card_context = 'card' in terms or 'cards' in terms
+    has_credit_context = 'credit' in terms or bool(re.search(r'\bcredit\s+cards?\b', question, re.I))
+    offer_terms = {'offer', 'offers', 'deal', 'deals', 'promotion', 'promotions', 'promo',
+                   'cashback', 'reward', 'rewards', 'discount', 'discounts', 'waive', 'waived',
+                   'waiver', 'bonus', 'bonuses', 'perk', 'perks'}
+    return has_card_context and has_credit_context and bool(terms & offer_terms)
+
+
+def filter_credit_card_offer_evidence(question, evidence):
+    """Keep only records with both card context and a concrete offer signal."""
+    if not is_credit_card_offer_question(question):
+        return evidence
+    offer_pattern = re.compile(
+        r'\b(?:offers?|deals?|promotions?|promos?|cash\s*back|rewards?|discounts?|'
+        r'waiv(?:e|ed|er)|bonuses?|perks?)\b', re.I)
+    card_pattern = re.compile(r'\b(?:credit\s+)?cards?\b', re.I)
+    return [item for item in evidence
+            if card_pattern.search(f'{item.title}\n{item.excerpt}')
+            and offer_pattern.search(f'{item.title}\n{item.excerpt}')]
+
+
+def drive_query_for_question(question):
+    return ' '.join(natural_search_terms(question))
+
+
+def collect_connected_evidence(wid, body, actor, db):
     workspace(wid, actor, db)
     if not body.question.strip():
         raise HTTPException(422, 'Enter a question.')
@@ -394,55 +444,127 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
         if count != len(set(body.document_ids)):
             raise HTTPException(404, 'Selected document not found.')
     from .gmail import connection, access_token, gmail_get, email_from_json, GMAIL_API
-    from .ai import client, ollama_chat
     from .sources import Evidence
     from .external_sources import read_connection, source_search, PROVIDERS
     from .drive import access_token as drive_access_token, drive_search, drive_evidence
-    import json
-    import re
     if any(p not in (*PROVIDERS, 'drive') for p in body.providers):
         raise HTTPException(422, 'Unknown connected provider.')
-    evidence = []
-    document_evidence = {}
+    evidence, document_evidence = [], {}
     try:
-        for item in retrieve(wid, retrieval_query(body.question, body.history), body.document_ids)[:6]:
-            evidence.append(Evidence('documents', item['chunk_id'], item['name'],
-                                     item['text'][:1800], None))
-            document_evidence[item['chunk_id']] = item
+        if body.include_documents:
+            for item in retrieve(wid, retrieval_query(body.question, body.history), body.document_ids)[:6]:
+                evidence.append(Evidence('documents', item['chunk_id'], item['name'],
+                                         item['text'][:1800], None))
+                document_evidence[item['chunk_id']] = item
         if body.include_gmail:
             entry = connection(db, actor, wid)
             token = access_token(entry, db)
             matches = gmail_get(token, GMAIL_API + '/messages',
-                    {'q': body.gmail_query, 'maxResults': 8}).get('messages', [])
+                    {'q': gmail_query_for_question(body.gmail_query, body.question), 'maxResults': 8}).get('messages', [])
             for m in matches:
                 msg = email_from_json(gmail_get(token, GMAIL_API + '/messages/' + m['id'],
                                                {'format': 'full'}))
                 evidence.append(Evidence('gmail', msg['id'], msg['subject'],
-                                         (msg['body'] or msg['snippet'])[:1300],
+                                         (msg['body'] or msg['snippet'])[:8000],
                                          msg['url'], msg['date']))
         if 'drive' in body.providers:
-            drive_token=drive_access_token(db,actor,wid)
-            drive_items=drive_evidence(drive_token,drive_search(drive_token,body.question))
+            drive_token = drive_access_token(db, actor, wid)
+            drive_items = drive_evidence(drive_token, drive_search(drive_token, drive_query_for_question(body.question)))
             for hit in drive_items:
-                evidence.append(Evidence('drive',hit['id'],hit['title'],
-                                         hit['excerpt'],hit.get('url')))
+                evidence.append(Evidence('drive', hit['id'], hit['title'],
+                                         hit['excerpt'], hit.get('url')))
         for provider in dict.fromkeys(p for p in body.providers if p != 'drive'):
             _, provider_token = read_connection(db, actor, wid, provider)
-            for hit in source_search(provider, provider_token, body.question)[:5]:
+            for hit in source_search(provider, provider_token, body.question):
+                excerpt_limit = 8000 if provider == 'slack' else 1300
                 evidence.append(Evidence(provider, hit['id'], hit['title'],
-                                         hit.get('excerpt', '')[:1300], hit.get('url')))
+                                         hit.get('excerpt', '')[:excerpt_limit], hit.get('url')))
     except HTTPException:
         raise
     except Exception as exc:
-        import logging
-        logging.getLogger(__name__).exception('Connected retrieval failed')
+        log.exception('Connected retrieval failed')
         raise HTTPException(502, 'Could not retrieve connected sources.') from exc
+    return filter_credit_card_offer_evidence(body.question, evidence), document_evidence
+
+
+def connected_sources_for_payload(payload, document_evidence):
+    sources = []
+    for entry in payload:
+        original = document_evidence.get(entry.get('origin_id')) if entry.get('provider') == 'documents' else None
+        sources.append({
+            'chunk_id': original['chunk_id'] if original else str(entry['source_id']),
+            'document_id': original['document_id'] if original else '',
+            'name': entry['title'], 'page': original['page'] if original else 0,
+            'text': entry['text'],
+            'location_type': original['location_type'] if original else entry.get('provider', 'source'),
+            'provider': entry.get('provider'), 'url': entry.get('url'),
+        })
+    return sources
+
+
+def connected_scope(body):
+    scope = ['documents'] if body.include_documents else []
+    if body.include_gmail:
+        scope.append('gmail')
+    scope.extend(provider for provider in body.providers if provider not in scope)
+    return scope
+
+
+def no_evidence_result(body):
+    labels = {'documents': 'uploaded documents', 'gmail': 'Gmail', 'drive': 'Google Drive',
+              'github': 'GitHub', 'notion': 'Notion', 'slack': 'Slack'}
+    scope = connected_scope(body)
+    if not scope:
+        answer = 'Choose at least one source, then ask again.'
+    else:
+        names = ', '.join(labels.get(item, item) for item in scope)
+        answer = f'No matching results were found in {names} for this question. Try different keywords or check the source connection.'
+    return {'answer': answer, 'sources': [], 'mode': 'insufficient_evidence', 'scope': scope}
+
+
+def github_pull_request_listing(question, providers):
+    import re
+    if 'github' not in providers or not re.search(r'\b(?:pull\s*requests?|prs?)\b', question, re.I):
+        return False
+    return bool(re.search(r'\b(?:list|show|find|get|all|my|mine)\b', question, re.I))
+
+
+def github_pull_request_list_result(question, body, evidence, document_evidence):
+    """Return source-owned PR rows directly for list requests, without model synthesis."""
+    if not github_pull_request_listing(question, body.providers):
+        return None
+    import re
+    from .external_sources import requested_result_limit
+    from .connected_synthesis import source_list_answer
+    matches = [item for item in evidence if item.provider == 'github']
+    if not matches:
+        return None
+    explicit_all = bool(re.search(r'\ball\b', question, re.I))
+    limit = requested_result_limit(question, default=12)
+    if explicit_all:
+        limit = 30
+    payload = [item.as_prompt(index) | {'origin_id': item.source_id}
+               for index, item in enumerate(matches[:limit], 1)]
+    return {'answer': source_list_answer(payload, len(matches), limit),
+            'sources': connected_sources_for_payload(payload, document_evidence),
+            'mode': 'source_results', 'scope': ['github']}
+
+
+@app.post('/api/workspaces/{wid}/connected-chat')
+def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
+                   actor=Depends(user), db=Depends(database)):
+    """Retrieve evidence across workspace documents and optionally live Gmail."""
+    from .ai import client, ollama_chat
+    import re
+    evidence, document_evidence = collect_connected_evidence(wid, body, actor, db)
     if not evidence:
-        return {'answer': 'No matching evidence was found in the selected sources.',
-                'sources': [], 'mode': 'insufficient_evidence'}
+        return no_evidence_result(body)
     # A local 8k-context model cannot accept all retrieved source bodies at once.
     # Keep source IDs stable across retries so citations always refer to real evidence.
-    from .connected_synthesis import synthesize_connected
+    from .connected_synthesis import synthesize_connected, source_results_answer
+    listed = github_pull_request_list_result(body.question, body, evidence, document_evidence)
+    if listed:
+        return listed
     try:
         answer, payload = synthesize_connected(
             body.question, evidence, config.AI_PROVIDER, config.API_KEY,
@@ -460,24 +582,146 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
         raise HTTPException(502, 'Connected answer generation failed. Check the AI provider logs.') from exc
     refs = {int(x) for x in re.findall(r'\[(\d+)\]', answer or '')}
     if not refs or any(n < 1 or n > len(payload) for n in refs):
-        return {'answer': 'AI did not produce verifiable citations. Try a narrower question.',
-                'sources': [], 'mode': 'citation_check_failed'}
+        payload = payload[:12]
+        return {'answer': source_results_answer(payload),
+                'sources': connected_sources_for_payload(payload, document_evidence),
+                'mode': 'source_results', 'scope': connected_scope(body)}
     # Preserve positional [n] citations used by the standard chat renderer.
     # Non-document evidence carries a URL so the UI opens the original record.
-    sources = []
-    for entry in payload:
-        original = document_evidence.get(entry.get('origin_id')) if entry.get('provider') == 'documents' else None
-        sources.append({
-            'chunk_id': original['chunk_id'] if original else str(entry['source_id']),
-            'document_id': original['document_id'] if original else '',
-            'name': entry['title'],
-            'page': original['page'] if original else 0,
-            'text': entry['text'],
-            'location_type': original['location_type'] if original else entry.get('provider','source'),
-            'provider': entry.get('provider'),
-            'url': entry.get('url'),
-        })
-    return {'answer': answer, 'sources': sources, 'mode': 'connected'}
+    sources = connected_sources_for_payload(payload, document_evidence)
+    return {'answer': answer, 'sources': sources, 'mode': 'connected', 'scope': connected_scope(body)}
+
+
+@app.post('/api/workspaces/{wid}/connected-chat/stream')
+def connected_chat_stream(wid: str, body: ConnectedQuestion, request: Request,
+                          actor=Depends(user), db=Depends(database)):
+    """Stream answer progress and text as newline-delimited JSON events."""
+    import json
+    def events():
+        yield json.dumps({'type': 'status', 'text': 'Searching selected sources…'}, ensure_ascii=False) + '\n'
+        try:
+            evidence, document_evidence = collect_connected_evidence(wid, body, actor, db)
+            if not evidence:
+                yield json.dumps({'type': 'done', 'result': no_evidence_result(body)}, ensure_ascii=False) + '\n'
+                return
+            listed = github_pull_request_list_result(body.question, body, evidence, document_evidence)
+            if listed:
+                yield json.dumps({'type': 'done', 'result': listed}, ensure_ascii=False) + '\n'
+                return
+            yield json.dumps({'type': 'status', 'text': 'Writing an answer from the evidence…'}, ensure_ascii=False) + '\n'
+            # With no configured model and no external sources selected, keep
+            # document search useful by streaming the existing local excerpt mode.
+            if not enabled() and body.include_documents and not body.include_gmail and not body.providers:
+                doc_sources = [document_evidence[item.source_id]
+                               for item in evidence if item.provider == 'documents'
+                               and item.source_id in document_evidence]
+                result = generate(body.question, doc_sources,
+                                  [t.model_dump() for t in body.history])
+                result['scope'] = connected_scope(body)
+                yield json.dumps({'type': 'delta', 'text': result['answer']}, ensure_ascii=False) + '\n'
+                yield json.dumps({'type': 'done', 'result': result}, ensure_ascii=False) + '\n'
+                return
+            from .connected_synthesis import stream_connected
+            from .ai import client
+            for event in stream_connected(body.question, evidence, config.AI_PROVIDER,
+                    config.API_KEY, config.CHAT_MODEL, client, config.OLLAMA_URL,
+                    config.OLLAMA_CHAT_MODEL):
+                if event['type'] == 'complete':
+                    public_sources = connected_sources_for_payload(
+                        event['sources'], document_evidence) if event['sources'] else []
+                    result = {'answer': event['answer'], 'sources': public_sources,
+                              'mode': event['mode'], 'scope': connected_scope(body)}
+                    yield json.dumps({'type': 'done', 'result': result}, ensure_ascii=False) + '\n'
+                else:
+                    yield json.dumps(event, ensure_ascii=False) + '\n'
+        except HTTPException as exc:
+            yield json.dumps({'type': 'error', 'message': exc.detail}, ensure_ascii=False) + '\n'
+        except Exception as exc:
+            log.exception('Connected streaming answer failed')
+            message = 'The answer could not be completed. Check the source connection and AI provider, then retry.'
+            if isinstance(exc, ValueError):
+                message = str(exc)
+            yield json.dumps({'type': 'error', 'message': message}, ensure_ascii=False) + '\n'
+
+    return StreamingResponse(events(), media_type='application/x-ndjson',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+@app.get('/api/workspaces/{wid}/sources/health')
+def source_health(wid: str, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    return {'checks': [
+        {'provider': row.provider, 'healthy': row.healthy, 'matches': row.matches,
+         'error': row.error, 'checked_at': row.checked_at}
+        for row in db.query(SourceHealthCheck).filter_by(workspace_id=wid).all()
+    ]}
+
+
+@app.post('/api/workspaces/{wid}/sources/health/check')
+def verify_sources(wid: str, request: Request, actor=Depends(user), db=Depends(database)):
+    """Check real provider access; return only status, account, and match counts."""
+    workspace(wid, actor, db)
+    from .external_sources import PROVIDERS, read_connection, verify_source_access
+    from .gmail import connection as gmail_connection, access_token as gmail_access, gmail_get, GMAIL_API
+    from .drive import access_token as drive_access, drive_search
+    checks = []
+
+    def record(provider, connected, callback, account=None):
+        check = {'provider': provider, 'connected': connected, 'healthy': False,
+                 'account': account, 'checked_at': time.time(), 'matches': None, 'error': None}
+        if not connected:
+            check['error'] = 'Not connected.'
+        else:
+            try:
+                check['account'], check['matches'] = callback()
+                check['healthy'] = True
+            except HTTPException as exc:
+                check['error'] = exc.detail
+            except Exception as exc:
+                log.warning('Source verification failed for %s: %s', provider, type(exc).__name__)
+                check['error'] = 'Could not verify access. Check the provider connection and retry.'
+        saved = db.get(SourceHealthCheck, (wid, provider))
+        if saved is None:
+            saved = SourceHealthCheck(workspace_id=wid, provider=provider,
+                                      checked_at=check['checked_at'], healthy=check['healthy'])
+            db.add(saved)
+        saved.checked_at = check['checked_at']
+        saved.healthy = check['healthy']
+        saved.matches = check['matches']
+        saved.error = (check['error'] or '')[:500] or None
+        checks.append(check)
+
+    for provider in PROVIDERS:
+        row = db.get(ExternalConnection, (wid, provider))
+        if row:
+            def check_external(p=provider):
+                _, token = read_connection(db, actor, wid, p)
+                return verify_source_access(p, token)
+            record(provider, True, check_external, row.account)
+        else:
+            record(provider, False, lambda: None)
+
+    gmail_row = db.query(GmailConnection).filter_by(workspace_id=wid).first()
+    if gmail_row:
+        def check_gmail():
+            entry = gmail_connection(db, actor, wid)
+            token = gmail_access(entry, db)
+            items = gmail_get(token, GMAIL_API + '/messages', {'q': 'newer_than:30d', 'maxResults': 1}).get('messages', [])
+            return entry.email, len(items)
+        record('gmail', True, check_gmail, gmail_row.email)
+    else:
+        record('gmail', False, lambda: None)
+
+    drive_row = db.get(ExternalConnection, (wid, 'drive'))
+    if drive_row:
+        def check_drive():
+            token = drive_access(db, actor, wid)
+            return drive_row.account, len(drive_search(token, ''))
+        record('drive', True, check_drive, drive_row.account)
+    else:
+        record('drive', False, lambda: None)
+    db.commit()
+    return {'checks': checks}
 
 
 @app.post('/api/workspaces/{wid}/chat')

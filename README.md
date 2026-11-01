@@ -1,68 +1,44 @@
 # Atlas — Document intelligence
 
-A working first release for bulk document ingestion, private workspaces, source-backed chat, and persistent multi-conversation history. Built with Next.js/TypeScript, FastAPI, SQLAlchemy, and PostgreSQL/pgvector, with an API-key-free local mode.
+Atlas is a private, workspace-based research app. Upload documents, connect read-only data sources, ask questions across selected sources, and inspect citations that link back to the evidence.
 
-### Google Drive (read-only)
+The app uses a Next.js/TypeScript frontend and a FastAPI backend. Local development uses SQLite; Docker Compose runs PostgreSQL with pgvector. You can generate answers with Ollama on your machine, OpenAI, or use source excerpts without an AI provider.
 
-1. Enable the **Google Drive API** in your Google Cloud project and configure a **Web application** OAuth client. Gmail and Drive may share the same Google client credentials.
-2. Add `http://localhost:3000/api/drive/callback` as an **Authorized redirect URI** (in addition to the Gmail callback, if used).
-3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_DRIVE_REDIRECT_URI`, and `GMAIL_TOKEN_ENCRYPTION_KEY` in the backend environment. Restart the API and frontend.
-4. In **Atlas → Sources → Google Drive**, select **Connect Google Drive**, authorize access, and browse or search your Drive files.
-5. Tick **Google Drive** in Ask Atlas to compare Google Docs and readable text files with other sources.
+## Get started locally
 
-Drive uses `drive.readonly`, a **restricted Google OAuth scope** that permits reading and downloading the user's accessible Drive files. Public deployment may require Google's verification and a security assessment depending on data handling. This connector is designed for local/development use initially. Access tokens are refreshed on demand, refresh tokens encrypted per workspace, and access revoked in Atlas by disconnecting; for full revocation, also revoke the application's access in Google Account settings.
+### Requirements
 
-The initial search lists Drive metadata; Ask Atlas reads text/plain Google Docs exports and plain-text files on demand. Drive now extracts readable PDF and DOCX text on demand and can export Google Sheets as CSV. Presentation slides and image-only Drive PDFs remain unsupported as Drive evidence. Drive is not automatically indexed, and selected excerpts may be sent to the configured AI provider.
+- macOS or Linux (the staged-upload implementation uses filesystem locks)
+- Python 3.9 or later
+- Node.js 20.9 or later and npm
+- Tesseract OCR for scanned PDFs (optional; Docker installs it for you)
+- Ollama for local AI (optional), or an OpenAI API key
 
-## Connect additional sources (experimental)
+### Install and start
 
-Open **Sources** in the Atlas sidebar. Gmail is now accessed through its card in Sources (its full search and summary screen is unchanged). GitHub, Notion, and Slack support initial **read-only token-based connections** (not one-click OAuth). Choose a provider, enter a provider-issued token with the minimum permissions, and select **Connect account**. You can search it from that screen or select it in **Ask Atlas** alongside documents and Gmail. Tokens are encrypted with `GMAIL_TOKEN_ENCRYPTION_KEY` and stored per workspace. They are not included in AI prompts. Disconnect deletes the stored token; revoke it at the provider as well if necessary.
-
-- **GitHub:** Use a fine-grained read-only token scoped to the repositories you want to access. The first adapter searches issues and pull requests, not source code.
-- **Notion:** Use a Notion integration token and share the intended pages with the integration. The initial search returns page/database title metadata only, not complete page bodies.
-- **Slack:** Use an appropriately authorized token with `search:read`. Slack search permissions and token type vary by app configuration; the initial adapter searches messages.
-- **Google Drive:** Connect with read-only Google OAuth from Sources. Browsing/search and on-demand text extraction are supported; a Drive file picker and rich-format extraction remain future work.
-
-This is a developer-first connector setup and has not been end-to-end tested against real providers. For a public multi-user release, replace manual token entry with OAuth/GitHub App installation, add provider-specific token rotation/revocation and audit logs, and validate policy compliance.
-
-## Connected-source research (experimental)
-
-**Ask Atlas** now combines workspace documents and selected live connectors in one persistent conversation. Choose sources directly above the chat; there is no separate Connected Search page. Gmail is opt-in for each question, with a user-specified Gmail search scope (default: last 30 days). The backend verifies workspace ownership and Gmail connection before retrieving mail. It fetches up to eight matching messages on demand, and up to six document excerpts. Generated answers require citation references; the interface displays source passages and original Gmail URLs.
-
-Google Drive and full production-ready provider OAuth flows remain pending. Those require separate per-user OAuth installation, permission scoping, encrypted connection storage, refresh/revocation handling, and provider-specific adapters. Do not enter provider access tokens in the UI. Future adapters should use the evidence contract in `backend/app/sources.py`, avoid bulk ingestion by default, and maintain the original source's permission boundary.
-
-Connected questions are saved to normal workspace conversation history, using the same answer and citation contract as document-only chat. Read-only retrieval does not send, edit, or delete Gmail messages. This feature is not yet covered by an end-to-end integration test.
-
-## UI design preview
-
-Open [the interactive Atlas design preview](docs/Atlas_Research_Workspace.html) locally in a browser to review the current Home, Ask Atlas, Documents, Gmail, and workspace-management layouts. This standalone HTML uses fictional sample content and does not connect to the backend. The Next.js frontend in `frontend/app/` remains the source of truth for the working app.
-
-## Reliability, OCR, and database setup
-
-- **Health probes:** `GET /api/health/live` reports liveness; `GET /api/health/ready` checks DB connectivity. `GET /api/workspaces/{wid}/processing-stats` requires authentication and reports queued/processing/ready/failed counts.
-- **Migrations:** Starting the API or worker runs Alembic migrations from `backend/migrations`. For a manual migration run, use `cd backend && PYTHONPATH=. ../.venv/bin/alembic -c alembic.ini upgrade head`. Existing development databases should be backed up before moving to the new baseline.
-- **OCR:** Scanned PDF pages are OCR'd if they lack a text layer. Install the `tesseract` binary locally (the Docker image includes it), or set `OCR_ENABLED=false` to require already-searchable PDFs.
-- **Worker:** Transient ingestion exceptions are retried with backoff up to three attempts; invalid files remain failed and can be manually retried.
-- **Browser tests:** Install Playwright with `cd frontend && npm install --no-save @playwright/test@1.56.1 && npx playwright install chromium && npx playwright test`. CI runs Chromium tests for Home research, long answers, and Gmail navigation.
-- **Structured documents:** CSV, JSON, and HTML uploads are converted to readable text; formatting and formulas are not executed.
-
-## Run locally
-
-Requires Python 3.9+ and Node 20.9+.
+Run these commands from the repository root:
 
 ```sh
+cp .env.example .env
 python3 -m venv .venv
 .venv/bin/pip install -r backend/requirements-dev.txt
-cp .env.example .env
 ```
 
-Start the API from the repository root:
+Generate an encryption key for connected-source credentials:
+
+```sh
+.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Copy the printed value into `.env` as `GMAIL_TOKEN_ENCRYPTION_KEY=...`. This key is required for Gmail, Google Drive, GitHub, Notion, and Slack connections. Keep it private and back it up: Atlas cannot decrypt saved credentials if the key is lost or changed.
+
+Start the API in one terminal:
 
 ```sh
 PYTHONPATH=backend .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-In another terminal:
+Start the frontend in a second terminal:
 
 ```sh
 cd frontend
@@ -70,64 +46,161 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000 and create an account. Upload the two files in `samples/` to try questions such as “What budgets were proposed?” or “When is the pilot launch?” The sample documents intentionally disagree on proposed dates and budgets.
+Open <http://localhost:3000>, create an account, and use the default workspace or create another. The API docs are at <http://127.0.0.1:8000/docs>.
 
-Local data is persisted under `data/`, excluded from Git. The browser calls the API through Next.js, keeping session cookies on the same origin. API documentation: http://127.0.0.1:8000/docs.
+For scanned PDFs, install Tesseract locally (`brew install tesseract` on macOS or `sudo apt-get install tesseract-ocr` on Debian/Ubuntu). To turn OCR off and accept searchable PDFs only, set `OCR_ENABLED=false` in `.env`.
 
-## Enable AI
+To try document search, upload the examples in `samples/` and ask a question such as “What budgets were proposed?” The sample documents intentionally disagree about dates and budgets.
 
-Set `AI_PROVIDER=openai` and add `OPENAI_API_KEY` to `.env`, then restart the API. The provided `.env.example` already defaults to `AI_PROVIDER=openai`; older `.env` files may still contain `AI_PROVIDER=none`, which disables generated answers even when a key is present. Credentials stay on the server. This enables embeddings and answers through the OpenAI Responses API. Uploaded passage text is sent to the configured AI provider during embedding and chat; use documents you are authorized to process there. Responses use `store=False` (this does not promise zero provider-side retention).
+SQLite data and uploaded files are stored under `data/` by default. The directory is excluded from Git. Back it up if you need to preserve a local workspace.
 
-Defaults are configurable with `CHAT_MODEL` and `EMBED_MODEL`. Embeddings explicitly use 1,536 dimensions. Reindex documents with the circular-arrow button after enabling embeddings or changing the embedding model. Documents indexed without a key remain keyword-searchable until reindexed.
+## Choose how Atlas generates answers
 
-### Run AI fully on this Mac (no API key)
+The `.env.example` file defaults to `AI_PROVIDER=openai` with an empty API key. In that configuration, Atlas still searches sources and shows matching excerpts, but does not synthesize answers.
 
-Install [Ollama](https://ollama.com), then download the local chat and embedding models:
+### Local AI with Ollama
 
-```sh
-ollama pull qwen3:4b
-ollama pull nomic-embed-text
-```
+1. Install [Ollama](https://ollama.com/download).
+2. Download the chat and embedding models:
 
-In `.env`, set `AI_PROVIDER=ollama` and keep `OLLAMA_URL=http://127.0.0.1:11434` (the defaults in `.env.example` already name these models). Restart the API. To re-embed all documents already indexed in the local database with Ollama, run from the repository root while the API worker is stopped:
+   ```sh
+   ollama pull qwen3:4b
+   ollama pull nomic-embed-text
+   ```
+
+3. Set these values in `.env`:
+
+   ```dotenv
+   AI_PROVIDER=ollama
+   OLLAMA_URL=http://127.0.0.1:11434
+   OLLAMA_CHAT_MODEL=qwen3:4b
+   OLLAMA_EMBED_MODEL=nomic-embed-text
+   ```
+
+4. Restart the API.
+
+Ollama keeps prompts and generated answers on the machine running Ollama. Atlas does not set an output-token cap for local generation; response time depends on your hardware, and the model still has a finite context window. New uploads use local embeddings. To re-embed existing documents, stop the API worker and run from the repository root:
 
 ```sh
 PYTHONPATH=backend .venv/bin/python evals/reindex_local.py
 ```
 
-New uploads use Ollama embeddings automatically. Document text, questions, and chat history stay on this machine when using the Ollama provider. The 4B model is a compact local model; source-grounded answers can still miss details, so check its citations for important claims.
+### OpenAI
 
-Without an AI provider, chat returns relevant source excerpts rather than synthesizing answers. The same retrieval path handles every question; it has no separate summary, count, or topic-specific answer rules. Configure Ollama for on-device answer generation and semantic retrieval, or an OpenAI API key for hosted generation. Unrelated questions do not inherit earlier search terms; explicit references such as “its budget” can use the previous question.
+Set `AI_PROVIDER=openai` and `OPENAI_API_KEY` in `.env`, then restart the API. Optionally set `CHAT_MODEL` and `EMBED_MODEL`; the defaults are `gpt-4.1-mini` and `text-embedding-3-small`.
 
-## PostgreSQL deployment with Docker
+With OpenAI selected, document passages and selected connected-source excerpts are sent to the configured OpenAI API for embeddings or answer generation. Responses use `store=False`; that does not promise zero provider-side retention. Only send content you are authorized to process with that provider.
+
+### Search without generated answers
+
+Set `AI_PROVIDER=none` and leave `OPENAI_API_KEY` empty. Atlas returns matching source excerpts instead of a synthesized answer.
+
+## Connect data sources
+
+Connections are workspace-scoped and retrieved on demand. Connect a provider in **Sources**, then select it above the prompt in **Ask Atlas**. Source data is not automatically copied into the document library. Disconnecting removes Atlas's saved credential; revoke the token or app authorization at the provider as well when appropriate.
+
+Atlas encrypts saved provider credentials with `GMAIL_TOKEN_ENCRYPTION_KEY`. Do not commit `.env`, share credentials, or paste a bot token where a user token is required.
+
+### Gmail
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or choose a project, enable the **Gmail API**, configure the OAuth consent screen, and create an OAuth client of type **Web application**.
+2. Add this Authorized redirect URI for local development:
+
+   ```text
+   http://localhost:3000/api/gmail/callback
+   ```
+
+3. Add the client ID and secret to `.env`:
+
+   ```dotenv
+   GOOGLE_CLIENT_ID=your-client-id
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   GOOGLE_REDIRECT_URI=http://localhost:3000/api/gmail/callback
+   ```
+
+4. Make sure `GMAIL_TOKEN_ENCRYPTION_KEY` is set, restart the API and frontend, then open **Sources → Gmail → Connect Gmail** and authorize read-only access.
+
+Gmail search is opt-in per Ask Atlas question. Email is fetched on demand, not indexed automatically. The connector uses the restricted `gmail.readonly` scope; public deployments may need Google's verification and security assessment. Review Google's current requirements before publishing.
+
+### Google Drive
+
+Use the same Google Cloud project and OAuth Web application as Gmail. Enable the **Google Drive API** and add this additional Authorized redirect URI:
+
+```text
+http://localhost:3000/api/drive/callback
+```
+
+Set the Drive redirect in `.env` and restart:
+
+```dotenv
+GOOGLE_DRIVE_REDIRECT_URI=http://localhost:3000/api/drive/callback
+```
+
+Connect from **Sources → Google Drive**. Atlas uses read-only Drive access and reads files on demand. It can extract text from Google Docs, Sheets (CSV), PDF, DOCX, and supported text files. Slides and image-only Drive PDFs are not supported as Drive evidence. Drive access uses the restricted `drive.readonly` scope; review Google's verification and security-assessment requirements before public launch.
+
+### GitHub
+
+Create a fine-grained personal access token scoped to the repositories Atlas should access, with read-only metadata and issue permissions. Add it under **Sources → GitHub**.
+
+Atlas can search repositories, issues, and pull requests. Repository descriptions and metadata can support project overviews. The connector does not search source-code files. Results are limited to repositories and records visible to the token.
+
+### Notion
+
+Create an internal integration in [Notion My integrations](https://www.notion.so/profile/integrations), copy its secret, and share the pages or parent pages you want Atlas to read with that integration. Add the token under **Sources → Notion**.
+
+Notion integrations only see pages shared with them. Atlas searches accessible page titles and reads page blocks on demand; a valid token does not grant automatic access to every workspace page.
+
+### Slack
+
+Slack message search requires a **user-scoped OAuth token** with the `search:read` user token scope. Bot tokens may authenticate but cannot use message search.
+
+1. Create or open the Atlas app in the [Slack API console](https://api.slack.com/apps).
+2. Under **OAuth & Permissions → User Token Scopes**, add `search:read`.
+3. Reinstall the app to the intended workspace and authorize the requested access.
+4. Copy the **User OAuth Token** (not the Bot User OAuth Token) and add it under **Sources → Slack**.
+
+The user token can search content that the authorizing Slack user can access. Slack may require you to reauthorize Atlas after changing scopes.
+
+## Run with Docker Compose
+
+Docker Compose runs PostgreSQL/pgvector, the API, a separate background worker, and the frontend. From the repository root:
 
 ```sh
 cp .env.example .env
-# Optionally add your API key, then:
+```
+
+Set `POSTGRES_PASSWORD` to a strong value in `.env`. Set `GMAIL_TOKEN_ENCRYPTION_KEY` if you will connect sources. Add an AI provider configuration if you want generated answers, and add the Google OAuth values if using Gmail or Drive. Then run:
+
+```sh
 docker compose up --build
 ```
 
-Open http://localhost:3000. Compose runs PostgreSQL/pgvector, an API container, a separate durable worker, and the web app. Database and document files use named volumes. Only the web port is exposed, bound to loopback.
+Open <http://localhost:3000>. The database and documents use named volumes. The web port is bound to loopback. Compose runs Ollama on the host by default only if you configure:
 
-PDF text extraction uses PDFium to handle complex large PDFs without the former pure-Python parser token limit. Staged uploads use filesystem locks and require a Unix-like host (macOS/Linux).
+```dotenv
+AI_PROVIDER=ollama
+OLLAMA_URL=http://host.docker.internal:11434
+```
 
-The initial release uses a database-backed job queue with expiring leases and generation fencing instead of Redis/Celery. This keeps local and container execution consistent and recovers interrupted jobs without losing queued work. Original files use a shared filesystem volume; S3 storage is a future extension. The PostgreSQL path uses indexed full-text search and HNSW vector search, fused with reciprocal rank fusion and a lexical-coverage adjustment. It does not include a cross-encoder reranker. SQLite mode uses in-memory BM25 and optional cosine similarity and is intended for development/small collections.
+Pull the models on the host before connecting. `host.docker.internal` lets the API container reach Ollama on macOS/Windows; on Linux, configure a host-gateway route or use another reachable Ollama URL.
 
-Compose is a development deployment, not a hardened public service. Set a strong `POSTGRES_PASSWORD` before first initialization, place the web app behind HTTPS, and set `COOKIE_SECURE=true` for secure cookies. A changed database password does not update an already initialized PostgreSQL volume automatically.
+The default Compose PostgreSQL password is for local development only. Changing `POSTGRES_PASSWORD` after PostgreSQL has initialized does not change the existing database user's password; recreate or update the database credentials deliberately. Do not expose this development stack directly to the public internet.
 
-## What works
+## Troubleshooting
 
-- Email/password accounts, hashed passwords, expiring HTTP-only sessions, account-owned workspaces.
-- Multiple document uploads; the UI sends files sequentially to keep requests bounded. PDF, DOCX, UTF-8 TXT, Markdown, up to 250 MB/file and 50 files/API request. The browser sends large files in authenticated 8 MB chunks with offset checks and retry recovery; interrupted staging data expires after 24 hours. Individual failures do not stop the rest of a selected batch. Upload progress and per-file errors remain visible.
-- Per-workspace SHA-256 deduplication, including a database uniqueness constraint for concurrent uploads.
-- Durable queued/processing/ready/failed states, explicit retry/reindex, worker crash recovery.
-- PDF page references and text/DOCX section references, overlapping chunks, optional batched embeddings.
-- Permission-filtered retrieval, document scope selection, bounded conversation context, source previews and original downloads.
-- AI source-ID validation and refusal when no evidence is found. This is **not** automatic verification that every generated claim is entailed by its cited passage.
-- Persistent, workspace-scoped conversations with saved messages and source citations, rename, and delete controls.
-- Deletion removes originals and indexed chunks. Previously saved citations to deleted documents may no longer point to retrievable source chunks.
+- **Atlas only shows excerpts, not an answer:** Check `AI_PROVIDER`, the API logs, and that Ollama is running or the OpenAI key is valid. Restart the API after changing `.env`.
+- **Ollama is unreachable in Docker:** `127.0.0.1` inside a container refers to that container. Use `http://host.docker.internal:11434` on macOS/Windows or a host-reachable address on Linux.
+- **A saved connection cannot be decrypted:** `GMAIL_TOKEN_ENCRYPTION_KEY` changed or is missing. Restore the original key; otherwise reconnect each provider. Back up the key with the database.
+- **Google OAuth returns a redirect error:** The callback URL must match the URI registered in Google Cloud exactly, including scheme, host, port, and path.
+- **Google OAuth says access is blocked:** In OAuth consent-screen testing mode, add the account as a test user. Check that the required Gmail or Drive API is enabled and review verification status.
+- **Slack says token type is not allowed:** Reconnect with the User OAuth Token after adding `search:read` and reinstalling the app.
+- **Notion search returns no pages:** Confirm Atlas was shared with the page or a parent page. The token alone cannot see unshared content.
+- **Scanned PDF has no text:** Install Tesseract OCR. Set `OCR_ENABLED=false` only when you want to require searchable PDFs.
+- **A model change produces poor document search:** Re-embed existing documents after changing embedding providers or models.
 
-## Validation
+## Development and validation
+
+Run backend tests and frontend checks from the repository root:
 
 ```sh
 PYTHONPATH=backend .venv/bin/pytest backend/tests -q
@@ -136,40 +209,45 @@ npm run typecheck
 npm run build
 ```
 
-Tests use an isolated temporary database and no network/API calls. They cover ingestion, retrieval, account isolation, source scoping, duplicate detection, job leases, failed ingestion/retry, source deletion, authentication, chunk boundaries, and mocked AI citation validation.
+The tests use an isolated temporary database and mock provider calls. They do not verify OAuth credentials or live access to Gmail, Drive, GitHub, Notion, or Slack.
 
-## Current limits and next milestones
+For browser tests, install Playwright and Chromium:
 
-Insights and background collection reports have been removed. The worker now processes ingestion jobs only. Existing deployments may still have a legacy `analyses` table; the new Alembic migration baseline is intended for fresh development databases, so back up or recreate older databases first.
+```sh
+cd frontend
+npm install --no-save @playwright/test@1.56.1
+npx playwright install chromium
+npx playwright test
+```
 
-This release has not been benchmarked for 10,000 documents/workspace. The architecture supports a separate worker and indexed PostgreSQL retrieval, but capacity, latency, accuracy, and cost targets must be established with representative documents before scaling.
+## What Atlas supports
 
-Image-only PDF pages use Tesseract OCR when enabled (default: enabled); installing the Python package alone is insufficient without the Tesseract executable. OCR is CPU-intensive and a poor fit for extremely large scans. Vision/table-aware parsing and object-store integration remain pending. DOCX references are logical sections, not rendered Word page numbers.
+- Workspace accounts, private documents, saved conversations, and source citations.
+- PDF, DOCX, TXT, Markdown, CSV, JSON, and HTML ingestion. Individual files can be up to 250 MB; scanned PDF text extraction uses Tesseract OCR.
+- Durable document processing with retry and reindex controls.
+- Keyword search, optional vector search, and source-grounded answers.
+- On-demand Gmail, Drive, GitHub, Notion, and Slack retrieval when each source is connected.
 
-Also pending: cross-encoder reranking, streamed AI output, shared workspace membership/roles, password recovery/email verification, login/API rate limits and usage quotas, object-store integration, complete audit logging, backup/restore validation, antivirus/parser sandboxing, and production load/accuracy evaluation. Provider calls have bounded timeouts and retries; errors stay visible rather than falling back to fabricated answers.
+Connected sources use permission checks at the provider and do not sync in the background. AI answers can miss details; review cited passages before relying on them. Atlas validates citation references but does not prove every claim is supported by its citation.
 
-Do not expose this development release publicly until the authentication, abuse controls, document parsing isolation, and deployment hardening items are completed. Schema creation is automatic for a fresh database; use a migration system before evolving a deployed database.
+## Security and deployment notes
 
-## Layout
+This project is a development release, not a hardened public service. Before serving other users, add HTTPS and set `COOKIE_SECURE=true`, configure a protected secret store, restrict database/network access, validate backup and restore, and implement rate limits, audit logging, and document parsing isolation. Review provider verification and privacy requirements for the scopes you enable. Do not deploy the sample Compose password or expose the development stack publicly.
 
-- `backend/app/main.py`: API, session authentication, access checks, uploads, chat, and conversations.
-- `backend/app/ingest.py`: parsing and chunking.
-- `backend/app/retrieval.py`: keyword/vector retrieval and fusion.
-- `backend/app/ai.py`: embedding and grounded answer generation.
-- `backend/app/worker.py`: durable job claiming, leases, ingestion.
-- `frontend/app/page.tsx`: workspace, library, saved chats, source viewer.
-- `compose.yaml`: PostgreSQL development deployment.
+Tokens and originals are workspace data. Protect the database, document volume, `.env`, and encryption-key backup as one set. Revoking a token at the provider is separate from disconnecting it in Atlas.
 
-## Gmail connector (read-only, opt-in)
+## Project layout
 
-Atlas can connect a Gmail mailbox to a workspace and let you search and summarize selected messages without sending, deleting, or modifying mail. Mail is fetched on demand and is **not automatically added to the RAG document index**. The summarization request sends the selected email text to your configured AI provider (OpenAI or Ollama); for private local processing choose Ollama.
+- `backend/app/main.py`: API, authentication, access checks, uploads, chat, and conversations.
+- `backend/app/ingest.py`: file parsing, OCR, and chunking.
+- `backend/app/retrieval.py`: keyword/vector retrieval and ranking.
+- `backend/app/ai.py`: embeddings and grounded answer generation.
+- `backend/app/external_sources.py`: GitHub, Notion, and Slack adapters.
+- `backend/app/drive.py` and `backend/app/gmail.py`: Google connectors.
+- `backend/app/worker.py`: durable ingestion queue worker.
+- `frontend/app/page.tsx`: workspace UI, Ask Atlas, sources, and document library.
+- `compose.yaml`: PostgreSQL, API, worker, and web services.
 
-1. Enable Gmail API in a Google Cloud project, configure an OAuth consent screen, and create an OAuth **Web application** client.
-2. Set the Google OAuth redirect URI to `http://localhost:3000/api/gmail/callback` for local development. In production use `https://your-atlas-domain/api/gmail/callback` as both the registered redirect URI and `GOOGLE_REDIRECT_URI`.
-3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` in the backend environment (`.env` for local development).
-4. Generate `GMAIL_TOKEN_ENCRYPTION_KEY` using `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` and keep it in a protected secret store. Back up the key; losing it makes stored connections unreadable. Never commit it.
-5. Install backend dependencies and restart both services. Open **Gmail** in Atlas, choose **Connect Gmail**, authorize read-only access, and search your mailbox. Select up to 15 messages and choose **Summarize selected**.
+## Design preview
 
-**Security and policy:** Gmail's `gmail.readonly` is a **restricted scope**. A public app may need Google's OAuth verification and a security assessment for server-side restricted-scope data handling. Do not launch this integration publicly until you've completed applicable requirements and reviewed the privacy policy and deletion behavior. This implementation encrypts refresh tokens at rest and never puts them in browser state; disconnecting removes Atlas's saved token, though users can additionally revoke consent at Google. No background mailbox sync is configured. Avoid sending sensitive mail to a hosted AI provider unless users understand and consent to that data flow.
-
-**Limits:** Summaries are generated on demand from up to 15 selected messages; HTML-only messages currently fall back to Gmail snippets, attachments are not parsed, and citations link back to Gmail. The integration does not yet provide automatic scheduled digests or inbox-to-document indexing.
+Open [the interactive Atlas design preview](docs/Atlas_Research_Workspace.html) locally. It uses fictional sample content and does not connect to the backend; `frontend/app/` is the working interface.

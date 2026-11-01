@@ -19,10 +19,20 @@ services:
     environment: &backend-env
       DATABASE_URL: postgresql+psycopg://atlas:${POSTGRES_PASSWORD:-atlas-local-only}@db:5432/atlas
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen3:4b}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       CHAT_MODEL: ${CHAT_MODEL:-gpt-4.1-mini}
       EMBED_MODEL: ${EMBED_MODEL:-text-embedding-3-small}
       MAX_FILE_MB: ${MAX_FILE_MB:-250}
+      OCR_ENABLED: ${OCR_ENABLED:-true}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      GMAIL_TOKEN_ENCRYPTION_KEY: ${GMAIL_TOKEN_ENCRYPTION_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/gmail/callback}
+      GOOGLE_DRIVE_REDIRECT_URI: ${GOOGLE_DRIVE_REDIRECT_URI:-http://localhost:3000/api/drive/callback}
       DATA_DIR: /data
       INLINE_WORKER: 'false'
     volumes:

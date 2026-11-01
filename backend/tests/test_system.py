@@ -1,14 +1,6 @@
-import os
-import tempfile
 import time
 from pathlib import Path
 from types import SimpleNamespace
-
-os.environ['DATA_DIR'] = tempfile.mkdtemp(prefix='atlas-test-')
-os.environ['DATABASE_URL'] = 'sqlite:///' + os.environ['DATA_DIR'] + '/test.db'
-os.environ['INLINE_WORKER'] = 'false'
-os.environ['OPENAI_API_KEY'] = ''
-os.environ['AI_PROVIDER'] = 'none'
 
 import pytest
 from fastapi.testclient import TestClient
@@ -429,13 +421,81 @@ def test_connected_source_evidence_contract():
     assert prompt['title'] == 'Update'
 
 
+def test_notion_source_search_reads_shared_page_content(monkeypatch):
+    from app import external_sources
+    page_id = '29601486-3e4f-8030-b34b-d03b4a4f6944'
+    calls = []
+    def fake_http_json(url, token, provider, params=None, method='GET'):
+        calls.append((url, params, method))
+        if url.endswith('/v1/search') and params and params.get('query'):
+            return {'results': [], 'has_more': False}
+        if url.endswith('/v1/search'):
+            return {'results': [{
+                'object': 'page', 'id': page_id, 'url': 'https://notion.so/hackathon',
+                'properties': {'title': {'title': [{'plain_text': 'Hackathon'}]}},
+            }]}
+        if url.endswith(f'/v1/blocks/{page_id}/children'):
+            return {'results': [{
+                'id': 'block-1', 'type': 'paragraph', 'has_children': False,
+                'paragraph': {'rich_text': [{'plain_text': 'Organizers assign roles to judges and mentors.'}]},
+            }], 'has_more': False}
+        raise AssertionError(f'Unexpected Notion API request: {url}')
+    monkeypatch.setattr(external_sources, 'http_json', fake_http_json)
+
+    results = external_sources.source_search('notion', 'test-token', 'organizer roles')
+
+    assert len(results) == 1
+    assert results[0]['id'] == page_id
+    assert results[0]['title'] == 'Hackathon'
+    assert 'Organizers assign roles' in results[0]['excerpt']
+    assert any('/blocks/' in url for url, _, _ in calls)
+
+
+def test_slack_bot_token_error_explains_user_search_token_requirement(monkeypatch):
+    from app import external_sources
+    from fastapi import HTTPException
+    monkeypatch.setattr(external_sources, 'http_json',
+                        lambda *args, **kwargs: {'ok': False, 'error': 'not_allowed_token_type'})
+    with pytest.raises(HTTPException) as exc:
+        external_sources.source_search('slack', 'test-token', 'notion')
+    assert exc.value.status_code == 422
+    assert 'user-scoped token' in exc.value.detail
+    assert 'search:read' in exc.value.detail
+
+
+def test_slack_search_keeps_long_message_text_for_relevant_evidence(monkeypatch):
+    from app import external_sources
+    full_text='Deforestation note. ' + ('Background text. ' * 180) + 'Causes: agricultural expansion, urbanisation, industrialisation, timber logging, mining, and forest fires.'
+    monkeypatch.setattr(external_sources, 'http_json', lambda *args, **kwargs: {
+        'ok': True, 'messages': {'matches': [{'ts':'1','channel':{'name':'environment'},
+            'text':full_text,'permalink':'https://slack.test/message'}]}})
+    result=external_sources.source_search('slack','token','causes of deforestation')
+    assert result[0]['excerpt']==full_text
+    assert 'forest fires' in result[0]['excerpt']
+
+
+def test_connected_payload_keeps_relevant_late_slack_details_and_ranks_them_first():
+    from app.connected_synthesis import bounded_payload
+    from app.sources import Evidence
+    slack_text='Deforestation overview. ' + ('General background text. ' * 180) + (
+        'Causes include agricultural expansion, urbanisation, industrialisation, '
+        'timber logging, mining activities, and forest fires.')
+    evidence=[Evidence('documents','doc','General guide','Deforestation is a problem.'),
+              Evidence('slack','msg','#environment',slack_text)]
+    payload=bounded_payload(evidence,question='What are the causes of deforestation?')
+    assert payload[0]['provider']=='slack'
+    assert all(term in payload[0]['text'].lower() for term in (
+        'agricultural expansion','urbanisation','industrialisation','timber logging',
+        'mining activities','forest fires'))
+
+
 def test_connected_synthesis_fits_local_model_and_preserves_citations():
     from app.connected_synthesis import synthesize_connected
     from app.sources import Evidence
     evidence = [Evidence('documents', 'd', 'Document', 'important fact ' * 1000)]
     evidence += [Evidence('gmail', str(i), 'Mail', 'other fact ' * 1000) for i in range(8)]
     calls = []
-    def fake_ollama(messages, max_tokens):
+    def fake_ollama(messages):
         import json
         payload = json.loads(messages[-1]['content'])
         calls.append(payload)
@@ -446,18 +506,320 @@ def test_connected_synthesis_fits_local_model_and_preserves_citations():
         'What changed?', evidence, 'ollama', '', 'ignored',
         None, fake_ollama)
     assert len(calls) == 2
-    assert len(calls[0]['sources']) <= 12
-    assert sum(len(x['text']) for x in calls[0]['sources']) <= 7000
+    assert len(calls[0]['sources']) <= 50
+    assert sum(len(x['text']) for x in calls[0]['sources']) <= 16000
     assert [x['source_id'] for x in payload] == list(range(1, len(payload)+1))
     assert {x['provider'] for x in payload} == {'documents', 'gmail'}
     assert answer == 'Supported by [1] and [2].'
 
 
+def test_connected_synthesis_includes_broad_repository_inventory():
+    from app.connected_synthesis import bounded_payload
+    from app.sources import Evidence
+    evidence = [Evidence('github', str(i), f'owner/project-{i}',
+                         f'Project {i} description. Language: Python. Topics: search, research.')
+                for i in range(37)]
+    payload = bounded_payload(evidence)
+    assert len(payload) == 37
+    assert [item['origin_id'] for item in payload] == [str(i) for i in range(37)]
+
+
+def test_connected_synthesis_hides_reasoning_and_validates_before_emitting(monkeypatch):
+    from contextlib import contextmanager
+    from app import connected_synthesis
+    from app.sources import Evidence
+    lines = [
+        {'message': {'content': 'Let me analyze the source first. '}},
+        {'message': {'content': 'The change adds a retry [1].'}},
+        {'done': True, 'done_reason': 'stop'},
+    ]
+    class Response:
+        def raise_for_status(self): pass
+        def iter_lines(self):
+            import json
+            return iter(json.dumps(line) for line in lines)
+    @contextmanager
+    def fake_stream(*args, **kwargs):
+        yield Response()
+    monkeypatch.setattr(connected_synthesis.httpx, 'stream', fake_stream)
+    events = list(connected_synthesis.stream_connected(
+        'Summarize the change', [Evidence('github','1','Retry PR','Adds retry support')],
+        'ollama', '', 'model', None, 'http://ollama', 'model'))
+    assert [event['type'] for event in events] == ['complete']
+    assert events[0]['mode'] == 'source_results'
+    assert 'Let me analyze' not in events[0]['answer']
+    assert 'Retry PR' in events[0]['answer'] and '[1]' in events[0]['answer']
+
+
+def test_connected_synthesis_emits_only_citation_checked_final_text(monkeypatch):
+    from contextlib import contextmanager
+    from app import connected_synthesis
+    from app.sources import Evidence
+    lines = [{'message': {'content': 'The change adds a retry [1].'}},
+             {'done': True, 'done_reason': 'stop'}]
+    class Response:
+        def raise_for_status(self): pass
+        def iter_lines(self):
+            import json
+            return iter(json.dumps(line) for line in lines)
+    @contextmanager
+    def fake_stream(*args, **kwargs):
+        yield Response()
+    monkeypatch.setattr(connected_synthesis.httpx, 'stream', fake_stream)
+    events = list(connected_synthesis.stream_connected(
+        'Summarize the change', [Evidence('github','1','Retry PR','Adds retry support')],
+        'ollama', '', 'model', None, 'http://ollama', 'model'))
+    assert [event['type'] for event in events] == ['delta','complete']
+    assert events[0]['text'] == 'The change adds a retry [1].'
+    assert events[1]['mode'] == 'connected'
+
+
+def test_local_connected_synthesis_times_out_to_cited_source_matches(monkeypatch):
+    from contextlib import contextmanager
+    from app import connected_synthesis
+    from app.sources import Evidence
+    class Response:
+        def raise_for_status(self): pass
+        def iter_lines(self):
+            return iter(['{"message":{"content":"Still reasoning…"}}'])
+    @contextmanager
+    def fake_stream(*args, **kwargs):
+        yield Response()
+    ticks=iter([0,46])
+    monkeypatch.setattr(connected_synthesis.httpx, 'stream', fake_stream)
+    monkeypatch.setattr(connected_synthesis.time, 'monotonic', lambda: next(ticks))
+    events=list(connected_synthesis.stream_connected(
+        'What is deforestation?', [Evidence('documents','1','Forest guide','Deforestation removes native forest cover.')],
+        'ollama', '', 'model', None, 'http://ollama', 'model'))
+    assert events[0]['type']=='status' and 'too long' in events[0]['text']
+    assert events[-1]['type']=='complete' and events[-1]['mode']=='source_results'
+    assert 'Forest guide' in events[-1]['answer'] and '[1]' in events[-1]['answer']
+
+
+def test_connected_chat_stream_returns_explicit_no_evidence_result(client):
+    w = wid(client)
+    response = client.post(f'/api/workspaces/{w}/connected-chat/stream', json={
+        'question': 'Summarize the selected sources', 'providers': []})
+    assert response.status_code == 200
+    events = [__import__('json').loads(line) for line in response.text.splitlines() if line]
+    assert events[0]['type'] == 'status'
+    assert events[-1]['type'] == 'done'
+    assert events[-1]['result']['mode'] == 'insufficient_evidence'
+
+
+def test_connected_chat_stream_keeps_local_excerpt_mode_without_model(client, monkeypatch):
+    w = wid(client)
+    upload(client, w)
+    drain()
+    monkeypatch.setattr(config, 'AI_PROVIDER', 'none')
+    monkeypatch.setattr(config, 'API_KEY', '')
+    response = client.post(f'/api/workspaces/{w}/connected-chat/stream', json={
+        'question': 'What is the budget?', 'providers': []})
+    assert response.status_code == 200
+    events = [__import__('json').loads(line) for line in response.text.splitlines() if line]
+    assert events[-1]['type'] == 'done'
+    assert events[-1]['result']['mode'] == 'local_excerpts'
+    assert '75000' in events[-1]['result']['answer']
+
+
+def test_connected_chat_can_exclude_documents_and_reports_source_specific_no_match(client, monkeypatch):
+    from app import main, external_sources
+    from app.db import Session, ExternalConnection
+    w = wid(client)
+    with Session() as db:
+        db.add(ExternalConnection(workspace_id=w, provider='slack', account='test', secret='encrypted'))
+        db.commit()
+    monkeypatch.setattr(main, 'retrieve', lambda *args, **kwargs: (_ for _ in ()).throw(
+        AssertionError('documents should be excluded')))
+    monkeypatch.setattr(external_sources, 'read_connection', lambda *args: (None, 'test-token'))
+    monkeypatch.setattr(external_sources, 'source_search', lambda *args: [])
+    response = client.post(f'/api/workspaces/{w}/connected-chat/stream', json={
+        'question': 'What did we decide in Slack?', 'include_documents': False,
+        'providers': ['slack']})
+    assert response.status_code == 200
+    events = [__import__('json').loads(line) for line in response.text.splitlines() if line]
+    result = events[-1]['result']
+    assert result['mode'] == 'insufficient_evidence'
+    assert result['scope'] == ['slack']
+    assert 'No matching results were found in Slack' in result['answer']
+
+
+def test_connected_chat_preserves_full_slack_message_through_retrieval(client, monkeypatch):
+    from app import main, external_sources, connected_synthesis
+    from app.sources import Evidence
+    w=wid(client)
+    full_text='Deforestation introduction. ' + ('Background. ' * 150) + (
+        'Causes include agricultural expansion, urbanisation, industrialisation, '
+        'timber logging, mining activities, and forest fires.')
+    monkeypatch.setattr(main, 'retrieve', lambda *args, **kwargs: [])
+    monkeypatch.setattr(external_sources, 'read_connection', lambda *args: (None,'token'))
+    monkeypatch.setattr(external_sources, 'source_search', lambda *args: [{
+        'id':'slack-1','title':'#environment','excerpt':full_text,'url':'https://slack.test/1'}])
+    captured={}
+    def fake_synthesize(question,evidence,*args):
+        item=evidence[0]
+        captured['excerpt']=item.excerpt
+        return 'The note lists several causes [1].',[{**item.as_prompt(1),'origin_id':item.source_id}]
+    monkeypatch.setattr(connected_synthesis,'synthesize_connected',fake_synthesize)
+    response=client.post(f'/api/workspaces/{w}/connected-chat',json={
+        'question':'What causes of deforestation are listed?',
+        'include_documents':False,'providers':['slack']})
+    assert response.status_code==200,response.text
+    assert captured['excerpt']==full_text
+    assert 'forest fires' in captured['excerpt']
+
+
+def test_natural_language_connected_queries_are_simplified():
+    from app.main import gmail_query_for_question, drive_query_for_question
+    assert gmail_query_for_question('newer_than:30d', 'What are the latest project updates in my email?') == 'newer_than:30d project updates'
+    assert gmail_query_for_question('newer_than:30d', 'Are there any credit card offers?') == 'newer_than:30d credit card offers'
+    assert drive_query_for_question('Find the AI Engineer resume files in my Google Drive and list their exact file names.') == 'ai engineer resume'
+
+
+def test_document_retrieval_requires_multiple_concept_matches_for_specific_questions():
+    from app.retrieval import has_query_support, minimum_query_overlap
+    question = 'What is the recipe for matcha ice cream in my documents?'
+    assert minimum_query_overlap(question) == 2
+    assert not has_query_support(question, 'Iceland, land of fire and ice.')
+    assert not has_query_support(question, 'A sample recipe for a project idea.')
+    assert has_query_support('What causes of deforestation are listed?',
+        'Causes of deforestation include agricultural expansion and logging.')
+
+
+def test_credit_card_offer_retrieval_drops_unrelated_results_and_reads_full_email(client, monkeypatch):
+    import base64
+    from app import main, gmail
+    from app.db import Session, User
+
+    w = wid(client)
+    actor_id = client.get('/api/me').json()['id']
+    question = 'Are there any credit card offers?'
+    detail = 'Your monthly statement is ready. ' + ('Account information. ' * 100) + (
+        'Exclusive credit card cashback offer: earn 5% cashback on dining through December.')
+    encoded = base64.urlsafe_b64encode(detail.encode()).decode().rstrip('=')
+    messages = {
+        'statement': {'id': 'statement', 'payload': {'headers': [{'name': 'Subject', 'value': 'SBI Card ELITE Monthly Statement'}],
+            'mimeType': 'text/plain', 'body': {'data': encoded}}},
+        'unrelated': {'id': 'unrelated', 'payload': {'headers': [{'name': 'Subject', 'value': 'North America'}],
+            'mimeType': 'text/plain', 'body': {'data': base64.urlsafe_b64encode(b'Country guide and travel information').decode()}}},
+    }
+    monkeypatch.setattr(gmail, 'connection', lambda *args: object())
+    monkeypatch.setattr(gmail, 'access_token', lambda *args: 'test-token')
+    monkeypatch.setattr(gmail, 'gmail_get', lambda token, url, params=None: {'messages': [
+        {'id': 'statement'}, {'id': 'unrelated'}]} if url.endswith('/messages') else messages[url.rsplit('/', 1)[-1]])
+    body = main.ConnectedQuestion(question=question, include_documents=False, include_gmail=True)
+    with Session() as db:
+        actor = db.get(User, actor_id)
+        evidence, _ = main.collect_connected_evidence(w, body, actor, db)
+
+    assert len(evidence) == 1
+    assert evidence[0].provider == 'gmail'
+    assert evidence[0].source_id == 'statement'
+    assert '5% cashback' in evidence[0].excerpt
+    assert len(evidence[0].excerpt) > 1300
+
+
+def test_github_pull_request_search_honors_requested_count(monkeypatch):
+    from app import external_sources
+    captured = {}
+    def fake_http(url, token, provider, params=None, method='GET'):
+        if url.endswith('/user'):
+            return {'login': 'test-user'}
+        captured.update(params or {})
+        return {'items': []}
+    monkeypatch.setattr(external_sources, 'http_json', fake_http)
+    external_sources.source_search('github', 'token',
+        'What are three of my recently updated open GitHub pull requests?')
+    assert captured['per_page'] == 3
+
+
+def test_github_own_pull_requests_are_scoped_to_authenticated_login(monkeypatch):
+    from app import external_sources
+    requests = []
+    def fake_http(url, token, provider, params=None, method='GET'):
+        requests.append((url, params or {}))
+        if url.endswith('/user'):
+            return {'login': 'srbmaury'}
+        return {'items': [{'id': 1, 'title': 'My PR', 'body': 'Update',
+                           'html_url': 'https://github.com/org/repo/pull/1'}]}
+    monkeypatch.setattr(external_sources, 'http_json', fake_http)
+    result = external_sources.source_search('github', 'token',
+        'List three of my recently updated open GitHub pull requests')
+    assert requests[0][0].endswith('/user')
+    assert requests[1][1]['q'] == 'is:pr state:open author:srbmaury'
+    assert requests[1][1]['per_page'] == 3
+    assert len(result) == 1
+
+
+def test_github_own_pull_requests_fail_closed_without_identity(monkeypatch):
+    from app import external_sources
+    from fastapi import HTTPException
+    def fake_http(url, token, provider, params=None, method='GET'):
+        return {} if url.endswith('/user') else {'items': []}
+    monkeypatch.setattr(external_sources, 'http_json', fake_http)
+    with pytest.raises(HTTPException, match='Could not identify'):
+        external_sources.source_search('github', 'token', 'List my open pull requests')
+
+
+def test_github_pull_requests_from_my_github_are_scoped_to_the_connected_author(monkeypatch):
+    from app import external_sources
+    captured = {}
+    def fake_http(url, token, provider, params=None, method='GET'):
+        if url.endswith('/user'):
+            return {'login': 'srbmaury'}
+        captured.update(params or {})
+        return {'items': []}
+    monkeypatch.setattr(external_sources, 'http_json', fake_http)
+    external_sources.source_search('github', 'token',
+        'List all open pull requests from my GitHub')
+    assert captured['q'] == 'is:pr state:open author:srbmaury'
+
+
+def test_source_health_check_distinguishes_unconnected_from_healthy(client, monkeypatch):
+    from app.db import Session, ExternalConnection, Workspace
+    from app import external_sources
+    w = wid(client)
+    with Session() as db:
+        owner = db.query(Workspace).filter_by(id=w).first()
+        db.add(ExternalConnection(workspace_id=w, provider='github', account='test-user', secret='encrypted'))
+        db.commit()
+    monkeypatch.setattr(external_sources, 'read_connection',
+        lambda db, who, wid, provider: (db.get(ExternalConnection, (wid, provider)), 'test-token'))
+    monkeypatch.setattr(external_sources, 'verify_source_access',
+        lambda provider, token: ('test-user', 2))
+    response = client.post(f'/api/workspaces/{w}/sources/health/check')
+    assert response.status_code == 200
+    checks = {item['provider']: item for item in response.json()['checks']}
+    assert checks['github']['connected'] and checks['github']['healthy']
+    assert checks['github']['matches'] == 2
+    assert not checks['slack']['connected'] and not checks['slack']['healthy']
+    assert 'test-token' not in response.text
+
+
 def test_github_search_query_preserves_filters_and_simplifies_questions():
-    from app.external_sources import github_search_query
+    from app.external_sources import github_search_query, github_pull_request_query, github_repository_query, requested_result_limit, slack_search_query
     assert github_search_query('repo:owner/project is:issue bug') == 'repo:owner/project is:issue bug'
-    assert github_search_query('What issues and pull requests discuss a payment timeout?') == 'discuss a payment timeout'
-    assert len(github_search_query('what ' * 100 + 'bug')) <= 180
+    assert github_search_query('repo:owner/project bug') == 'repo:owner/project bug is:issue'
+    assert github_search_query('What issues discuss a payment timeout?') == 'discuss a payment timeout is:issue'
+    assert len(github_search_query('what ' * 100 + 'bug')) <= 240
+    assert github_pull_request_query('List all open pull requests from my github') == 'is:pr state:open'
+    assert github_pull_request_query('repo:owner/project is:pull-request state:open') == 'repo:owner/project is:pr state:open'
+    assert github_repository_query('What different kinds of projects are there in my GitHub?', 'srbmaury') == 'user:srbmaury'
+    assert requested_result_limit('What are three of my recently updated open GitHub pull requests?') == 3
+    assert slack_search_query('What decisions about Hackathon did the team discuss in Slack?') == 'Hackathon'
+
+
+def test_relative_data_dir_is_anchored_to_project_root(tmp_path):
+    from app.config import ROOT, resolve_data_dir
+    from pathlib import Path
+    import os
+    previous = Path.cwd()
+    os.chdir(tmp_path)
+    try:
+        assert resolve_data_dir('./data', ROOT) == Path(ROOT, 'data').resolve()
+        assert resolve_data_dir('/tmp/atlas-data', ROOT) == Path('/tmp/atlas-data').resolve()
+    finally:
+        os.chdir(previous)
 
 
 def test_drive_search_scope_and_connect_requires_login(client):
@@ -500,6 +862,54 @@ def test_connected_chat_uses_standard_chat_citation_contract(client, monkeypatch
     assert result['sources'][0]['document_id'] == 'doc-123'
     assert result['sources'][0]['page'] == 2
     assert result['sources'][0]['location_type'] == 'section'
+
+
+def test_github_pull_request_listing_uses_connected_records_without_model(client, monkeypatch):
+    from app import main
+    from app.sources import Evidence
+    w = wid(client)
+    records = [
+        Evidence('github', 'pr-1', 'Fix account-scoped retrieval', 'This PR scopes search to the authenticated account. More details follow.', 'https://github.com/me/repo/pull/1'),
+        Evidence('github', 'pr-2', 'Improve source citations', 'Adds source links to each result.', 'https://github.com/me/repo/pull/2'),
+    ]
+    monkeypatch.setattr(main, 'collect_connected_evidence', lambda *args: (records, {}))
+    monkeypatch.setattr(main, 'enabled', lambda: True)
+    response = client.post(f'/api/workspaces/{w}/connected-chat', json={
+        'question': 'my pull requests', 'include_documents': False, 'providers': ['github']})
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result['mode'] == 'source_results'
+    assert result['scope'] == ['github']
+    assert 'Fix account-scoped retrieval' in result['answer']
+    assert 'This PR scopes search to the authenticated account.' in result['answer']
+    assert '[1]' in result['answer'] and '[2]' in result['answer']
+    assert result['sources'][0]['url'] == records[0].url
+
+
+def test_unqualified_github_search_is_scoped_to_connected_users_repositories(monkeypatch):
+    from app import external_sources
+    captured = {}
+    def fake_http(url, token, provider, params=None, method='GET'):
+        if url.endswith('/user'):
+            return {'login': 'srbmaury'}
+        captured.update(params or {})
+        return {'items': []}
+    monkeypatch.setattr(external_sources, 'http_json', fake_http)
+    external_sources.source_search('github', 'token', 'What is deforestation?')
+    assert captured['q'] == 'deforestation is:issue user:srbmaury'
+
+
+def test_unqualified_github_pr_search_is_scoped_to_connected_users_repositories(monkeypatch):
+    from app import external_sources
+    captured = {}
+    def fake_http(url, token, provider, params=None, method='GET'):
+        if url.endswith('/user'):
+            return {'login': 'srbmaury'}
+        captured.update(params or {})
+        return {'items': []}
+    monkeypatch.setattr(external_sources, 'http_json', fake_http)
+    external_sources.source_search('github', 'token', 'List open pull requests')
+    assert captured['q'] == 'is:pr state:open user:srbmaury'
 
 def test_health_and_processing_stats(client):
     workspace_id=wid(client)
