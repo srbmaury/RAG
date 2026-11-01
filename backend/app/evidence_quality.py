@@ -69,20 +69,3 @@ def prepare_evidence(question, items, *, limit=60, per_provider=20):
             break
     return selected
 
-
-def related_evidence(items, *, min_common=3, max_pairs=20):
-    """Show candidate links for review, not asserted relationships."""
-    pairs = []
-    for i, left in enumerate(items):
-        a = keywords(left.title + " " + left.excerpt[:500])
-        for right in items[i + 1:]:
-            if right.provider == left.provider:
-                continue
-            common = sorted(a & keywords(right.title + " " + right.excerpt[:500]))
-            if len(common) >= min_common:
-                pairs.append({"left": {"provider": left.provider, "id": left.source_id},
-                              "right": {"provider": right.provider, "id": right.source_id},
-                              "shared_terms": common[:12], "status": "candidate_only"})
-                if len(pairs) >= max_pairs:
-                    return pairs
-    return pairs
