@@ -235,7 +235,7 @@ export function AtlasWorkspace() {
         summarizeGmail,
         disconnectGmail,
     } = useConnectedSourcesController({
-        wid: workspaceId,
+        workspaceId,
         tab,
         scope,
         sourceState,
