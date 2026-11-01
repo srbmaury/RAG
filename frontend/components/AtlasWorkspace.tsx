@@ -15,6 +15,7 @@ import {ConversationTranscript} from './chat/ConversationTranscript';
 import {ResearchComposer} from './chat/ResearchComposer';
 import {DocumentsView} from './documents/DocumentsView';
 import {HomeView} from './home/HomeView';
+import {AuthView} from './auth/AuthView';
 import {AtlasMark,FileBadge,Status,EmptyState,Dialog} from './ui/WorkspacePrimitives';
 import {IntegrationTile} from '../components/IntegrationTile';
 import {flushSync} from 'react-dom';
@@ -538,7 +539,7 @@ export function AtlasWorkspace() {
   const uploadButton = <button className="btn primary" disabled={uploading || !wid} onClick={() => input.current?.click()}>{uploading ? <LoaderCircle className="spin"/> : <Plus/>}<span>{uploading ? 'Uploading…' : 'Add documents'}</span></button>;
 
   if (loading) return <div className="opening"><AtlasMark/><LoaderCircle className="spin"/><span>Opening your research workspace…</span></div>;
-  if (!user) return <div className="auth-page"><header><div className="brand-row"><AtlasMark/><span>Atlas</span></div>{themeButton}</header><div className="auth-grid"><div className="auth-intro"><span className="eyebrow">YOUR RESEARCH WORKSPACE</span><h1>Your knowledge,<br/>a conversation away.</h1><p>Bring your documents together. Ask better questions. Follow every answer back to the evidence.</p><div className="auth-points"><span><FileText/>All your documents, one place</span><span><MessageSquare/>Questions with context</span><span><ShieldCheck/>A workspace of your own</span></div></div><form className="auth-form" onSubmit={authenticate}><h2>{register ? 'Create your workspace' : 'Welcome back'}</h2><p>{register ? 'Make room for your next discovery.' : 'Continue where your research left off.'}</p><label>Email address<input type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@company.com"/></label><label>Password<input type="password" autoComplete={register ? 'new-password' : 'current-password'} required minLength={10} maxLength={200} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 10 characters"/></label>{error && <div className="feedback error" role="alert">{error}</div>}<button className="btn primary" disabled={busy}>{busy ? <LoaderCircle className="spin"/> : <ArrowUpRight/>}{register ? 'Create account' : 'Sign in'}</button><div className="auth-switch">{register ? 'Already have an account?' : 'New to Atlas?'} <button type="button" onClick={()=>{setRegister(!register);setError('');}}>{register ? 'Sign in' : 'Create an account'}</button></div></form></div></div>;
+  if (!user) return <AuthView themeButton={themeButton} register={register} email={email} password={password} error={error} busy={busy} onSubmit={authenticate} onEmailChange={setEmail} onPasswordChange={setPassword} onToggleMode={()=>{setRegister(!register);setError('');}}/>
 
   return <div className={`app atlas-v3 ${sidebarCollapsed ? 'collapsed' : ''}`}>
     <input ref={input} type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm" hidden onChange={e=>{if(e.target.files) void upload(e.target.files);}}/>
