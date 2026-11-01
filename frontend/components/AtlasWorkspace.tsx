@@ -17,6 +17,7 @@ import '../app/rebuild.css';
 import {ConversationTranscript} from './chat/ConversationTranscript';
 import {ResearchComposer} from './chat/ResearchComposer';
 import {ConversationHistory} from './chat/ConversationHistory';
+import {ResearchSourceSelector} from './chat/ResearchSourceSelector';
 import {DocumentsView} from './documents/DocumentsView';
 import {HomeView} from './home/HomeView';
 import {AuthView} from './auth/AuthView';
@@ -534,11 +535,7 @@ export function AtlasWorkspace() {
         {wid && tab==='chat' && <section>
           <div className="crumb">Ask Atlas<span>›</span><span className="crumb-title">{title}</span></div><div className="heading-row"><div className="research-heading"><span className="eyebrow">RESEARCH ASSISTANT</span><h1 title={title}>{title}</h1><p className="subtitle">Answers grounded in your documents, with evidence you can inspect.</p></div><div className="actions"><button className="btn" onClick={()=>setHistoryOpen(v=>!v)}><MessageSquare size={15}/>{historyOpen?'Hide history':'History'}</button><button className="btn hide-small" disabled={!messages.length} onClick={()=>void copyConversation()}>{copied?<Check/>:<Copy/>}{copied?'Copied':'Copy chat'}</button><button className="btn primary" disabled={busy} onClick={newChat}><Plus/><span>New chat</span></button></div></div>
           <div className="filters"><button className="filter" onClick={()=>setScopeOpen(true)}><FileText/>{selected.length?`${selected.length} selected documents`:'All documents'}<ChevronDown/></button><span className="research-mode"><i/>{user.mode==='ai'?'AI research':'Source search'} · {ready.length} ready documents</span></div>
-          <div className="unified-sources"><span className="unified-sources-label">Search sources</span><label><input type="checkbox" checked={includeDocuments} onChange={e=>setIncludeDocuments(e.target.checked)}/> Documents</label>
-            <label><input type="checkbox" disabled={!gmailStatus?.connected} checked={connectedGmail} onChange={e=>setConnectedGmail(e.target.checked)}/> Gmail</label>
-            {(['drive','github','notion','slack'] as const).map(p=><label key={p} title={p==='drive'?(driveStatus?.connected?'':'Connect Drive in Sources first'):(sourceStatuses.find(x=>x.provider===p)?.connected?'':'Connect this source in Sources first')}><input type="checkbox" disabled={p==='drive'?!driveStatus?.connected:!sourceStatuses.some(x=>x.provider===p&&x.connected)} checked={connectedProviders.includes(p)} onChange={e=>setConnectedProviders(old=>e.target.checked?[...old,p]:old.filter(x=>x!==p))}/>{p==='drive'?'Drive':p==='github'?'GitHub':p==='notion'?'Notion':'Slack'}</label>)}
-            <button type="button" className="unified-source-manage" onClick={()=>navigate('sources')}>Manage connections <ArrowUpRight size={13}/></button>
-          </div>
+          <ResearchSourceSelector includeDocuments={includeDocuments} onIncludeDocuments={setIncludeDocuments} gmailStatus={gmailStatus} connectedGmail={connectedGmail} onIncludeGmail={setConnectedGmail} driveStatus={driveStatus} sourceStatuses={sourceStatuses} connectedProviders={connectedProviders} onToggleProvider={(provider,enabled)=>setConnectedProviders(old=>enabled?[...old,provider]:old.filter(x=>x!==provider))} onManage={()=>navigate('sources')}/>
           {connectedGmail&&<div className="unified-gmail-scope"><label>Gmail search scope <input aria-label="Gmail search scope" value={connectedGmailQuery} onChange={e=>setConnectedGmailQuery(e.target.value)}/></label></div>}
 
           {user.mode !== 'ai' && <div className="feedback" role="status"><CircleHelp/><span><strong>Source search only.</strong> Atlas can find relevant passages, but it cannot write synthesized answers until an AI provider is configured. Set <code>AI_PROVIDER=openai</code> with <code>OPENAI_API_KEY</code>, or use <code>AI_PROVIDER=ollama</code>, then restart the API.</span></div>}
