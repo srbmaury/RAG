@@ -20,7 +20,6 @@ import {
   Upload,
   X,
   LoaderCircle,
-  Download,
   MessageSquare,
   Moon,
   Sun,
@@ -31,14 +30,14 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { conversationPlan } from '../lib/conversation';
-import { sourceLocation } from '../lib/evidence';
 import { requestedConnectedSource } from '../lib/query-routing';
 import { useConversation } from '../hooks/useConversation';
 import { useAtlasTheme } from '../hooks/useAtlasTheme';
 import { useSourceConnections } from '../hooks/useSourceConnections';
 import { useGmailWorkspace } from '../hooks/useGmailWorkspace';
 import { useConnectedSourcesController } from '../hooks/useConnectedSourcesController';
-import { api, apiStream } from '../lib/api';
+import { api } from '../lib/api';
+import { requestResearchAnswer, persistConversation } from '../lib/researchRequests';
 import { uploadDocument } from '../lib/uploadDocuments';
 import type {
   User,
@@ -56,6 +55,10 @@ import '../app/rebuild.css';
 import { ConversationTranscript } from './chat/ConversationTranscript';
 import { ResearchComposer } from './chat/ResearchComposer';
 import { ResearchAnswer } from './chat/ResearchAnswer';
+import { EvidenceInspector } from './chat/EvidenceInspector';
+import { WorkspaceSearchDialog } from './layout/WorkspaceSearchDialog';
+import { WorkspaceManagerDialog } from './layout/WorkspaceManagerDialog';
+import { WebPageImportForm } from './documents/WebPageImportForm';
 import { ConversationHistory } from './chat/ConversationHistory';
 import { ResearchSourceSelector } from './chat/ResearchSourceSelector';
 import { DocumentsView } from './documents/DocumentsView';
@@ -477,10 +480,7 @@ export function AtlasWorkspace() {
     let id = plan.id;
     try {
       if (!id) {
-        const created = await api<SavedChat>(`/workspaces/${target}/conversations`, {
-          method: 'POST',
-          body: JSON.stringify({ title, messages: pending }),
-        });
+        const created = await persistConversation(target, null, title, pending);
         id = created.id;
         activeChat.current = id;
         setChatId(id);
@@ -491,40 +491,28 @@ export function AtlasWorkspace() {
       const scopedDocuments = requestedSource === 'github' ? false : includeDocuments;
       const scopedGmail = requestedSource === 'github' ? false : connectedGmail;
       const useConnected = scopedGmail || scopedProviders.length > 0 || user?.mode === 'ai';
-      const answerBody = {
-        question,
-        history,
-        document_ids: selected,
-        include_documents: scopedDocuments,
-        include_gmail: scopedGmail,
-        gmail_query: connectedGmailQuery,
-        providers: scopedProviders,
-      };
-      let result: Answer;
-      if (useConnected) {
-        let draft = '';
-        result = await apiStream<Answer>(
-          `/workspaces/${target}/connected-chat/stream`,
-          answerBody,
-          (event) => {
-            if (event.type === 'status') setAnswerProgress(event.text);
-            if (event.type === 'delta') {
-              draft += event.text;
-              const live: Message[] = [...pending, { role: 'assistant', content: draft }];
-              chatMessages.current = live;
-              setMessages(live);
-            }
-          },
-          controller.signal,
-        );
-      } else {
-        result = await api<Answer>(`/workspaces/${target}/chat`, {
-          method: 'POST',
-          body: JSON.stringify({ question, history, document_ids: selected }),
-          signal: controller.signal,
-        });
-        result.scope = ['documents'];
-      }
+      let draft = '';
+      const result = await requestResearchAnswer(
+        {
+          workspaceId: target,
+          question,
+          history,
+          documentIds: selected,
+          includeDocuments: scopedDocuments,
+          includeGmail: scopedGmail,
+          gmailQuery: connectedGmailQuery,
+          providers: scopedProviders,
+          useConnected,
+        },
+        controller.signal,
+        setAnswerProgress,
+        (delta) => {
+          draft += delta;
+          const live: Message[] = [...pending, { role: 'assistant', content: draft }];
+          chatMessages.current = live;
+          setMessages(live);
+        },
+      );
       if (scope.current !== target) return;
       const completed: Message[] = [
         ...pending,
@@ -532,10 +520,7 @@ export function AtlasWorkspace() {
       ];
       chatMessages.current = completed;
       setMessages(completed);
-      const saved = await api<SavedChat>(`/workspaces/${target}/conversations/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ title, messages: completed }),
-      });
+      const saved = await persistConversation(target, id, title, completed);
       setChats((old) => [
         { id: saved.id, title: saved.title, updated: saved.updated },
         ...old.filter((c) => c.id !== saved.id),
@@ -1110,36 +1095,12 @@ export function AtlasWorkspace() {
             <DocumentsView
               uploadButton={uploadButton}
               webImport={
-                <form
-                  onSubmit={(e) => void importWebPage(e)}
-                  style={{
-                    display: 'flex',
-                    gap: 8,
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    margin: '18px 0',
-                  }}
-                >
-                  <label htmlFor="atlas-web-url">Save public web page</label>
-                  <input
-                    id="atlas-web-url"
-                    type="url"
-                    required
-                    value={webUrl}
-                    onChange={(e) => setWebUrl(e.target.value)}
-                    placeholder="https://example.com/article"
-                    style={{
-                      minWidth: 260,
-                      flex: 1,
-                      padding: 10,
-                      borderRadius: 8,
-                      border: '1px solid var(--border, #999)',
-                    }}
-                  />
-                  <button className="btn" type="submit" disabled={webBusy}>
-                    {webBusy ? 'Importing…' : 'Add URL'}
-                  </button>
-                </form>
+                <WebPageImportForm
+                  url={webUrl}
+                  busy={webBusy}
+                  onUrlChange={setWebUrl}
+                  onSubmit={(event) => void importWebPage(event)}
+                />
               }
               totalDocuments={docs.length}
               readyDocuments={ready.length}
@@ -1282,65 +1243,22 @@ export function AtlasWorkspace() {
         </div>
       </main>
       {searchOpen && (
-        <Dialog
-          title="Search your workspace"
+        <WorkspaceSearchDialog
+          query={globalQuery}
+          onQueryChange={setGlobalQuery}
           onClose={() => setSearchOpen(false)}
-          className="search-dialog"
-        >
-          <div className="modal-search">
-            <Search />
-            <input
-              autoFocus
-              data-autofocus
-              aria-label="Search your workspace"
-              placeholder="Find a document or ask a question…"
-              value={globalQuery}
-              onChange={(e) => setGlobalQuery(e.target.value)}
-            />
-          </div>
-          {globalQuery.trim() && (
-            <button
-              className="search-question"
-              disabled={busy || !hasAskSources}
-              onClick={() => {
-                setSearchOpen(false);
-                void ask(globalQuery, true);
-                setGlobalQuery('');
-              }}
-            >
-              <Sparkles />
-              <span>Ask Atlas: {globalQuery}</span>
-              <ArrowUpRight />
-            </button>
-          )}
-          <div className="search-results">
-            {docs
-              .filter((d) => d.name.toLowerCase().includes(globalQuery.toLowerCase()))
-              .slice(0, 12)
-              .map((d) => (
-                <button
-                  className="doc-item"
-                  key={d.id}
-                  onClick={() => {
-                    setSearchOpen(false);
-                    void inspect(d);
-                  }}
-                >
-                  <FileBadge name={d.name} />
-                  <span className="doc-item-info">
-                    <strong>{d.name}</strong>
-                    <small>
-                      {prettyBytes(d.size)} · {d.chunk_count} passages
-                    </small>
-                  </span>
-                  <ChevronRight />
-                </button>
-              ))}
-            {!docs.some((d) => d.name.toLowerCase().includes(globalQuery.toLowerCase())) && (
-              <p className="evidence-empty">No matching documents.</p>
-            )}
-          </div>
-        </Dialog>
+          onAsk={(question) => {
+            setSearchOpen(false);
+            void ask(question, true);
+            setGlobalQuery('');
+          }}
+          onInspect={(doc) => {
+            setSearchOpen(false);
+            void inspect(doc);
+          }}
+          documents={docs}
+          canAsk={!busy && hasAskSources}
+        />
       )}
       {scopeOpen && (
         <Dialog title="Choose your sources" onClose={() => setScopeOpen(false)}>
@@ -1378,197 +1296,33 @@ export function AtlasWorkspace() {
         </Dialog>
       )}
       {newWorkspace && (
-        <Dialog
-          title="Your workspaces"
-          onClose={() => {
-            setNewWorkspace(false);
-            setDeleteWorkspaceId(null);
-          }}
-        >
-          <p className="dialog-intro">Manage your workspaces and their saved conversations.</p>
-          <div className="workspace-list">
-            {workspaces.map((w) => (
-              <div className="workspace-manage-row" key={w.id}>
-                <button
-                  className={w.id === wid ? 'selected' : ''}
-                  disabled={busy || uploading || deletingWorkspace}
-                  onClick={() => {
-                    setWid(w.id);
-                    setNewWorkspace(false);
-                  }}
-                >
-                  <span className="ws-avatar">{w.name[0].toUpperCase()}</span>
-                  <strong>{w.name}</strong>
-                  {w.id === wid ? <Check /> : <ChevronRight />}
-                </button>
-                <button
-                  className="workspace-delete"
-                  type="button"
-                  title={`Delete ${w.name}`}
-                  aria-label={`Delete workspace ${w.name}`}
-                  onClick={() => {
-                    setDeleteWorkspaceId(w.id);
-                    setConfirmWorkspaceName('');
-                  }}
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-          {deleteWorkspaceId && (
-            <div
-              className="workspace-delete-confirm"
-              role="group"
-              aria-label="Confirm workspace deletion"
-            >
-              <strong>Delete “{workspaces.find((w) => w.id === deleteWorkspaceId)?.name}”?</strong>
-              <p>
-                This permanently deletes its documents, indexed passages, and saved chats. Type the
-                workspace name to confirm.
-              </p>
-              <input
-                aria-label="Type workspace name to confirm"
-                autoComplete="off"
-                value={confirmWorkspaceName}
-                onChange={(e) => setConfirmWorkspaceName(e.target.value)}
-                placeholder="Exact workspace name"
-              />
-              <div className="dialog-actions">
-                <button className="btn" type="button" onClick={() => setDeleteWorkspaceId(null)}>
-                  Cancel
-                </button>
-                <button
-                  className="btn danger"
-                  type="button"
-                  disabled={
-                    deletingWorkspace ||
-                    busy ||
-                    uploading ||
-                    confirmWorkspaceName !==
-                      workspaces.find((w) => w.id === deleteWorkspaceId)?.name
-                  }
-                  onClick={() => void removeWorkspace()}
-                >
-                  {deletingWorkspace ? 'Deleting…' : 'Delete workspace'}
-                </button>
-              </div>
-            </div>
-          )}
-          <form className="workspace-form" onSubmit={addWorkspace}>
-            <label>
-              New workspace
-              <input
-                required
-                maxLength={100}
-                value={workspaceName}
-                onChange={(e) => setWorkspaceName(e.target.value)}
-                placeholder="e.g. Product research"
-              />
-            </label>
-            <button className="btn primary">
-              <Plus />
-              Create workspace
-            </button>
-          </form>
-        </Dialog>
+        <WorkspaceManagerDialog
+          workspaces={workspaces}
+          activeId={wid}
+          busy={busy}
+          uploading={uploading}
+          deleting={deletingWorkspace}
+          deleteId={deleteWorkspaceId}
+          confirmation={confirmWorkspaceName}
+          name={workspaceName}
+          onClose={() => { setNewWorkspace(false); setDeleteWorkspaceId(null); }}
+          onSelect={(id) => { setWid(id); setNewWorkspace(false); }}
+          onSelectDelete={(id) => { setDeleteWorkspaceId(id); setConfirmWorkspaceName(''); }}
+          onConfirmation={setConfirmWorkspaceName}
+          onCancelDelete={() => setDeleteWorkspaceId(null)}
+          onDelete={() => void removeWorkspace()}
+          onName={setWorkspaceName}
+          onCreate={addWorkspace}
+        />
       )}
-      {(source || preview) && (
-        <Dialog
-          title={source ? 'Source passage' : 'Document preview'}
-          closeLabel="Close preview"
-          className="evidence-inspector"
-          onClose={() => {
-            setSource(null);
-            setPreview(null);
-          }}
-        >
-          <div className="drawer-header">
-            <div>
-              <div className="caption">{source ? 'Source excerpt' : 'Document preview'}</div>
-              <h2>{source?.name || preview?.document.name}</h2>
-              <div className="caption">
-                {source
-                  ? sourceLocation(source)
-                  : `${preview?.document.chunk_count} passages · ${preview?.document.status}`}
-              </div>
-            </div>
-          </div>
-          <div className="drawer-body">
-            {source ? (
-              <div className="evidence-inspector-passage">
-                <p className="caption evidence-disclaimer">
-                  Retrieved excerpt. Check the original source to confirm context.
-                </p>
-                <DocumentPassage name={source.name} text={source.text} />
-              </div>
-            ) : (
-              preview && (
-                <>
-                  {preview.document.error && (
-                    <p className="feedback error">{preview.document.error}</p>
-                  )}
-                  {preview.chunks.map((c) => (
-                    <section className="preview-chunk" key={c.id}>
-                      <span className="caption">
-                        {preview.document.name.toLowerCase().endsWith('.pdf') ? 'Page' : 'Section'}{' '}
-                        {c.page}
-                      </span>
-                      <DocumentPassage name={preview.document.name} text={c.text} />
-                    </section>
-                  ))}
-                  {!preview.chunks.length && (
-                    <p className="evidence-empty">No indexed passages yet.</p>
-                  )}
-                  {preview.document.chunk_count > preview.chunks.length && (
-                    <button
-                      className="btn"
-                      onClick={async () => {
-                        try {
-                          const next = await api<typeof preview>(
-                            `/workspaces/${wid}/documents/${preview.document.id}/chunks?offset=${preview.chunks.length}`,
-                          );
-                          if (next)
-                            setPreview({ ...preview, chunks: [...preview.chunks, ...next.chunks] });
-                        } catch (e) {
-                          setError((e as Error).message);
-                        }
-                      }}
-                    >
-                      Load more passages
-                    </button>
-                  )}
-                </>
-              )
-            )}
-          </div>
-          <div className="drawer-footer">
-            {source?.url ? (
-              <a className="btn" href={source.url} target="_blank" rel="noopener noreferrer">
-                <ArrowUpRight />
-                Open source
-              </a>
-            ) : (
-              <a
-                className="btn"
-                href={`/api/workspaces/${wid}/documents/${source?.document_id || preview?.document.id}/original`}
-              >
-                <Download />
-                Download original
-              </a>
-            )}
-            <button
-              className="btn"
-              onClick={() => {
-                setSource(null);
-                setPreview(null);
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </Dialog>
-      )}
+      <EvidenceInspector
+        wid={wid}
+        source={source}
+        preview={preview}
+        onClose={() => { setSource(null); setPreview(null); }}
+        onPreviewChange={setPreview}
+        onError={setError}
+      />
     </div>
   );
 }
