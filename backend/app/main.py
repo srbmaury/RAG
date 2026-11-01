@@ -307,9 +307,13 @@ def delete_workspace(
     # Use explicit deletes for SQLite and PostgreSQL; no reliance on ORM cascades.
     db.query(GmailOAuthState).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
     db.query(DriveOAuthState).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
-    db.query(ConnectedOAuthState).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
+    db.query(ConnectedOAuthState).filter_by(workspace_id=workspaceId).delete(
+        synchronize_session=False
+    )
     db.query(GmailConnection).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
-    db.query(ExternalConnection).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
+    db.query(ExternalConnection).filter_by(workspace_id=workspaceId).delete(
+        synchronize_session=False
+    )
     db.query(Conversation).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
     db.query(Chunk).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
     db.query(Document).filter_by(workspace_id=workspaceId).delete(synchronize_session=False)
@@ -325,7 +329,9 @@ def documents(workspaceId: str, actor=Depends(user), db=Depends(database)):
     workspace(workspaceId, actor, db)
     return [
         public_doc(d)
-        for d in db.query(Document).filter_by(workspace_id=workspaceId).order_by(Document.created.desc())
+        for d in db.query(Document)
+        .filter_by(workspace_id=workspaceId)
+        .order_by(Document.created.desc())
     ]
 
 
@@ -403,7 +409,9 @@ async def upload(
             if not count:
                 raise ValueError('File is empty.')
             existing = (
-                db.query(Document).filter_by(workspace_id=workspaceId, digest=digest.hexdigest()).first()
+                db.query(Document)
+                .filter_by(workspace_id=workspaceId, digest=digest.hexdigest())
+                .first()
             )
             if existing:
                 path.unlink(missing_ok=True)
@@ -419,7 +427,9 @@ async def upload(
             db.rollback()
             path.unlink(missing_ok=True)
             existing = (
-                db.query(Document).filter_by(workspace_id=workspaceId, digest=digest.hexdigest()).first()
+                db.query(Document)
+                .filter_by(workspace_id=workspaceId, digest=digest.hexdigest())
+                .first()
             )
             if not existing:
                 raise
@@ -760,7 +770,11 @@ def github_pull_request_list_result(question, body, evidence, document_evidence)
 
 @app.post('/api/workspaces/{workspaceId}/connected-chat')
 def connected_chat(
-    workspaceId: str, body: ConnectedQuestion, request: Request, actor=Depends(user), db=Depends(database)
+    workspaceId: str,
+    body: ConnectedQuestion,
+    request: Request,
+    actor=Depends(user),
+    db=Depends(database),
 ):
     """Retrieve evidence across workspace documents and optionally live Gmail."""
     import re
@@ -833,7 +847,11 @@ def connected_chat(
 
 @app.post('/api/workspaces/{workspaceId}/connected-chat/stream')
 def connected_chat_stream(
-    workspaceId: str, body: ConnectedQuestion, request: Request, actor=Depends(user), db=Depends(database)
+    workspaceId: str,
+    body: ConnectedQuestion,
+    request: Request,
+    actor=Depends(user),
+    db=Depends(database),
 ):
     """Stream answer progress and text as newline-delimited JSON events."""
     import json
@@ -1074,7 +1092,9 @@ def chat(workspaceId: str, body: Question, actor=Depends(user), db=Depends(datab
     if sources:
         current = (
             db.query(Chunk.id)
-            .filter(Chunk.workspace_id == workspaceId, Chunk.id.in_([s['chunk_id'] for s in sources]))
+            .filter(
+                Chunk.workspace_id == workspaceId, Chunk.id.in_([s['chunk_id'] for s in sources])
+            )
             .count()
         )
         if current != len(sources):

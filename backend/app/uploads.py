@@ -106,7 +106,11 @@ def finish(upload_id, workspaceId, owner, db):
         with part.open('rb') as file:
             for block in iter(lambda: file.read(PART_BYTES), b''):
                 digest.update(block)
-        existing = db.query(Document).filter_by(workspace_id=workspaceId, digest=digest.hexdigest()).first()
+        existing = (
+            db.query(Document)
+            .filter_by(workspace_id=workspaceId, digest=digest.hexdigest())
+            .first()
+        )
         if existing:
             part.unlink()
             meta.unlink()
@@ -128,7 +132,9 @@ def finish(upload_id, workspaceId, owner, db):
             db.rollback()
             destination.unlink(missing_ok=True)
             existing = (
-                db.query(Document).filter_by(workspace_id=workspaceId, digest=digest.hexdigest()).first()
+                db.query(Document)
+                .filter_by(workspace_id=workspaceId, digest=digest.hexdigest())
+                .first()
             )
             if not existing:
                 raise

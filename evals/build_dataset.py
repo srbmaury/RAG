@@ -786,7 +786,10 @@ def norm(s):
 def build():
     assert len(items) == 100, len(items)
     with Session() as db:
-        docs = {d.name: d for d in db.query(Document).filter_by(workspace_id=workspaceId, status='ready')}
+        docs = {
+            d.name: d
+            for d in db.query(Document).filter_by(workspace_id=workspaceId, status='ready')
+        }
         for i, item in enumerate(items, 1):
             item['id'] = f'Q{i:03d}'
             names = item['document'] if isinstance(item['document'], list) else [item['document']]

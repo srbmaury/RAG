@@ -1108,9 +1108,11 @@ def test_credit_card_offer_retrieval_drops_unrelated_results_and_reads_full_emai
     monkeypatch.setattr(
         gmail,
         'gmail_get',
-        lambda token, url, params=None: {'messages': [{'id': 'statement'}, {'id': 'unrelated'}]}
-        if url.endswith('/messages')
-        else messages[url.rsplit('/', 1)[-1]],
+        lambda token, url, params=None: (
+            {'messages': [{'id': 'statement'}, {'id': 'unrelated'}]}
+            if url.endswith('/messages')
+            else messages[url.rsplit('/', 1)[-1]]
+        ),
     )
     body = main.ConnectedQuestion(question=question, include_documents=False, include_gmail=True)
     with Session() as db:
@@ -1216,7 +1218,10 @@ def test_source_health_check_distinguishes_unconnected_from_healthy(client, monk
     monkeypatch.setattr(
         external_sources,
         'read_connection',
-        lambda db, who, workspaceId, provider: (db.get(ExternalConnection, (workspaceId, provider)), 'test-token'),
+        lambda db, who, workspaceId, provider: (
+            db.get(ExternalConnection, (workspaceId, provider)),
+            'test-token',
+        ),
     )
     monkeypatch.setattr(
         external_sources, 'verify_source_access', lambda provider, token: ('test-user', 2)

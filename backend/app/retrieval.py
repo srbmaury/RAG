@@ -198,8 +198,9 @@ def retrieve(workspace_id, query, document_ids=None, limit=8):
             or (len(terms) > 1 and semantic_scores.get(c.id, 0) >= 0.68)
         ]
         ranked.sort(
-            key=lambda c: scores[c.id]
-            + 0.001 * len(terms & set(tokens(c.text))) / max(len(terms), 1),
+            key=lambda c: (
+                scores[c.id] + 0.001 * len(terms & set(tokens(c.text))) / max(len(terms), 1)
+            ),
             reverse=True,
         )
         selected = diversify_ranked_chunks(ranked, limit)

@@ -156,7 +156,11 @@ def save_webpage(workspaceId: str, url: str, db) -> dict:
     try:
         path.write_bytes(data)
         doc = Document(
-            id=did, workspace_id=workspaceId, name=f'{title[:170]}.md', size=len(data), digest=digest
+            id=did,
+            workspace_id=workspaceId,
+            name=f'{title[:170]}.md',
+            size=len(data),
+            digest=digest,
         )
         db.add(doc)
         db.commit()

@@ -129,7 +129,10 @@ def callback(provider: str, state: str = '', code: str = ''):
         workspaceId = item.workspace_id
         verifier = item.verifier
         owner = db.get(User, item.user_id)
-        if not owner or not db.query(Workspace).filter_by(id=workspaceId, owner_id=owner.id).first():
+        if (
+            not owner
+            or not db.query(Workspace).filter_by(id=workspaceId, owner_id=owner.id).first()
+        ):
             raise HTTPException(400, 'Workspace no longer exists.')
         db.delete(item)
         db.commit()
