@@ -8,6 +8,7 @@ Run from the repository root:
 
 ```bash
 PYTHONPATH=backend python evals/answer_quality.py evals/answer_quality_cases.json
+PYTHONPATH=backend python evals/research_quality_suite.py evals/research_quality_suite.json
 PYTHONPATH=backend python evals/connected_retrieval_eval.py evals/connected_cases.json
 PYTHONPATH=backend python evals/citation_eval.py evals/citation_cases.json
 ```
@@ -54,3 +55,25 @@ See `docs/OPERATIONS.md` for network hardening and backup/restore guidance.
 
 No new connector is added by default. Extend the provider set only when
 user demand and a real authenticated test account justify the maintenance cost.
+
+## Decision timelines and realistic evaluation
+
+The answer UI displays dated source statements only when at least two retrieved
+sources share an explicit issue/PR reference. Each timeline event links to its
+original source and is labeled `source_reported`. Dates are parsed from source
+text, not inferred from retrieval time. These events are **not** automatically
+certified as accurate decisions or causal relationships.
+
+`evals/research_quality_suite.json` includes 96 fictional, synthetic,
+unreviewed cases across 12 categories. Many are templated variations, so this
+suite is useful for regression coverage but **not representative of actual user
+traffic**. Its metrics score retrieval of required passages only.
+
+To build a representative benchmark, collect opt-in questions from real Atlas
+workflows with consent; strip identifiers and secrets; sample across data
+sources, question lengths, access boundaries and tasks; have at least two
+independent reviewers annotate relevant sources, answer claims, conflicts,
+and permitted abstentions. Resolve disagreements and store immutable dataset
+versions. Evaluate retrieval recall, answer correctness, citation entailment,
+correct abstention, and temporal ordering separately, with review by category.
+Never upload private connected content into public test fixtures.
