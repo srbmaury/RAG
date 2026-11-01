@@ -1,0 +1,331 @@
+.upload-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px dashed var(--line2);
+  border-radius: 10px;
+  padding: 23px;
+  margin-top: 28px;
+  background: var(--panel);
+}
+.upload-area > svg {
+  color: var(--brand);
+  width: 24px;
+  height: 24px;
+}
+.upload-area > div {
+  flex: 1;
+}
+.upload-area strong {
+  font-size: 12px;
+}
+.upload-area p {
+  font-size: 11px;
+  color: var(--sub);
+  margin-top: 4px;
+}
+.upload-area.dragging {
+  background: var(--active);
+  border-color: var(--brand);
+}
+.document-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--panel);
+}
+.document-search svg {
+  width: 16px;
+  height: 16px;
+  color: var(--sub);
+}
+.library-bar .document-search input {
+  border: 0;
+  background: none;
+  padding: 10px 0;
+  min-width: 220px;
+  font-size: 12px;
+}
+.library-bar {
+  align-items: center;
+}
+.document-name {
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  max-width: 430px;
+  padding: 0;
+}
+.document-name > span:last-child {
+  min-width: 0;
+}
+.document-name strong {
+  display: block;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 330px;
+}
+.document-name .document-error {
+  display: block;
+  font-size: 10px;
+  color: #be6859;
+  margin-top: 5px;
+  max-width: 300px;
+  overflow-wrap: anywhere;
+}
+.document-table td {
+  white-space: nowrap;
+}
+.document-table td:first-child {
+  min-width: 260px;
+}
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.status svg {
+  width: 13px;
+  height: 13px;
+}
+.status-failed {
+  color: #be6859;
+}
+.status-queued,
+.status-processing {
+  color: #9a8247;
+}
+.row-actions {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+}
+.row-actions .icon-button svg {
+  width: 15px;
+  height: 15px;
+}
+.icon-button.destructive:hover {
+  color: #c15c4a;
+  background: color-mix(in srgb, #d95747 9%, var(--panel));
+}
+.insights-section {
+  position: relative;
+  min-height: 350px;
+}
+.scope-tag {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--sub);
+  background: var(--pill);
+  padding: 8px 11px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+.scope-tag svg {
+  width: 14px;
+  height: 14px;
+}
+.insight-tools {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 28px;
+}
+.insight-tool {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 21px;
+  border-radius: 10px;
+}
+.insight-tool:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--line2);
+}
+.insight-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--active);
+  color: var(--brand);
+  margin-bottom: 17px;
+  grid-column: 1;
+}
+.insight-tool strong {
+  grid-column: 1;
+  font-size: 13px;
+}
+.insight-tool small {
+  grid-column: 1;
+  font-size: 11px;
+  color: var(--sub);
+  margin-top: 5px;
+}
+.insight-tool > svg {
+  grid-column: 2;
+  grid-row: 1;
+  color: var(--faint);
+  width: 15px;
+  height: 15px;
+}
+.insight-explanation {
+  margin: 15px 0 26px;
+  line-height: 1.8;
+}
+.report {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 24px;
+  margin-top: 17px;
+}
+.report-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 18px;
+}
+.report-heading .eyebrow {
+  font-size: 9px;
+  color: var(--faint);
+  margin-bottom: 7px;
+}
+.report-heading h2 {
+  font-size: 17px;
+  letter-spacing: -0.4px;
+}
+.report-progress {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--hover);
+  padding: 18px;
+  border-radius: 8px;
+  color: var(--sub);
+  font-size: 12px;
+}
+.report-progress > svg {
+  width: 20px;
+  height: 20px;
+  color: var(--brand);
+}
+.report-progress p {
+  font-size: 11px;
+  margin-top: 4px;
+  line-height: 1.7;
+}
+.report-results {
+  margin-top: 20px;
+}
+.coverage {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 13px;
+  border-radius: 7px;
+  background: var(--active);
+  font-size: 12px;
+  margin-bottom: 17px;
+}
+.coverage svg {
+  width: 16px;
+  height: 16px;
+  color: var(--brand);
+}
+.report details {
+  border-top: 1px solid var(--line);
+  padding: 15px 0;
+}
+.report summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+}
+.report summary > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.report summary svg {
+  width: 16px;
+  height: 16px;
+  color: var(--sub);
+}
+.report-batch {
+  padding: 18px;
+  margin: 14px 0;
+  background: var(--hover);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.report-batch > .caption {
+  display: block;
+  margin-bottom: 13px;
+}
+.report-batch .source-chip {
+  background: var(--panel);
+}
+.report-results > .caption {
+  display: block;
+  margin-top: 12px;
+}
+.loading-overlay {
+  position: fixed;
+  inset: 64px 0 0 250px;
+  z-index: 18;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  backdrop-filter: blur(4px);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+}
+.loading-overlay > div {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 38px 32px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  width: min(390px, 100%);
+}
+.loading-overlay svg {
+  width: 30px;
+  height: 30px;
+  color: var(--brand);
+  margin-bottom: 18px;
+}
+.loading-overlay h2 {
+  font-size: 20px;
+  letter-spacing: -0.5px;
+  margin-bottom: 9px;
+}
+.loading-overlay p {
+  font-size: 12px;
+  color: var(--sub);
+  line-height: 1.8;
+}
+.collapsed .loading-overlay {
+  left: 64px;
+}
