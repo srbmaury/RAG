@@ -8,7 +8,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -535,7 +535,7 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
         return no_evidence_result(body)
     # A local 8k-context model cannot accept all retrieved source bodies at once.
     # Keep source IDs stable across retries so citations always refer to real evidence.
-    from .connected_synthesis import synthesize_connected, source_results_answer
+    from .connected_synthesis import synthesize_connected
     listed = github_pull_request_list_result(body.question, body, evidence, document_evidence)
     if listed:
         return listed

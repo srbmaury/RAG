@@ -5,10 +5,8 @@ at rest. Never send them to AI providers or include them in responses.
 """
 import logging
 import re
-from urllib.parse import quote
 
 import httpx
-from cryptography.fernet import Fernet
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from .db import Session, ExternalConnection, SourceHealthCheck

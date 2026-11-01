@@ -2,7 +2,7 @@ name: Atlas checks
 on:
   pull_request:
   push:
-    branches: [main, feature/reliability-overhaul]
+    branches: [main]
 jobs:
   backend:
     runs-on: ubuntu-latest

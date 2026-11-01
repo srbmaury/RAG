@@ -1,10 +1,8 @@
 """Google Drive read-only OAuth and on-demand source retrieval."""
 import hashlib
 import io
-import csv
 import pypdfium2 as pdfium
 from docx import Document as WordDocument
-import json
 import logging
 import os
 import secrets
