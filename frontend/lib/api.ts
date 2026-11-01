@@ -22,22 +22,38 @@ export async function apiStream<T>(path:string,body:unknown,onEvent:(event:Strea
   throw new Error(detail||`The server returned HTTP ${response.status}. Check the backend terminal for details.`);
  }
  if(!response.body)throw new Error('The server did not start an answer stream. Try again.');
- const reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';let result:T|undefined;
+ const reader=response.body.getReader();
+ const decoder=new TextDecoder();
+ let buffer='';
+ let result:T|undefined;
+ let completed=false;
  const consume=(line:string)=>{
   if(!line.trim())return;
-  const event=JSON.parse(line) as StreamEvent;
+  let event:StreamEvent;
+  try { event=JSON.parse(line) as StreamEvent; }
+  catch { throw new Error('The server returned an invalid answer-stream event.'); }
   if(event.type==='error')throw new Error(event.message);
-  if(event.type==='done')result=event.result as T;
+  if(event.type==='done'){result=event.result as T;completed=true;}
   else onEvent(event);
  };
- while(true){
-  const {done,value}=await reader.read();
-  buffer+=decoder.decode(value||new Uint8Array(),{stream:!done});
-  let end=buffer.indexOf('\n');
-  while(end>=0){const line=buffer.slice(0,end);buffer=buffer.slice(end+1);consume(line);end=buffer.indexOf('\n');}
-  if(done)break;
+ try {
+  while(true){
+   const {done,value}=await reader.read();
+   buffer+=decoder.decode(value||new Uint8Array(),{stream:!done});
+   let end=buffer.indexOf('\n');
+   while(end>=0){
+    const line=buffer.slice(0,end);
+    buffer=buffer.slice(end+1);
+    consume(line);
+    end=buffer.indexOf('\n');
+   }
+   if(done)break;
+  }
+  if(buffer.trim())consume(buffer);
+  if(!completed||result===undefined)throw new Error('The answer stream ended before Atlas returned a result. Retry the question.');
+  return result;
+ }finally{
+  if(!completed){await reader.cancel().catch(()=>undefined);}
+  reader.releaseLock();
  }
- if(buffer.trim())consume(buffer);
- if(result===undefined)throw new Error('The answer stream ended before Atlas returned a result. Retry the question.');
- return result;
 }

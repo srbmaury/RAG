@@ -164,3 +164,91 @@ test('mobile navigation closes after choosing a destination',async({page})=>{
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);
   expect(overflow).toBe(false);
 });
+
+test('Home keeps the primary research entry accessible on mobile',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.getByRole('button',{name:'Open menu',exact:true}).click();
+ await page.getByRole('button',{name:'Home',exact:true}).click();
+ await expect(page.getByRole('heading',{name:/What would you like/})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Ask Atlas'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth)).toBe(false);
+});
+
+test('nested citations open a modal excerpt and restore focus',async({page})=>{
+ await page.route('**/api/workspaces/w1/connected-chat/stream',route=>route.fulfill({status:200,contentType:'application/x-ndjson',body:JSON.stringify({type:'done',result:{answer:'Evidence **supports [1]**.',mode:'connected',sources:[{chunk_id:'pr-1',document_id:'',name:'Release decision',page:0,location_type:'github',provider:'github',url:'https://github.com/example/repo/pull/1',text:'Release after accessibility review.'}]}})+'\n'}));
+ await page.getByRole('checkbox',{name:'GitHub'}).check();
+ await page.getByRole('textbox',{name:'Your question'}).fill('Summarize the sources');
+ await page.getByRole('button',{name:'Send question'}).click();
+ const citation=page.getByRole('button',{name:'Open source 1: Release decision',exact:true});
+ await expect(citation).toBeVisible();
+ await citation.click();
+ const drawer=page.getByRole('dialog',{name:'Source passage'});
+ await expect(drawer).toContainText('Release after accessibility review.');
+ await page.screenshot({path:'/tmp/atlas-audit/after-evidence.png',animations:'disabled'});
+ await expect(drawer).toContainText('GitHub');
+ await expect(drawer).not.toContainText('Section 0');
+ await expect(drawer.getByRole('link',{name:'Open source',exact:true})).toHaveAttribute('href','https://github.com/example/repo/pull/1');
+ await expect(drawer.getByRole('button',{name:'Close preview'})).toBeFocused();
+ await page.keyboard.press('Shift+Tab');
+ await expect(drawer.getByRole('button',{name:'Close',exact:true})).toBeFocused();
+ await page.keyboard.press('Tab');
+ await expect(drawer.getByRole('button',{name:'Close preview'})).toBeFocused();
+ await page.keyboard.press('Escape');
+ await expect(drawer).toHaveCount(0);
+ await expect(citation).toBeFocused();
+});
+
+test('IME confirmation does not submit a question',async({page})=>{
+ const input=page.getByRole('textbox',{name:'Your question'});
+ await input.fill('質問');
+ await input.dispatchEvent('keydown',{key:'Enter',isComposing:true});
+ await expect(page.locator('.user-message')).toHaveCount(0);
+});
+
+test('audit screen captures',async({page})=>{
+ test.setTimeout(120000);
+ for(const width of [390,768,1280,1920]){
+ await page.setViewportSize({width,height:900});
+ for(const theme of ['light','dark']){
+ await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+ for(const screen of ['Home','Documents','Sources','Ask Atlas']){
+ if(await page.getByRole('button',{name:'Open menu',exact:true}).isVisible())await page.getByRole('button',{name:'Open menu',exact:true}).click();
+ await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:screen,exact:true}).click();
+ await page.screenshot({path:`/tmp/atlas-audit/${process.env.AUDIT_PHASE||'after'}-${screen}-${width}-${theme}.png`,fullPage:true,animations:'disabled'});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),`${screen} ${width} ${theme}`).toBe(false);
+ if(width>600){
+ const sidebar=await page.locator('.sidebar').boundingBox();
+ const main=await page.locator('.main').boundingBox();
+ expect(main!.x,`Navigation must not cover ${screen} at ${width}px`).toBeGreaterThanOrEqual(sidebar!.x+sidebar!.width);
+ }
+ }
+ }
+ }
+});
+
+test('document processing failures expose context and retry',async({page})=>{
+ await page.route('**/api/workspaces/w1/documents',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([
+ {id:'bad',name:'failed.pdf',size:512,status:'failed',pages:0,chunk_count:0,error:'The PDF is password protected. Upload an unlocked copy.'},
+ {id:'pending',name:'pending.md',size:128,status:'processing',pages:1,chunk_count:0}
+ ])}));
+ await page.reload();
+ await page.getByRole('button',{name:'Documents',exact:true}).click();
+ await expect(page.getByText('The PDF is password protected. Upload an unlocked copy.')).toBeVisible();
+ await expect(page.getByRole('button',{name:'Reindex failed.pdf'})).toBeVisible();
+ await expect(page.getByText('Processing',{exact:true})).toBeVisible();
+ await page.getByRole('searchbox',{name:'Search documents'}).fill('absent');
+ await expect(page.getByRole('heading',{name:'No matching documents'})).toBeVisible();
+});
+
+test('authentication failure stays actionable and announced',async({page})=>{
+ await page.route('**/api/me',route=>route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({detail:'Please sign in.'})}));
+ await page.reload();
+ await expect(page.getByRole('heading',{name:'Create your workspace'})).toBeVisible();
+ await page.getByRole('button',{name:'Sign in',exact:true}).click();
+ await page.route('**/api/auth/login',route=>route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({detail:'Incorrect email or password.'})}));
+ await page.getByLabel('Email address').fill('test@example.com');
+ await page.getByLabel('Password',{exact:true}).fill('wrong-password');
+ await page.getByRole('button',{name:'Sign in',exact:true}).click();
+ await expect(page.locator('.auth-form').getByRole('alert')).toContainText('Incorrect email or password.');
+ await page.screenshot({path:'/tmp/atlas-audit/after-auth.png',animations:'disabled'});
+});

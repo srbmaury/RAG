@@ -245,7 +245,11 @@ Tokens and originals are workspace data. Protect the database, document volume, 
 - `backend/app/external_sources.py`: GitHub, Notion, and Slack adapters.
 - `backend/app/drive.py` and `backend/app/gmail.py`: Google connectors.
 - `backend/app/worker.py`: durable ingestion queue worker.
-- `frontend/app/page.tsx`: workspace UI, Ask Atlas, sources, and document library.
+- `frontend/app/page.tsx`: lightweight Next.js entry point.
+- `frontend/components/AtlasWorkspace.tsx`: workspace orchestration and API actions.
+- `frontend/components/{home,documents,chat,sources,auth,layout,ui}/`: feature-level UI and shared components.
+- `frontend/hooks/`: theme, conversation, Gmail and connected-source state.
+- `frontend/app/rebuild.css`: current feature-specific visual refinements; consolidation with legacy `globals.css` remains future cleanup.
 - `compose.yaml`: PostgreSQL, API, worker, and web services.
 
 ## Design preview
