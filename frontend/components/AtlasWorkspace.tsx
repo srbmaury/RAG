@@ -20,6 +20,7 @@ import {DocumentPassage} from '../components/DocumentPassage';
 import '../app/rebuild.css';
 import {ConversationTranscript} from './chat/ConversationTranscript';
 import {ResearchComposer} from './chat/ResearchComposer';
+import {ResearchAnswer} from './chat/ResearchAnswer';
 import {ConversationHistory} from './chat/ConversationHistory';
 import {ResearchSourceSelector} from './chat/ResearchSourceSelector';
 import {DocumentsView} from './documents/DocumentsView';
@@ -376,15 +377,8 @@ export function AtlasWorkspace() {
     uploadSummary.ids.some(id => !docs.some(d => d.id === id)) ? 'Refreshing document status' : '',
   ].filter(Boolean).join(' · ') : '';
 
-  function citationText(children: ReactNode, evidence: Source[]) {
-    return Children.map(children, child => typeof child === 'string' ? child.split(/(\[\d+\])/g).map((part,index) => {
-      const match = /^\[(\d+)\]$/.exec(part);
-      const passage = match ? evidence[Number(match[1])-1] : null;
-      return passage ? <button key={index} className="cite" onClick={() => passage.url ? window.open(passage.url,'_blank','noopener,noreferrer') : setSource(passage)} aria-label={`Open source ${match![1]}: ${passage.name}`}>{match![1]}</button> : part;
-    }) : child);
-  }
-  function renderAnswer(result: Answer) {
-    return <><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{p:({children})=><p>{citationText(children,result.sources)}</p>,li:({children})=><li>{citationText(children,result.sources)}</li>}}>{result.answer}</ReactMarkdown></div>{visibleEvidence(result).length > 0 && <div className="source-chips">{visibleEvidence(result).map(({source:s,number}) => <button className="source-chip" key={s.chunk_id} onClick={() => s.url ? window.open(s.url,'_blank','noopener,noreferrer') : setSource(s)}><FileBadge name={s.name}/><span><b>{s.name}</b><small>{result.mode === 'local_excerpts' ? 'Search match' : 'Citation'} [{number}] · {s.location_type === 'page' ? 'Page' : 'Section'} {s.page}</small></span></button>)}</div>}</>;
+  function renderAnswer(result:Answer){
+    return <ResearchAnswer result={result} onOpenSource={passage=>passage.url?window.open(passage.url,'_blank','noopener,noreferrer'):setSource(passage)}/>;
   }
   async function copyConversation() {
     try {await navigator.clipboard.writeText(messages.map(m => `${m.role === 'user' ? 'You' : 'Atlas'}\n${m.content}`).join('\n\n')); setCopied(true); window.setTimeout(() => setCopied(false),2000);}
