@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import {conversationPlan} from '../lib/conversation';
 import {requestedConnectedSource} from '../lib/query-routing';
 import {useConversation} from '../hooks/useConversation';
+import {useAtlasTheme} from '../hooks/useAtlasTheme';
 import {api,apiStream} from '../lib/api';
 import type {User,Workspace,Doc,Source,Answer,Message,GmailMessage,GmailStatus,GmailSummary,ChatSummary,SavedChat} from '../lib/types';
 import {DocumentPassage} from '../components/DocumentPassage';
@@ -23,16 +24,7 @@ const prettyBytes = (n: number) => n < 1024*1024 ? `${Math.max(1, Math.round(n/1
 const prompts = ['What are the key takeaways?', 'What risks should I be aware of?', 'Compare the main findings across documents', 'Which decisions still need to be made?'];
 
 export function AtlasWorkspace() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  useEffect(() => {
-    const saved = localStorage.getItem('atlas-theme');
-    const initial = saved === 'dark' || (saved !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
-    setTheme(initial); document.documentElement.dataset.theme = initial;
-  }, []);
-  function toggleTheme() {
-    const next = theme === 'light' ? 'dark' : 'light';
-    setTheme(next); document.documentElement.dataset.theme = next; localStorage.setItem('atlas-theme', next);
-  }
+  const {theme,toggleTheme}=useAtlasTheme();
   const themeButton = <button type="button" className="icon-button" aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`} onClick={toggleTheme}>{theme === 'light' ? <Moon size={17}/> : <Sun size={17}/>}</button>;
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
