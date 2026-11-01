@@ -493,13 +493,18 @@ def connected_sources_for_payload(payload, document_evidence):
     sources = []
     for entry in payload:
         original = document_evidence.get(entry.get('origin_id')) if entry.get('provider') == 'documents' else None
+        origin_url = None
+        if original and original['name'].lower().endswith('.md'):
+            match = re.search(r'(?m)^Source URL: (https?://\\S+)', original.get('text',''))
+            if match:
+                origin_url = match.group(1)
         sources.append({
             'chunk_id': original['chunk_id'] if original else str(entry['source_id']),
             'document_id': original['document_id'] if original else '',
             'name': entry['title'], 'page': original['page'] if original else 0,
             'text': entry['text'],
             'location_type': original['location_type'] if original else entry.get('provider', 'source'),
-            'provider': entry.get('provider'), 'url': entry.get('url'),
+            'provider': entry.get('provider'), 'url': origin_url or entry.get('url'),
         })
     return sources
 
