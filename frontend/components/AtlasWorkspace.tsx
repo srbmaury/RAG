@@ -7,6 +7,7 @@ import {Children, useEffect, useRef, useState, useCallback, type ReactNode} from
 import {ArrowUp, ArrowUpRight, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, FileText, FolderOpen, Layers3, LogOut, Plus, Search, ShieldCheck, Sparkles, Trash2, Upload, X, LoaderCircle, RotateCcw, Download, MessageSquare, Mail, Github, HardDrive, Hash, Lightbulb, Clock3, Moon, Sun, Home as HomeIcon, PanelLeftClose, PanelLeftOpen, Menu, Copy, SlidersHorizontal, CheckCircle2, AlertCircle, NotebookPen, ArrowDownToLine} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import {conversationPlan} from '../lib/conversation';
+import {visibleEvidence} from '../lib/evidence';
 import {requestedConnectedSource} from '../lib/query-routing';
 import {useConversation} from '../hooks/useConversation';
 import {useAtlasTheme} from '../hooks/useAtlasTheme';
@@ -365,11 +366,7 @@ export function AtlasWorkspace() {
   const storage = docs.reduce((sum,d) => sum + d.size, 0);
   // Only passages actually cited in the answer count as supporting evidence.
   // Preserve original retrieval indices so [3] always opens source 3.
-  const visibleEvidence = (result: Answer | undefined) => {
-    if (!result || !['ai', 'local_excerpts','connected','source_results'].includes(result.mode)) return [];
-    const cited = new Set(Array.from(result.answer.matchAll(/\[(\d+)\]/g), m => Number(m[1])));
-    return result.sources.flatMap((source, index) => cited.has(index + 1) ? [{source, number: index + 1}] : []);
-  };
+
   const title = messages.find(m => m.role === 'user')?.content || 'New research';
   const initials = user?.email.slice(0,2).toUpperCase() || 'A';
   const uploadedDocs = uploadSummary ? docs.filter(d => uploadSummary.ids.includes(d.id)) : [];
