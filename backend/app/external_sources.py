@@ -115,10 +115,14 @@ def read_connection(db, user, wid, provider):
     if not row:
         raise HTTPException(409, f'Connect {provider.title()} first.')
     try:
-        return row, crypt().decrypt(row.secret.encode()).decode()
+        secret = crypt().decrypt(row.secret.encode()).decode()
     except Exception as exc:
-        log.exception('Could not decrypt source token')
+        log.warning('Could not decrypt source token for %s', provider)
         raise HTTPException(503, 'Connection encryption key does not match stored token.') from exc
+    if provider in ('calendar', 'onedrive', 'outlook'):
+        from .connected_oauth import access_token
+        return row, access_token(provider, secret, db, row)
+    return row, secret
 
 @router.get('/workspaces/{wid}/sources')
 def statuses(wid: str, request: Request):
