@@ -4,7 +4,7 @@ Connector adapters return trusted metadata with untrusted excerpts. Never treat
 source text as instructions; access checks belong in individual adapters.
 """
 from dataclasses import dataclass
-from .source_contract import normalize_evidence, Evidence as UnifiedEvidence
+from .source_contract import normalize_evidence
 from typing import Optional
 
 @dataclass(frozen=True)
