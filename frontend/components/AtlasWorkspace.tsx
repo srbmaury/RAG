@@ -16,6 +16,7 @@ import {ResearchComposer} from './chat/ResearchComposer';
 import {DocumentsView} from './documents/DocumentsView';
 import {HomeView} from './home/HomeView';
 import {AuthView} from './auth/AuthView';
+import {WorkspaceSidebar} from './layout/WorkspaceSidebar';
 import {AtlasMark,FileBadge,Status,EmptyState,Dialog} from './ui/WorkspacePrimitives';
 import {IntegrationTile} from '../components/IntegrationTile';
 import {flushSync} from 'react-dom';
@@ -544,13 +545,7 @@ export function AtlasWorkspace() {
   return <div className={`app atlas-v3 ${sidebarCollapsed ? 'collapsed' : ''}`}>
     <input ref={input} type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm" hidden onChange={e=>{if(e.target.files) void upload(e.target.files);}}/>
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={()=>setSidebarOpen(false)}/>}
-    <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-      <div className="brand-row"><AtlasMark/><span>Atlas</span><button className="sidebar-collapse" aria-label="Collapse sidebar" onClick={()=>{setSidebarCollapsed(true);setSidebarOpen(false);}}><PanelLeftClose/></button></div>
-      <button className="workspace-btn" onClick={()=>setNewWorkspace(true)}><span className="ws-avatar">{workspace?.name[0]?.toUpperCase() || 'A'}</span><span><strong>{workspace?.name || 'Choose workspace'}</strong><small>{workspaces.length} workspace{workspaces.length===1?'':'s'}</small></span><ChevronDown/></button>
-      <nav className="nav" aria-label="Main navigation">{([{id:'overview',label:'Home',icon:HomeIcon},{id:'chat',label:'Ask Atlas',icon:Search},{id:'documents',label:'Documents',icon:FileText},{id:'sources',label:'Sources',icon:FolderOpen}] as const).map(item=><button key={item.id} className={tab===item.id?'active':''} title={item.label} aria-current={tab===item.id?'page':undefined} onClick={()=>navigate(item.id)}><item.icon/><span>{item.label}</span></button>)}</nav>
-      <div className="sidebar-research" aria-label="Recent conversations"><div className="section-label">RECENT CHATS</div>{chats.slice(0,4).map(item=><button key={item.id} className="workspace-stat" onClick={()=>void loadChat(item.id)} title={item.title}><MessageSquare/><span>{item.title}</span></button>)}<button className="workspace-stat" onClick={()=>{navigate('chat');setHistoryOpen(true);void refreshChats();}}><Clock3/><span>All conversations ({chats.length})</span></button></div>
-      <div className="bottom"><div className="usage" title={`${ready.length} documents ready · ${storage ? prettyBytes(storage) : '0 KB'} stored`}><span>Storage</span><strong>{storage ? prettyBytes(storage) : '0 KB'}</strong></div><div className="profile"><span className="avatar">{initials}</span><div><strong>{user.email.split('@')[0]}</strong><small>{user.email}</small></div><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={()=>void signOut()}><LogOut/></button></div></div>
-    </aside>
+    <WorkspaceSidebar open={sidebarOpen} onCollapse={()=>{setSidebarCollapsed(true);setSidebarOpen(false);}} onWorkspaceSettings={()=>setNewWorkspace(true)} workspace={workspace} workspaceCount={workspaces.length} tab={tab} onNavigate={navigate} chats={chats} onOpenChat={id=>void loadChat(id)} onAllChats={()=>{navigate('chat');setHistoryOpen(true);void refreshChats();}} readyCount={ready.length} storageLabel={storage?prettyBytes(storage):'0 KB'} initials={initials} email={user.email} onSignOut={()=>void signOut()}/>
     <main className="main">
       <header className="topbar"><button className="icon-button mobile" aria-label="Open menu" onClick={()=>setSidebarOpen(true)}><Menu/></button><button className="icon-button expand-sidebar" aria-label="Expand sidebar" onClick={()=>setSidebarCollapsed(false)}><PanelLeftOpen/></button><button className="global-search" onClick={()=>setSearchOpen(true)}><Search/><span>Search documents or ask a question…</span><kbd className="key">⌘ K</kbd></button><div className="top-actions">{themeButton}<button className="initials" aria-label="Manage workspaces" onClick={()=>setNewWorkspace(true)}>{initials}</button></div></header>
       <div className="content">
