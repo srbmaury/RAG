@@ -7,12 +7,12 @@ import logging
 import os
 import secrets
 import time
-from urllib.parse import urlencode
 from typing import Annotated
+from urllib.parse import urlencode
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from openai import (
     APIConnectionError,

@@ -10,11 +10,11 @@ import json
 import os
 import secrets
 import time
-from urllib.parse import urlencode
 from typing import Annotated
+from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 
 from .db import ConnectedOAuthState, ExternalConnection, Session, SourceHealthCheck, User, Workspace

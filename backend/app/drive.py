@@ -6,13 +6,13 @@ import logging
 import os
 import secrets
 import time
-from urllib.parse import urlencode
 from typing import Annotated
+from urllib.parse import urlencode
 
 import httpx
 import pypdfium2 as pdfium
 from docx import Document as WordDocument
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
