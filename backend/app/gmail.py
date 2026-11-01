@@ -8,10 +8,11 @@ import os
 import secrets
 import time
 from urllib.parse import urlencode
+from typing import Annotated
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Query
 from fastapi.responses import RedirectResponse
 from openai import (
     APIConnectionError,
@@ -174,7 +175,7 @@ class SummaryRequest(BaseModel):
 
 
 @router.get('/gmail/status')
-def status(workspaceId: str, request: Request):
+def status(workspaceId: Annotated[str, Query(alias='wid')], request: Request):
     with Session() as db:
         user = actor(request, db)
         allowed_workspace(db, user, workspaceId)
@@ -187,7 +188,7 @@ def status(workspaceId: str, request: Request):
 
 
 @router.get('/gmail/connect')
-def connect(workspaceId: str, request: Request):
+def connect(workspaceId: Annotated[str, Query(alias='wid')], request: Request):
     configured()
     with Session() as db:
         user = actor(request, db)
