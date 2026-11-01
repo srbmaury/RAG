@@ -89,7 +89,7 @@ def connect(provider: str, workspaceId: str, request: Request):
     client_id, _, redirect, auth_base, _, scope = _settings(provider)
     with Session() as db:
         who = actor(request, db)
-        allowed_workspace(db, who, wid)
+        allowed_workspace(db, who, workspaceId)
         state = secrets.token_urlsafe(32)
         verifier, challenge = _pkce()
         db.add(
