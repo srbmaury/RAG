@@ -13,10 +13,11 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from .db import Session, ExternalConnection, SourceHealthCheck
 from .gmail import actor, allowed_workspace, crypt
+from . import batch_connectors
 
 router = APIRouter(prefix='/api')
 log = logging.getLogger(__name__)
-PROVIDERS = ('github', 'notion', 'slack')
+PROVIDERS = ('github', 'notion', 'slack', *batch_connectors.NEW_PROVIDERS)
 
 class ConnectRequest(BaseModel):
     token: str = Field(min_length=8, max_length=4096)
@@ -60,6 +61,8 @@ def http_json(url, token, provider, params=None, method='GET'):
         raise HTTPException(502, f'{provider.title()} could not be reached.') from exc
 
 def profile(provider, token):
+    if provider in batch_connectors.NEW_PROVIDERS:
+        return batch_connectors.profile(provider, token)
     if provider == 'github':
         d = http_json('https://api.github.com/user', token, provider)
         return d.get('login') or str(d.get('id') or 'GitHub user')
@@ -84,6 +87,8 @@ def profile(provider, token):
 def verify_source_access(provider, token):
     """Exercise each provider's search permission without returning content."""
     account = profile(provider, token)
+    if provider in batch_connectors.NEW_PROVIDERS:
+        return account, len(batch_connectors.search(provider, token, 'project'))
     if provider == 'github':
         data = http_json('https://api.github.com/search/issues', token, provider,
                          {'q': f'user:{account} is:issue', 'per_page': 1})
@@ -283,6 +288,8 @@ def github_search_all_pages(token, query, per_page=100, max_pages=10):
 
 
 def source_search(provider, token, query):
+    if provider in batch_connectors.NEW_PROVIDERS:
+        return batch_connectors.search(provider, token, query)
     if provider == 'github':
         pull_query = github_pull_request_query(query)
         if pull_query:

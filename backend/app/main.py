@@ -478,7 +478,7 @@ def collect_connected_evidence(wid, body, actor, db):
         for provider in dict.fromkeys(p for p in body.providers if p != 'drive'):
             _, provider_token = read_connection(db, actor, wid, provider)
             for hit in source_search(provider, provider_token, body.question):
-                excerpt_limit = 8000 if provider == 'slack' else 1300
+                excerpt_limit = 8000 if provider == 'slack' else 3000
                 evidence.append(Evidence(provider, hit['id'], hit['title'],
                                          hit.get('excerpt', '')[:excerpt_limit], hit.get('url')))
     except HTTPException:
