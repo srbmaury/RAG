@@ -5,6 +5,7 @@ large responses, and non-HTML content. The deployer must ALSO enforce outbound
 network controls: DNS rebinds can bypass application-level preflight checks.
 """
 import hashlib
+import os
 import ipaddress
 import re
 import socket
@@ -56,7 +57,7 @@ def validate_public_url(raw: str) -> str:
 
 
 class PageText(HTMLParser):
-    ignored = {"script", "style", "nav", "noscript", "svg", "footer"}
+    ignored = {"script", "style", "nav", "noscript", "svg", "footer", "head"}
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.skip = []
@@ -67,7 +68,7 @@ class PageText(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag in self.ignored:
             self.skip.append(tag)
-        if tag == "title" and not self.skip:
+        if tag == "title":
             self.in_title = True
         if tag in ("p", "div", "article", "section", "li", "h1", "h2", "h3", "br"):
             self.text.append("\n")
@@ -79,8 +80,10 @@ class PageText(HTMLParser):
             self.in_title = False
 
     def handle_data(self, data):
-        if not self.skip:
-            (self.title if self.in_title else self.text).append(data)
+        if self.in_title:
+            self.title.append(data)
+        elif not self.skip:
+            self.text.append(data)
 
 
 def extract_html(html: str) -> tuple[str, str]:
@@ -94,6 +97,10 @@ def extract_html(html: str) -> tuple[str, str]:
 
 def fetch_page(url: str) -> tuple[str, str]:
     url = validate_public_url(url)
+    # Fail closed by default until the deployment has IP-level egress controls.
+    # Preflight DNS resolution alone cannot eliminate DNS rebinding.
+    if os.getenv("ATLAS_WEB_EGRESS_PROTECTED", "").lower() != "true":
+        raise ValueError("Web import requires an outbound firewall blocking non-public IP ranges (ATLAS_WEB_EGRESS_PROTECTED=true).")
     try:
         with httpx.Client(timeout=httpx.Timeout(15.0), follow_redirects=False,
                           trust_env=False, headers={"User-Agent": "Atlas-Research/1.0",
