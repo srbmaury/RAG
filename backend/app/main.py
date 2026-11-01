@@ -495,7 +495,11 @@ def connected_sources_for_payload(payload, document_evidence):
         original = document_evidence.get(entry.get('origin_id')) if entry.get('provider') == 'documents' else None
         origin_url = None
         if original and original['name'].lower().endswith('.md'):
-            match = re.search(r'(?m)^Source URL: (https?://\\S+)', original.get('text',''))
+            try:
+                original_text = (DATA / 'files' / original['document_id']).read_text(encoding='utf-8')[:4096]
+            except (OSError, UnicodeError):
+                original_text = ''
+            match = re.search(r'(?m)^Source URL: (https?://\\S+)', original_text)
             if match:
                 origin_url = match.group(1)
         sources.append({
@@ -594,7 +598,9 @@ def connected_chat(wid: str, body: ConnectedQuestion, request: Request,
     # Preserve positional [n] citations used by the standard chat renderer.
     # Non-document evidence carries a URL so the UI opens the original record.
     sources = connected_sources_for_payload(payload, document_evidence)
-    return {'answer': answer, 'sources': sources, 'mode': 'connected', 'scope': connected_scope(body)}
+    from .citation_audit import audit_citations
+    return {'answer': answer, 'sources': sources, 'mode': 'connected',
+            'citation_audit': audit_citations(answer, payload), 'scope': connected_scope(body)}
 
 
 @app.post('/api/workspaces/{wid}/connected-chat/stream')
