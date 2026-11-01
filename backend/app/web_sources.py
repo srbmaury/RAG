@@ -98,11 +98,10 @@ def extract_html(html: str) -> tuple[str, str]:
 
 
 def fetch_page(url: str) -> tuple[str, str]:
-    url = validate_public_url(url)
-    # Fail closed by default until the deployment has IP-level egress controls.
-    # Preflight DNS resolution alone cannot eliminate DNS rebinding.
+    # Fail before DNS resolution when the required network policy is absent.
     if os.getenv("ATLAS_WEB_EGRESS_PROTECTED", "").lower() != "true":
         raise ValueError("Web import requires an outbound firewall blocking non-public IP ranges (ATLAS_WEB_EGRESS_PROTECTED=true).")
+    url = validate_public_url(url)
     try:
         with httpx.Client(timeout=httpx.Timeout(15.0), follow_redirects=False,
                           trust_env=False, headers={"User-Agent": "Atlas-Research/1.0",
