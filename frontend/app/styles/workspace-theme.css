@@ -1,0 +1,393 @@
+/* Exact light-theme palette from the Atlas design reference */
+:root {
+  --bg: #fff;
+  --sidebar: #f8fafc;
+  --panel: #fff;
+  --text: #111827;
+  --sub: #64748b;
+  --faint: #98a69b;
+  --line: #e2e8f0;
+  --line2: #d9e2db;
+  --hover: #f3f6f4;
+  --pill: #f1f5f9;
+  --active: #eff6ff;
+  --brand: #2563eb;
+  --brandhover: #1d4ed8;
+  --brandtext: #fff;
+  --user: #f1f5f9;
+  --evidence: #f9fbf8;
+}
+.atlas-v3 .sidebar {
+  background: #f8fafc;
+}
+.atlas-v3 .topbar {
+  background: #fff;
+}
+.atlas-v3 .nav button.active {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.atlas-v3 .btn.primary,
+.atlas-v3 .send,
+.home-send {
+  background: #2563eb;
+  color: #fff;
+}
+.atlas-v3 .btn.primary:hover,
+.atlas-v3 .send:hover,
+.home-send:hover {
+  background: #1d4ed8;
+}
+.gmail-integrated {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--outline);
+}
+.gmail-integrated-back {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 16px;
+}
+.gmail-integrated .gmail-workspace {
+  margin-bottom: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .atlas-v3 .sidebar {
+    background: var(--sidebar);
+  }
+  :root:not([data-theme='light']) .atlas-v3 .topbar {
+    background: var(--panel);
+  }
+}
+:root[data-theme='dark'] .atlas-v3 .sidebar {
+  background: var(--sidebar);
+}
+:root[data-theme='dark'] .atlas-v3 .topbar {
+  background: var(--panel);
+}
+/* Atlas design tokens — pure white, cool slate, restrained blue. */
+:root {
+  --canvas: #ffffff;
+  --ink: #111827;
+  --muted: #64748b;
+  --outline: #e2e8f0;
+  --wash: #f8fafc;
+  --forest: #2563eb;
+  --forest-dark: #1d4ed8;
+  --mint: #eff6ff;
+  --bg: #ffffff;
+  --sidebar: #f8fafc;
+  --panel: #ffffff;
+  --text: #111827;
+  --sub: #64748b;
+  --faint: #94a3b8;
+  --line: #e2e8f0;
+  --line2: #cbd5e1;
+  --hover: #f1f5f9;
+  --pill: #f1f5f9;
+  --active: #eff6ff;
+  --brand: #2563eb;
+  --brandhover: #1d4ed8;
+  --brandtext: #ffffff;
+  --user: #f1f5f9;
+  --evidence: #f8fafc;
+}
+:root[data-theme='dark'] {
+  --canvas: #181a1d;
+  --ink: #e6e8eb;
+  --muted: #adb4be;
+  --outline: #3b4048;
+  --wash: #202226;
+  --forest: #8ab4f8;
+  --forest-dark: #aecdfb;
+  --mint: #26364c;
+  --bg: #181a1d;
+  --sidebar: #202226;
+  --panel: #25282d;
+  --text: #e6e8eb;
+  --sub: #adb4be;
+  --faint: #a0a8b4;
+  --line: #3b4048;
+  --line2: #505762;
+  --hover: #30343b;
+  --pill: #30343b;
+  --active: #26364c;
+  --brand: #8ab4f8;
+  --brandhover: #aecdfb;
+  --brandtext: #17212f;
+  --user: #30343b;
+  --evidence: #25282d;
+}
+.atlas-v3 .sidebar {
+  background: var(--sidebar);
+}
+.atlas-v3 .topbar {
+  background: var(--panel);
+}
+.atlas-v3 .nav button.active {
+  background: var(--active);
+  color: var(--brand);
+}
+.atlas-v3 .btn.primary,
+.atlas-v3 .send,
+.home-send {
+  background: var(--brand);
+  color: var(--brandtext);
+}
+.atlas-v3 .btn.primary:hover,
+.atlas-v3 .send:hover,
+.home-send:hover {
+  background: var(--brandhover);
+}
+.atlas-v3 .home-prompt-panel:focus-within {
+  outline: none;
+  box-shadow: 0 13px 50px #0f172a08;
+  border-color: var(--outline);
+}
+.atlas-v3 .home-prompt-panel textarea:focus,
+.atlas-v3 .home-prompt-panel textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: 0;
+}
+.atlas-v3 .home-prompt-panel:has(textarea:focus-visible) {
+  border-color: #94a3b8;
+}
+.atlas-v3
+  .chat-workspace
+  .thread:has(.research-welcome):not(:has(.user-message)):not(:has(.answer-row)) {
+  overflow: visible;
+  max-height: none;
+  min-height: 360px;
+}
+.atlas-v3 .chat-workspace .thread:has(.research-welcome) .research-welcome {
+  min-height: 310px;
+  justify-content: center;
+  padding: 35px 20px;
+}
+.atlas-v3 .gmail-integrated {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.atlas-v3 .gmail-integrated-back {
+  margin-bottom: 20px;
+}
+.atlas-v3 .sources-overview {
+  min-height: 0;
+}
+
+/* Keep the Ask Atlas composer accessible while only the transcript scrolls. */
+.atlas-v3 .chat-workspace .research {
+  align-items: stretch;
+  min-height: 0;
+}
+.atlas-v3 .chat-workspace .chat-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: clamp(440px, calc(100dvh - 285px), 800px);
+  overflow: hidden;
+}
+.atlas-v3 .chat-workspace .thread {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.atlas-v3 .chat-workspace .prompt-row,
+.atlas-v3 .chat-workspace .composer,
+.atlas-v3 .chat-workspace .composer-caption {
+  flex-shrink: 0;
+}
+.atlas-v3 .chat-workspace .composer {
+  background: var(--panel);
+  position: relative;
+  z-index: 1;
+}
+@media (max-width: 790px) {
+  .atlas-v3 .chat-workspace .chat-pane {
+    height: clamp(400px, calc(100dvh - 315px), 740px);
+  }
+}
+
+/* Spacious answer-first research layout. Input remains anchored below the transcript. */
+.atlas-v3 .chat-workspace .research {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.atlas-v3 .chat-workspace .chat-pane {
+  height: clamp(600px, calc(100dvh - 235px), 1040px);
+}
+.atlas-v3 .chat-workspace .thread {
+  padding: clamp(20px, 2.2vw, 34px);
+  min-height: 0;
+}
+.atlas-v3 .chat-workspace .answer {
+  width: 100%;
+  max-width: none;
+}
+.atlas-v3 .chat-workspace .answer-row {
+  min-width: 0;
+}
+@media (max-width: 1050px) {
+  .atlas-v3 .chat-workspace .research {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 790px) {
+  .atlas-v3 .chat-workspace .chat-pane {
+    height: clamp(500px, calc(100dvh - 210px), 880px);
+  }
+}
+
+/* Modern research workspace: cool-white surfaces, restrained cobalt, no warm tints. */
+.atlas-v3 {
+  --canvas: #ffffff;
+  --wash: #f7f9fc;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --outline: #e2e8f0;
+  --brand: #2563eb;
+  --forest: #2563eb;
+  --forest-dark: #1d4ed8;
+  --mint: #eff6ff;
+  --active: #eff6ff;
+  --hover: #f1f5f9;
+  --evidence: #f8fafc;
+  background: #ffffff;
+  color: var(--ink);
+}
+.atlas-v3 .sidebar {
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+}
+.atlas-v3 .topbar {
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid #e2e8f0;
+}
+.atlas-v3 .nav button {
+  border-radius: 9px;
+  transition:
+    background-color 0.14s ease,
+    color 0.14s ease;
+}
+.atlas-v3 .nav button.active {
+  background: #eaf2ff;
+  color: #1d4ed8;
+  font-weight: 650;
+}
+.atlas-v3 .home-hero {
+  background: linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.035);
+}
+.atlas-v3 .home-prompt-panel,
+.atlas-v3 .library-workspace,
+.atlas-v3 .chat-workspace .thread,
+.atlas-v3 .chat-workspace .composer,
+.atlas-v3 .integration-tile {
+  border-color: #dfe7f0;
+  box-shadow: none;
+}
+.atlas-v3 .chat-workspace .answer {
+  background: #ffffff;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.atlas-v3 .chat-workspace .chat-pane {
+  height: clamp(590px, calc(100dvh - 230px), 1080px);
+}
+.atlas-v3 .chat-workspace .thread {
+  background: #ffffff;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.atlas-v3 .chat-workspace .composer {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 3px 15px rgba(15, 23, 42, 0.035);
+}
+.atlas-v3 .chat-workspace .composer:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.09);
+}
+.atlas-v3 .chat-workspace .composer textarea:focus {
+  outline: none;
+}
+.atlas-v3 .btn.primary,
+.atlas-v3 .send,
+.atlas-v3 .home-send {
+  background: #2563eb;
+  color: #ffffff;
+}
+.atlas-v3 .btn.primary:hover,
+.atlas-v3 .send:hover,
+.atlas-v3 .home-send:hover {
+  background: #1d4ed8;
+}
+:root[data-theme='dark'] .atlas-v3 {
+  --canvas: var(--bg);
+  --wash: var(--sidebar);
+  --ink: var(--text);
+  --muted: var(--sub);
+  --outline: var(--line);
+  --brand: #8ab4f8;
+  --forest: var(--brand);
+  --forest-dark: var(--brandhover);
+  --mint: #26364c;
+  --active: #26364c;
+  --hover: #30343b;
+  background: var(--canvas);
+}
+:root[data-theme='dark']
+  .atlas-v3
+  :is(.home-prompt-panel, .library-workspace, .integration-tile, .home-dropzone) {
+  border-color: var(--outline);
+}
+:root[data-theme='dark'] .atlas-v3 .sidebar {
+  background: var(--sidebar);
+  border-color: var(--outline);
+}
+:root[data-theme='dark'] .atlas-v3 .topbar {
+  background: var(--sidebar);
+  border-color: var(--outline);
+}
+:root[data-theme='dark'] .atlas-v3 .home-hero:not(.home-hero-focused) {
+  background: var(--panel);
+  border-color: var(--outline);
+  box-shadow: none;
+}
+:root[data-theme='dark'] .atlas-v3 .chat-workspace .answer,
+:root[data-theme='dark'] .atlas-v3 .chat-workspace .thread,
+:root[data-theme='dark'] .atlas-v3 .chat-workspace .composer {
+  background: var(--panel);
+  border-color: var(--outline);
+  box-shadow: none;
+}
+:root[data-theme='dark'] .atlas-v3 .nav button.active {
+  background: var(--active);
+  color: var(--brand);
+}
+:root[data-theme='dark']
+  :is(.atlas-v3 .btn.primary, .atlas-v3 .send, .atlas-v3 .home-send, .auth-page .btn.primary) {
+  background: var(--brand);
+  color: var(--brandtext);
+  border-color: var(--brand);
+}
+:root[data-theme='dark']
+  :is(
+    .atlas-v3 .btn.primary,
+    .atlas-v3 .send,
+    .atlas-v3 .home-send,
+    .auth-page .btn.primary
+  ):hover {
+  background: var(--brandhover);
+}
+@media (max-width: 790px) {
+  .atlas-v3 .chat-workspace .chat-pane {
+    height: clamp(470px, calc(100dvh - 210px), 900px);
+  }
+}
