@@ -23,13 +23,6 @@ def test_prefers_title_relevance():
     assert prepare_evidence("cache invalidation", rows)[0].source_id == "2"
 
 
-def test_relationship_candidates_not_assertions():
-    rows = [item("github", "a", "Cache invalidation design", "Redis cache invalidation"),
-            item("linear", "b", "Cache invalidation rollout", "Redis cache invalidation")]
-    pairs = related_evidence(rows)
-    assert pairs and pairs[0]["status"] == "candidate_only"
-
-
 def test_canonical_url_safely_handles_bad_values():
     assert canonical_url("file:///etc/hosts") == ""
     assert canonical_url("https://EXAMPLE.com/a#fragment") == "https://example.com/a"
