@@ -17,6 +17,9 @@ class Evidence:
     date: Optional[str] = None
 
     def as_prompt(self, index: int):
+        if not self.excerpt.strip():
+            return {'source_id': index, 'provider': self.provider, 'title': self.title,
+                    'text': '', 'url': self.url, 'date': self.date}
         evidence = normalize_evidence(self.provider, {'id': self.source_id, 'title': self.title,
             'text': self.excerpt, 'url': self.url, 'timestamp': self.date})
         return {'source_id': index, 'provider': evidence.provider, 'title': evidence.title,
