@@ -12,6 +12,6 @@ return <section className="document-library-v3">
             <div className="library-search-row"><label><Search size={17}/><input type="search" aria-label="Search documents" placeholder="Search your documents…" value={filter} onChange={e=>onFilter(e.target.value)}/></label></div>
             {documentTable}
           </div>
-          <div className={`home-dropzone ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();onDragging(true);}} onDragLeave={()=>onDragging(false)} onDrop={e=>{e.preventDefault();onDragging(false);onDrop(e.dataTransfer.files);}}><span className="home-drop-icon"><Upload size={20}/></span><div><strong>Add documents to your library</strong><p>Drag in PDFs, Word, text, Markdown, CSV, JSON or HTML · max {maxSizeMB} MB each.</p></div><button className="btn" disabled={uploading} onBrowse>Browse files</button></div>
+          <div className={`home-dropzone ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();onDragging(true);}} onDragLeave={()=>onDragging(false)} onDrop={e=>{e.preventDefault();onDragging(false);onDrop(e.dataTransfer.files);}}><span className="home-drop-icon"><Upload size={20}/></span><div><strong>Add documents to your library</strong><p>Drag in PDFs, Word, text, Markdown, CSV, JSON or HTML · max {maxSizeMB} MB each.</p></div><button className="btn" disabled={uploading} onClick={onBrowse}>Browse files</button></div>
         </section>;
 }
