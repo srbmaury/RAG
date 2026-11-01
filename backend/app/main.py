@@ -141,10 +141,22 @@ def document(workspaceId, did, actor, db):
 
 
 def public_doc(d):
-    return {
+    result = {
         key: getattr(d, key)
-        for key in ['id', 'name', 'size', 'status', 'error', 'pages', 'chunk_count', 'created']
+        for key in [
+            'id',
+            'name',
+            'size',
+            'status',
+            'error',
+            'pages',
+            'ocr_pages',
+            'chunk_count',
+            'created',
+        ]
     }
+    result['ocr_pages'] = d.ocr_pages or []
+    return result
 
 
 class Credentials(BaseModel):
@@ -449,19 +461,27 @@ async def upload(
 
 
 @app.get('/api/workspaces/{workspaceId}/documents/{did}/chunks')
-def chunks(workspaceId: str, did: str, offset: int = 0, actor=Depends(user), db=Depends(database)):
+def chunks(
+    workspaceId: str,
+    did: str,
+    offset: int = 0,
+    page: int = 0,
+    actor=Depends(user),
+    db=Depends(database),
+):
     doc = document(workspaceId, did, actor, db)
-    if offset < 0:
-        raise HTTPException(422, 'Offset must be non-negative.')
+    if offset < 0 or page < 0:
+        raise HTTPException(422, 'Offset and page must be non-negative.')
+    if page > doc.pages:
+        raise HTTPException(422, 'Requested page is outside this document.')
+    query = db.query(Chunk).filter_by(document_id=did)
+    if page:
+        query = query.filter_by(page=page)
     return {
         'document': public_doc(doc),
         'chunks': [
-            {'id': c.id, 'page': c.page, 'text': c.text}
-            for c in db.query(Chunk)
-            .filter_by(document_id=did)
-            .order_by(Chunk.ordinal)
-            .offset(offset)
-            .limit(50)
+            {'id': c.id, 'page': c.page, 'text': c.text, 'ocr': c.page in (doc.ocr_pages or [])}
+            for c in query.order_by(Chunk.ordinal).offset(offset).limit(50)
         ],
     }
 
@@ -481,6 +501,7 @@ def retry(workspaceId: str, did: str, actor=Depends(user), db=Depends(database))
         raise HTTPException(409, 'Document is already queued or processing.')
     db.query(Chunk).filter_by(document_id=did).delete()
     doc.status, doc.error, doc.chunk_count, doc.generation = 'queued', None, 0, doc.generation + 1
+    doc.ocr_pages = []
     db.commit()
     return public_doc(doc)
 
@@ -803,6 +824,7 @@ def connected_sources_for_payload(payload, document_evidence):
                 'name': entry['title'],
                 'page': original['page'] if original else 0,
                 'text': entry['text'],
+                'ocr': bool(original and original.get('ocr')),
                 'location_type': original['location_type']
                 if original
                 else entry.get('provider', 'source'),

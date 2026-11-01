@@ -100,7 +100,7 @@ def diversify_ranked_chunks(ranked, limit, per_document=3):
     return chosen
 
 
-def source(chunk, name):
+def source(chunk, name, ocr=False):
     return {
         'chunk_id': chunk.id,
         'document_id': chunk.document_id,
@@ -110,6 +110,7 @@ def source(chunk, name):
         'location_type': 'page' if name.lower().endswith('.pdf') else 'section',
         'provider': 'documents',
         'source_id': chunk.id,
+        'ocr': ocr,
     }
 
 
@@ -189,9 +190,10 @@ def retrieve(workspace_id, query, document_ids=None, limit=8):
                 scores[c.id] = scores.get(c.id, 0) + weight / (60 + rank + 1)
                 candidates[c.id] = c
         terms = set(tokens(query))
-        names = {
-            d.id: d.name for d in db.query(Document).filter(Document.workspace_id == workspace_id)
+        documents = {
+            d.id: d for d in db.query(Document).filter(Document.workspace_id == workspace_id)
         }
+        names = {document_id: doc.name for document_id, doc in documents.items()}
         ranked = [
             c
             for c in candidates.values()
@@ -205,4 +207,11 @@ def retrieve(workspace_id, query, document_ids=None, limit=8):
             reverse=True,
         )
         selected = diversify_ranked_chunks(ranked, limit)
-        return [source(c, names[c.document_id]) for c in selected]
+        return [
+            source(
+                c,
+                names[c.document_id],
+                c.page in (documents[c.document_id].ocr_pages or []),
+            )
+            for c in selected
+        ]

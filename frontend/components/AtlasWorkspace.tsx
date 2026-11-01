@@ -300,7 +300,15 @@ export function AtlasWorkspace() {
         : '';
 
     function renderAnswer(result: Answer, onPrompt: (prompt: string) => void) {
-        return <ResearchAnswer result={result} onOpenSource={setSource} onPrompt={onPrompt} />;
+        return (
+            <ResearchAnswer
+                result={result}
+                onOpenSource={(item, context) =>
+                    setSource(context ? { ...item, highlight_context: context } : item)
+                }
+                onPrompt={onPrompt}
+            />
+        );
     }
 
     const { authenticate, addWorkspace, removeWorkspace, signOut } = createSessionActions({

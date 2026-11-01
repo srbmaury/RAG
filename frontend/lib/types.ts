@@ -11,11 +11,13 @@ export type Doc = {
     status: string;
     error?: string;
     pages: number;
+    ocr_pages?: number[];
     chunk_count: number;
 };
 export type DocumentPreview = {
     document: Doc;
-    chunks: { id: string; page: number; text: string }[];
+    chunks: { id: string; page: number; text: string; ocr?: boolean }[];
+    current_page?: number;
 };
 export type Source = {
     chunk_id: string;
@@ -27,6 +29,8 @@ export type Source = {
     provider?: string;
     url?: string;
     date?: string;
+    ocr?: boolean;
+    highlight_context?: string;
 };
 export type Answer = {
     answer: string;

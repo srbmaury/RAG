@@ -7,14 +7,28 @@ import { visibleEvidence, sourceDisplayName, sourceLocation } from '../../lib/ev
 import { SOURCE_LABELS } from '../../lib/providers';
 import { FileBadge } from '../ui/WorkspacePrimitives';
 
-function citationText(children: ReactNode, evidence: Source[], onOpen: (source: Source) => void): ReactNode {
+function plainText(children: ReactNode): string {
+    return Children.toArray(children)
+        .map((child) => {
+            if (typeof child === 'string' || typeof child === 'number') return String(child);
+            return isValidElement<{ children?: ReactNode }>(child) ? plainText(child.props.children) : '';
+        })
+        .join('');
+}
+
+function citationText(
+    children: ReactNode,
+    evidence: Source[],
+    onOpen: (source: Source, context: string) => void,
+    context: string,
+): ReactNode {
     return Children.map(children, (child) =>
         typeof child === 'string'
             ? child.split(/(\[\d+\])/g).map((part, index) => {
                   const match = /^\[(\d+)\]$/.exec(part);
                   const passage = match ? evidence[Number(match[1]) - 1] : undefined;
                   return passage ? (
-                      <button key={index} className="cite" onClick={() => onOpen(passage)} aria-label={`Open source ${match?.[1]}: ${passage.name}`}>
+                      <button key={index} className="cite" onClick={() => onOpen(passage, context)} aria-label={`Open source ${match?.[1]}: ${passage.name}`}>
                           {match?.[1]}
                       </button>
                   ) : (
@@ -22,11 +36,11 @@ function citationText(children: ReactNode, evidence: Source[], onOpen: (source: 
                   );
               })
             : isValidElement<{ children?: ReactNode }>(child) && child.type !== 'code' && child.type !== 'a'
-              ? cloneElement(child, {}, citationText(child.props.children, evidence, onOpen))
+              ? cloneElement(child, {}, citationText(child.props.children, evidence, onOpen, context))
               : child,
     );
 }
-export const ResearchAnswer = memo(function ResearchAnswer({ result, onOpenSource, onPrompt }: { result: Answer; onOpenSource: (source: Source) => void; onPrompt: (prompt: string) => void }) {
+export const ResearchAnswer = memo(function ResearchAnswer({ result, onOpenSource, onPrompt }: { result: Answer; onOpenSource: (source: Source, context?: string) => void; onPrompt: (prompt: string) => void }) {
     const sources = visibleEvidence(result);
     return (
         <>
@@ -34,8 +48,18 @@ export const ResearchAnswer = memo(function ResearchAnswer({ result, onOpenSourc
                 <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                        p: ({ children }) => <p>{citationText(children, sources.length ? result.sources : [], onOpenSource)}</p>,
-                        li: ({ children }) => <li>{citationText(children, sources.length ? result.sources : [], onOpenSource)}</li>,
+                        p: ({ children }) => {
+                            const context =
+                                plainText(children).replace(/\[\d+\]/g, '').trim() ||
+                                result.answer.replace(/\[\d+\]/g, '').trim();
+                            return <p>{citationText(children, sources.length ? result.sources : [], onOpenSource, context)}</p>;
+                        },
+                        li: ({ children }) => {
+                            const context =
+                                plainText(children).replace(/\[\d+\]/g, '').trim() ||
+                                result.answer.replace(/\[\d+\]/g, '').trim();
+                            return <li>{citationText(children, sources.length ? result.sources : [], onOpenSource, context)}</li>;
+                        },
                     }}
                 >
                     {result.answer}
