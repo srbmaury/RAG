@@ -167,14 +167,14 @@ def save_webpage(workspaceId: str, url: str, db) -> dict:
     return {'id': did, 'name': doc.name, 'status': doc.status, 'url': url, 'duplicate': False}
 
 
-@router.post('/workspaces/{wid}/web-pages')
+@router.post('/workspaces/{workspaceId}/web-pages')
 def add_web_page(workspaceId: str, body: UrlRequest, request: Request):
     # Import inside handler to avoid circular import with app.main.
     from .gmail import actor, allowed_workspace
 
     with Session() as db:
         owner = actor(request, db)
-        allowed_workspace(db, owner, wid)
+        allowed_workspace(db, owner, workspaceId)
         try:
             return save_webpage(workspaceId, body.url, db)
         except ValueError as exc:
