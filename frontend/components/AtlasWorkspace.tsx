@@ -13,6 +13,7 @@ import '../app/rebuild.css';
 import {ConversationTranscript} from './chat/ConversationTranscript';
 import {ResearchComposer} from './chat/ResearchComposer';
 import {DocumentsView} from './documents/DocumentsView';
+import {HomeView} from './home/HomeView';
 import {AtlasMark,FileBadge,Status,EmptyState,Dialog} from './ui/WorkspacePrimitives';
 import {IntegrationTile} from '../components/IntegrationTile';
 import {flushSync} from 'react-dom';
@@ -565,29 +566,7 @@ export function AtlasWorkspace() {
         {uploadProgress && <div className="feedback" role="status"><LoaderCircle className="spin"/><span>{uploadProgress}</span></div>}
         {uploadSummary && <div className="feedback" role="status"><Upload/><span>{uploadStatus || 'No files added'} <button className="text-button" onClick={()=>navigate('documents')}>View documents</button></span><button className="icon-button" aria-label="Dismiss upload status" onClick={()=>setUploadSummary(null)}><X/></button></div>}
         {!wid && <EmptyState icon={<FolderOpen/>} title="A new space for your knowledge" text="Create a workspace to add documents and begin researching." action={<button className="btn primary" onClick={()=>setNewWorkspace(true)}><Plus/>Create workspace</button>}/>}
-        {wid && tab==='overview' && <section className="atlas-home">
-          <div className="home-hero">
-            <div className="home-hero-copy"><span className="section-kicker"><span/> RESEARCH WORKSPACE</span><h1>Find the answer.<br/><em>Know the source.</em></h1><p>Everything you've collected, connected, and learned. One thoughtful place to explore it.</p></div>
-            <div className="hero-symbol" aria-hidden="true"><AtlasMark/></div>
-          </div>
-          <div className="home-prompt-panel"><div className="home-prompt-top"><Sparkles size={17}/><span>Ask Atlas</span><span className="home-prompt-hint">Search your knowledge</span></div>
-            <form onSubmit={e=>{e.preventDefault();void ask(query,true);}}>
-              <textarea aria-label="Ask Atlas" placeholder="What would you like to understand?" value={query} maxLength={4000} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(hasAskSources)void ask(query,true);}}}/>
-              <div className="home-prompt-bottom"><div className="home-scope-summary"><FileText size={15}/>{includeDocuments?`${ready.length} ready documents`:'No documents selected'} <span>·</span> <button type="button" onClick={()=>navigate('sources')}>Manage sources <ArrowUpRight size={13}/></button></div><button className="home-send" aria-label="Ask Atlas" disabled={busy||!query.trim()||!hasAskSources}>{busy?<LoaderCircle size={18} className="spin"/>:<ArrowUp size={18}/>}</button></div>
-            </form></div>
-          <div className="home-section-header"><div><span className="section-kicker">PICK UP WHERE YOU LEFT OFF</span><h2>Your workspace</h2></div><button className="text-action" onClick={()=>navigate('sources')}>Connected sources <ArrowUpRight size={15}/></button></div>
-          <div className="home-activity-grid">
-            <div className="home-activity-card"><div className="home-card-head"><div><span className="home-card-icon"><MessageSquare size={18}/></span><h3>Recent conversations</h3></div><button aria-label="Open conversations" onClick={()=>{navigate('chat');setHistoryOpen(true);void refreshChats();}}><ArrowUpRight size={18}/></button></div>
-              {chats.length?<div className="home-activity-list">{chats.slice(0,4).map(item=><button key={item.id} onClick={()=>void loadChat(item.id)}><span><strong>{item.title}</strong><small>{new Date(item.updated*1000).toLocaleDateString()}</small></span><ChevronRight size={16}/></button>)}</div>:<div className="home-card-empty"><p>Every good question starts a conversation.</p><button onClick={()=>{newChat();navigate('chat');}}>Start researching <ArrowUpRight size={14}/></button></div>}
-            </div>
-            <div className="home-activity-card"><div className="home-card-head"><div><span className="home-card-icon"><FileText size={18}/></span><h3>Recent documents</h3></div><button aria-label="Open document library" onClick={()=>navigate('documents')}><ArrowUpRight size={18}/></button></div>
-              {docs.length?<div className="home-activity-list">{docs.slice(0,4).map(d=><button key={d.id} onClick={()=>void inspect(d)}><FileBadge name={d.name}/><span><strong>{d.name}</strong><small>{prettyBytes(d.size)} · {d.status==='ready'?'Ready to explore':d.status}</small></span><ChevronRight size={16}/></button>)}</div>:<div className="home-card-empty"><p>Add a document to start building your knowledge.</p>{uploadButton}</div>}
-            </div>
-          </div>
-          <div className={`home-dropzone ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}>
-            <span className="home-drop-icon"><Upload size={20}/></span><div><strong>Bring more knowledge into Atlas</strong><p>Drop PDF, DOCX, TXT, Markdown, CSV, JSON or HTML files. Up to {Math.round(user.max_file_bytes/1024/1024)} MB each.</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Choose files</button>
-          </div>
-        </section>}
+        {wid && tab==='overview' && <HomeView query={query} onQueryChange={setQuery} onAsk={()=>void ask(query,true)} hasAskSources={hasAskSources} includeDocuments={includeDocuments} readyCount={ready.length} busy={busy} chats={chats} docs={docs} onOpenSources={()=>navigate('sources')} onOpenConversations={()=>{navigate('chat');setHistoryOpen(true);void refreshChats();}} onOpenConversation={id=>void loadChat(id)} onStartChat={()=>{newChat();navigate('chat');}} onOpenDocuments={()=>navigate('documents')} onInspectDocument={d=>void inspect(d)} uploadButton={uploadButton} dragging={dragging} onDragging={setDragging} onDrop={files=>void upload(files)} maxSizeMB={Math.round(user.max_file_bytes/1024/1024)} uploading={uploading} onBrowse={()=>input.current?.click()} formatSize={prettyBytes}/>}
         {wid && tab==='chat' && <section>
           <div className="crumb">Ask Atlas<span>›</span><span className="crumb-title">{title}</span></div><div className="heading-row"><div className="research-heading"><span className="eyebrow">RESEARCH ASSISTANT</span><h1 title={title}>{title}</h1><p className="subtitle">Answers grounded in your documents, with evidence you can inspect.</p></div><div className="actions"><button className="btn" onClick={()=>setHistoryOpen(v=>!v)}><MessageSquare size={15}/>{historyOpen?'Hide history':'History'}</button><button className="btn hide-small" disabled={!messages.length} onClick={()=>void copyConversation()}>{copied?<Check/>:<Copy/>}{copied?'Copied':'Copy chat'}</button><button className="btn primary" disabled={busy} onClick={newChat}><Plus/><span>New chat</span></button></div></div>
           <div className="filters"><button className="filter" onClick={()=>setScopeOpen(true)}><FileText/>{selected.length?`${selected.length} selected documents`:'All documents'}<ChevronDown/></button><span className="research-mode"><i/>{user.mode==='ai'?'AI research':'Source search'} · {ready.length} ready documents</span></div>
