@@ -39,6 +39,31 @@ def bm25(query, chunks):
         if score > 0: scored.append((c, score))
     return sorted(scored, key=lambda x: x[1], reverse=True)[:60]
 
+def diversify_ranked_chunks(ranked, limit, per_document=3):
+    """Preserve diverse evidence while retaining high-scoring results.
+
+    Rank each document's strongest passages before filling remaining slots.
+    This prevents one lengthy PDF from crowding out comparison evidence.
+    """
+    if limit <= 0:
+        return []
+    chosen, counts, used = [], {}, set()
+    for item in ranked:
+        doc = item.document_id
+        if counts.get(doc, 0) >= per_document:
+            continue
+        chosen.append(item)
+        used.add(item.id)
+        counts[doc] = counts.get(doc, 0) + 1
+        if len(chosen) >= limit:
+            return chosen
+    for item in ranked:
+        if item.id not in used:
+            chosen.append(item)
+            if len(chosen) >= limit:
+                break
+    return chosen
+
 def source(chunk, name):
     return {'chunk_id': chunk.id, 'document_id': chunk.document_id, 'name': name, 'page': chunk.page, 'text': chunk.text, 'location_type': 'page' if name.lower().endswith('.pdf') else 'section'}
 
@@ -86,6 +111,7 @@ def retrieve(workspace_id, query, document_ids=None, limit=8):
                 scores[c.id] = scores.get(c.id, 0) + weight / (60 + rank + 1)
                 candidates[c.id] = c
         terms = set(tokens(query))
-        selected = sorted(candidates.values(), key=lambda c: scores[c.id] + .001 * len(terms & set(tokens(c.text))) / max(len(terms), 1), reverse=True)[:limit]
+        ranked = sorted(candidates.values(), key=lambda c: scores[c.id] + .001 * len(terms & set(tokens(c.text))) / max(len(terms), 1), reverse=True)
+        selected = diversify_ranked_chunks(ranked, limit)
         names = {d.id: d.name for d in db.query(Document).filter(Document.workspace_id == workspace_id)}
         return [source(c, names[c.document_id]) for c in selected]

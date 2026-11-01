@@ -3,43 +3,18 @@
 import {Children, useEffect, useRef, useState, useCallback, type ReactNode} from 'react';
 import {ArrowUp, ArrowUpRight, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, FileText, FolderOpen, Layers3, LogOut, Plus, Search, ShieldCheck, Sparkles, Trash2, Upload, X, LoaderCircle, RotateCcw, Download, MessageSquare, Mail, Github, HardDrive, Hash, Lightbulb, Clock3, Moon, Sun, Home as HomeIcon, PanelLeftClose, PanelLeftOpen, Menu, Copy, SlidersHorizontal, CheckCircle2, AlertCircle, NotebookPen, ArrowDownToLine} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import {conversationPlan} from '../lib/conversation';
+import {useConversation} from '../hooks/useConversation';
+import {api} from '../lib/api';
+import type {User,Workspace,Doc,Source,Answer,Message,GmailMessage,GmailStatus,GmailSummary,ChatSummary,SavedChat} from '../lib/types';
+import {DocumentPassage} from '../components/DocumentPassage';
 import './rebuild.css';
 import {IntegrationTile} from '../components/IntegrationTile';
 import {flushSync} from 'react-dom';
 import remarkGfm from 'remark-gfm';
 
-type User = {id: string; email: string; mode: string; max_file_bytes: number};
-type Workspace = {id: string; name: string};
-type Doc = {id: string; name: string; size: number; status: string; error?: string; pages: number; chunk_count: number};
-type Source = {chunk_id: string; document_id: string; name: string; page: number; text: string; location_type: string; provider?: string; url?: string};
-type Answer = {answer: string; sources: Source[]; mode: string; citation_note?: string};
-type Message = {role: 'user' | 'assistant'; content: string; result?: Answer};
-type GmailMessage = {id:string;subject:string;sender:string;date:string;snippet:string;body:string;url:string};
-type GmailStatus = {connected:boolean;email:string|null;configured:boolean};
-type GmailSummary = {summary:string;sources:{number:number;id:string;subject:string;url:string}[]};
-type ChatSummary = {id: string; title: string; updated: number};
-type SavedChat = ChatSummary & {messages: Message[]};
-
-async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {...options, headers: options?.body instanceof FormData ? options.headers : {'Content-Type': 'application/json', ...options?.headers}});
-  if (!response.ok) {
-    const value = await response.json().catch(() => ({}));
-    const detail = typeof value.detail === 'string' ? value.detail
-      : Array.isArray(value.detail) ? value.detail.map((item: {msg?:string}) => item.msg || 'Invalid request').join('; ')
-      : '';
-    throw new Error(detail || `The server returned HTTP ${response.status} for ${path}. Check the backend terminal for details.`);
-  }
-  return response.json();
-}
 const prettyBytes = (n: number) => n < 1024*1024 ? `${Math.max(1, Math.round(n/1024))} KB` : `${(n/1024/1024).toFixed(1)} MB`;
 const prompts = ['What are the key takeaways?', 'What risks should I be aware of?', 'Compare the main findings across documents', 'Which decisions still need to be made?'];
-
-function DocumentPassage({text, name}: {text: string; name: string}) {
-  if (/\.(md|docx)$/i.test(name)) {
-    return <div className="document-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown></div>;
-  }
-  return <div className="document-plain">{text}</div>;
-}
 
 export default function Home() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -66,7 +41,7 @@ export default function Home() {
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const {messages,chatId,setMessages,setChatId,activeChat,chatMessages,chatTitle} = useConversation();
   const [driveStatus,setDriveStatus] = useState<{connected:boolean;account:string|null;configured:boolean}|null>(null);
   const [driveQuery,setDriveQuery] = useState('');
   const [driveResults,setDriveResults] = useState<{id:string;title:string;excerpt:string;url:string}[]>([]);
@@ -97,10 +72,7 @@ export default function Home() {
   const [gmailPreview,setGmailPreview] = useState<GmailMessage|null>(null);
   const gmailSummaryHeading = useRef<HTMLHeadingElement>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
-  const [chatId, setChatId] = useState<string | null>(null);
-  const activeChat = useRef<string | null>(null);
-  const chatMessages = useRef<Message[]>([]);
-  const chatTitle = useRef('New chat');
+
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
@@ -128,8 +100,6 @@ export default function Home() {
   const chatThread = useRef<HTMLDivElement>(null);
   const scope = useRef('');
   scope.current = wid;
-  activeChat.current = chatId;
-  chatMessages.current = messages;
 
   const boot = useCallback(async () => {
     try {
@@ -266,13 +236,13 @@ export default function Home() {
       activeChat.current=null;setChatId(null);chatTitle.current='New chat';
       chatMessages.current=[];setMessages([]);setNotes('');setSource(null);setEvidenceTab('sources');
     }
-    const history=(startNewConversation?[]:chatMessages.current).slice(-12).map(m=>({role:m.role,content:m.content.slice(0,6000)}));
+    const plan=conversationPlan(startNewConversation?'new':'followup',activeChat.current,chatMessages.current,question);
+    const history=plan.history;
     setQuery('');setTab('chat');setError('');setBusy(true);
     const title=startNewConversation||chatTitle.current==='New chat'?question.trim().slice(0,100):chatTitle.current;
-    const previous=startNewConversation?[]:chatMessages.current;
-    const pending: Message[]=[...previous,{role:'user',content:question}];
+    const pending: Message[]=plan.pending;
     chatMessages.current=pending;setMessages(pending);
-    let id=startNewConversation?null:activeChat.current;
+    let id=plan.id;
     try {
       if (!id) {
         const created=await api<SavedChat>(`/workspaces/${target}/conversations`,{method:'POST',body:JSON.stringify({title,messages:pending})});
@@ -508,7 +478,7 @@ export default function Home() {
   if (!user) return <div className="auth-page"><header><div className="brand-row"><AtlasMark/><span>Atlas</span></div>{themeButton}</header><div className="auth-grid"><div className="auth-intro"><span className="eyebrow">YOUR RESEARCH WORKSPACE</span><h1>Your knowledge,<br/>a conversation away.</h1><p>Bring your documents together. Ask better questions. Follow every answer back to the evidence.</p><div className="auth-points"><span><FileText/>All your documents, one place</span><span><MessageSquare/>Questions with context</span><span><ShieldCheck/>A workspace of your own</span></div></div><form className="auth-form" onSubmit={authenticate}><h2>{register ? 'Create your workspace' : 'Welcome back'}</h2><p>{register ? 'Make room for your next discovery.' : 'Continue where your research left off.'}</p><label>Email address<input type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@company.com"/></label><label>Password<input type="password" autoComplete={register ? 'new-password' : 'current-password'} required minLength={10} maxLength={200} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 10 characters"/></label>{error && <div className="feedback error" role="alert">{error}</div>}<button className="btn primary" disabled={busy}>{busy ? <LoaderCircle className="spin"/> : <ArrowUpRight/>}{register ? 'Create account' : 'Sign in'}</button><div className="auth-switch">{register ? 'Already have an account?' : 'New to Atlas?'} <button type="button" onClick={()=>{setRegister(!register);setError('');}}>{register ? 'Sign in' : 'Create an account'}</button></div></form></div></div>;
 
   return <div className={`app atlas-v3 ${sidebarCollapsed ? 'collapsed' : ''}`}>
-    <input ref={input} type="file" multiple accept=".pdf,.docx,.txt,.md" hidden onChange={e=>{if(e.target.files) void upload(e.target.files);}}/>
+    <input ref={input} type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,.json,.html,.htm" hidden onChange={e=>{if(e.target.files) void upload(e.target.files);}}/>
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={()=>setSidebarOpen(false)}/>}
     <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
       <div className="brand-row"><AtlasMark/><span>Atlas</span><button className="sidebar-collapse" aria-label="Collapse sidebar" onClick={()=>{setSidebarCollapsed(true);setSidebarOpen(false);}}><PanelLeftClose/></button></div>
@@ -545,7 +515,7 @@ export default function Home() {
             </div>
           </div>
           <div className={`home-dropzone ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}>
-            <span className="home-drop-icon"><Upload size={20}/></span><div><strong>Bring more knowledge into Atlas</strong><p>Drop PDF, DOCX, TXT or Markdown files. Up to {Math.round(user.max_file_bytes/1024/1024)} MB each.</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Choose files</button>
+            <span className="home-drop-icon"><Upload size={20}/></span><div><strong>Bring more knowledge into Atlas</strong><p>Drop PDF, DOCX, TXT, Markdown, CSV, JSON or HTML files. Up to {Math.round(user.max_file_bytes/1024/1024)} MB each.</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Choose files</button>
           </div>
         </section>}
         {wid && tab==='chat' && <section>
@@ -580,7 +550,7 @@ export default function Home() {
             <div className="library-search-row"><label><Search size={17}/><input type="search" aria-label="Search documents" placeholder="Search your documents…" value={filter} onChange={e=>setFilter(e.target.value)}/></label></div>
             {renderDocuments(filtered)}
           </div>
-          <div className={`home-dropzone ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}><span className="home-drop-icon"><Upload size={20}/></span><div><strong>Add documents to your library</strong><p>Drag in PDFs, Word files, plain text, or Markdown · max {Math.round(user.max_file_bytes/1024/1024)} MB each.</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Browse files</button></div>
+          <div className={`home-dropzone ${dragging?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);void upload(e.dataTransfer.files);}}><span className="home-drop-icon"><Upload size={20}/></span><div><strong>Add documents to your library</strong><p>Drag in PDFs, Word, text, Markdown, CSV, JSON or HTML · max {Math.round(user.max_file_bytes/1024/1024)} MB each.</p></div><button className="btn" disabled={uploading} onClick={()=>input.current?.click()}>Browse files</button></div>
         </section>}
         {wid && tab==='sources' && <section className="connected-page">
           {sourceManage!=='gmail' && <div className="sources-overview">

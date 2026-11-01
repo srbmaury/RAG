@@ -12,7 +12,7 @@ A working first release for bulk document ingestion, private workspaces, source-
 
 Drive uses `drive.readonly`, a **restricted Google OAuth scope** that permits reading and downloading the user's accessible Drive files. Public deployment may require Google's verification and a security assessment depending on data handling. This connector is designed for local/development use initially. Access tokens are refreshed on demand, refresh tokens encrypted per workspace, and access revoked in Atlas by disconnecting; for full revocation, also revoke the application's access in Google Account settings.
 
-The initial search lists Drive metadata; Ask Atlas reads text/plain Google Docs exports and plain-text files on demand. PDF, spreadsheet, slide, and DOCX content are **not yet extracted through Drive**. Drive is not automatically indexed, and selected excerpts may be sent to the configured AI provider.
+The initial search lists Drive metadata; Ask Atlas reads text/plain Google Docs exports and plain-text files on demand. Drive now extracts readable PDF and DOCX text on demand and can export Google Sheets as CSV. Presentation slides and image-only Drive PDFs remain unsupported as Drive evidence. Drive is not automatically indexed, and selected excerpts may be sent to the configured AI provider.
 
 ## Connect additional sources (experimental)
 
@@ -36,6 +36,15 @@ Connected questions are saved to normal workspace conversation history, using th
 ## UI design preview
 
 Open [the interactive Atlas design preview](docs/Atlas_Research_Workspace.html) locally in a browser to review the current Home, Ask Atlas, Documents, Gmail, and workspace-management layouts. This standalone HTML uses fictional sample content and does not connect to the backend. The Next.js frontend in `frontend/app/` remains the source of truth for the working app.
+
+## Reliability, OCR, and database setup
+
+- **Health probes:** `GET /api/health/live` reports liveness; `GET /api/health/ready` checks DB connectivity. `GET /api/workspaces/{wid}/processing-stats` requires authentication and reports queued/processing/ready/failed counts.
+- **Migrations:** Starting the API or worker runs Alembic migrations from `backend/migrations`. For a manual migration run, use `cd backend && PYTHONPATH=. ../.venv/bin/alembic -c alembic.ini upgrade head`. Existing development databases should be backed up before moving to the new baseline.
+- **OCR:** Scanned PDF pages are OCR'd if they lack a text layer. Install the `tesseract` binary locally (the Docker image includes it), or set `OCR_ENABLED=false` to require already-searchable PDFs.
+- **Worker:** Transient ingestion exceptions are retried with backoff up to three attempts; invalid files remain failed and can be manually retried.
+- **Browser tests:** Install Playwright with `cd frontend && npm install --no-save @playwright/test@1.56.1 && npx playwright install chromium && npx playwright test`. CI runs Chromium tests for Home research, long answers, and Gmail navigation.
+- **Structured documents:** CSV, JSON, and HTML uploads are converted to readable text; formatting and formulas are not executed.
 
 ## Run locally
 
@@ -131,13 +140,13 @@ Tests use an isolated temporary database and no network/API calls. They cover in
 
 ## Current limits and next milestones
 
-Insights and background collection reports have been removed. The worker now processes ingestion jobs only. Existing deployments may still have a legacy `analyses` table; it is intentionally left untouched until a database migration is available.
+Insights and background collection reports have been removed. The worker now processes ingestion jobs only. Existing deployments may still have a legacy `analyses` table; the new Alembic migration baseline is intended for fresh development databases, so back up or recreate older databases first.
 
 This release has not been benchmarked for 10,000 documents/workspace. The architecture supports a separate worker and indexed PostgreSQL retrieval, but capacity, latency, accuracy, and cost targets must be established with representative documents before scaling.
 
-Scanned or partially image-only PDFs fail explicitly with an OCR message; they are never silently treated as fully indexed. OCR, vision/table-aware parsing, additional formats, and object-store integration are pending. DOCX references are logical sections, not rendered Word page numbers.
+Image-only PDF pages use Tesseract OCR when enabled (default: enabled); installing the Python package alone is insufficient without the Tesseract executable. OCR is CPU-intensive and a poor fit for extremely large scans. Vision/table-aware parsing and object-store integration remain pending. DOCX references are logical sections, not rendered Word page numbers.
 
-Also pending: cross-encoder reranking, streamed AI output, shared workspace membership/roles, password recovery/email verification, login/API rate limits and usage quotas, object-store integration, schema migrations, telemetry, backup/restore validation, antivirus/parser sandboxing, and production load/accuracy evaluation. Provider calls have bounded timeouts and retries; errors stay visible rather than falling back to fabricated answers.
+Also pending: cross-encoder reranking, streamed AI output, shared workspace membership/roles, password recovery/email verification, login/API rate limits and usage quotas, object-store integration, complete audit logging, backup/restore validation, antivirus/parser sandboxing, and production load/accuracy evaluation. Provider calls have bounded timeouts and retries; errors stay visible rather than falling back to fabricated answers.
 
 Do not expose this development release publicly until the authentication, abuse controls, document parsing isolation, and deployment hardening items are completed. Schema creation is automatic for a fresh database; use a migration system before evolving a deployed database.
 

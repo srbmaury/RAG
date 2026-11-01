@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import hmac
 import os
 import secrets
@@ -10,6 +11,7 @@ from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, DriveOAuthState, uid
 from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
@@ -23,6 +25,7 @@ from . import uploads
 from .gmail import router as gmail_router
 from .external_sources import router as external_router
 from .drive import router as drive_router
+from .health import router as health_router
 from starlette.concurrency import run_in_threadpool
 
 @asynccontextmanager
@@ -42,6 +45,26 @@ app = FastAPI(title='Atlas Document Intelligence', lifespan=lifespan)
 app.include_router(gmail_router)
 app.include_router(external_router)
 app.include_router(drive_router)
+app.include_router(health_router)
+log = logging.getLogger('atlas.requests')
+
+@app.middleware('http')
+async def request_diagnostics(request: Request, call_next):
+    started = time.monotonic()
+    request_id = secrets.token_hex(8)
+    try:
+        response = await call_next(request)
+    except Exception:
+        log.exception('request_failed id=%s method=%s path=%s', request_id, request.method, request.url.path)
+        raise
+    elapsed_ms = round((time.monotonic() - started) * 1000)
+    response.headers['X-Request-ID'] = request_id
+    response.headers['Server-Timing'] = f'api;dur={elapsed_ms}'
+    log.info('request id=%s method=%s path=%s status=%s duration_ms=%s',
+             request_id, request.method, request.url.path, response.status_code, elapsed_ms)
+    return response
+
+
 
 def database():
     with Session() as db: yield db
@@ -97,6 +120,19 @@ def issue_login(actor, response, db):
     db.commit()
     response.set_cookie('atlas_session', token, max_age=604800, httponly=True, secure=COOKIE_SECURE, samesite='strict', path='/')
     return {'id': actor.id, 'email': actor.email}
+
+@app.get('/api/workspaces/{wid}/processing-stats')
+def processing_stats(wid: str, actor=Depends(user), db=Depends(database)):
+    workspace(wid, actor, db)
+    rows = db.query(Document.status, func.count(Document.id)).filter(
+        Document.workspace_id == wid).group_by(Document.status).all()
+    counts = {name: count for name, count in rows}
+    return {
+        'queued': counts.get('queued', 0),
+        'processing': counts.get('processing', 0),
+        'ready': counts.get('ready', 0),
+        'failed': counts.get('failed', 0),
+    }
 
 @app.get('/api/health')
 def health(): return {'status': 'ok'}
@@ -216,7 +252,7 @@ async def upload(wid: str, files: List[UploadFile] = File(...), actor=Depends(us
     for file in files:
         name = Path((file.filename or 'untitled').replace('\\', '/')).name[:200]
         if Path(name).suffix.lower() not in SUPPORTED:
-            results.append({'name': name, 'error': 'Supported formats: PDF, DOCX, TXT, MD.'}); continue
+            results.append({'name': name, 'error': 'Supported formats: PDF, DOCX, TXT, MD, CSV, JSON, HTML.'}); continue
         did, count, digest = uid(), 0, hashlib.sha256()
         path = DATA / 'files' / did
         try:

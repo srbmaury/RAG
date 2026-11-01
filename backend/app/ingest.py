@@ -1,4 +1,5 @@
 import re
+import os
 from pathlib import Path
 import pypdfium2 as pdfium
 from docx import Document as WordDocument
@@ -8,8 +9,9 @@ from .config import DATA
 from .db import Session, Document, Chunk
 from .ai import embed, embedding_model_id
 from . import config
+from .structured_text import extract_structured
 
-SUPPORTED = {'.pdf', '.docx', '.txt', '.md'}
+SUPPORTED = {'.pdf', '.docx', '.txt', '.md', '.csv', '.json', '.html', '.htm'}
 
 def extract(path, name, heartbeat=None):
     ext = Path(name).suffix.lower()
@@ -30,8 +32,25 @@ def extract(path, name, heartbeat=None):
                     try: value = textpage.get_text_bounded()
                     finally: textpage.close()
                 finally: page.close()
+                if not value.strip() and os.getenv('OCR_ENABLED', 'true').lower() == 'true':
+                    # OCR only pages without a text layer, keeping searchable pages fast.
+                    try:
+                        import pytesseract
+                        ocr_page = pdf[i]
+                        try:
+                            bitmap = ocr_page.render(scale=2)
+                            try:
+                                value = pytesseract.image_to_string(bitmap.to_pil(), timeout=30)
+                            finally:
+                                bitmap.close()
+                        finally:
+                            ocr_page.close()
+                    except (ImportError, OSError, RuntimeError, TimeoutError) as exc:
+                        raise ValueError('OCR is unavailable. Install Tesseract and the Python OCR dependencies.') from exc
+                    except pytesseract.TesseractError as exc:
+                        raise ValueError(f'OCR failed for PDF page {i + 1}.') from exc
                 if not value.strip():
-                    raise ValueError(f'PDF page {i + 1} has no extractable text. OCR the document before uploading; partial indexing is disabled.')
+                    raise ValueError(f'PDF page {i + 1} has no readable text, including OCR.')
                 pages.append((i + 1, value.replace('\r\n', '\n')))
             return pages
         finally: pdf.close()
@@ -67,6 +86,8 @@ def extract(path, name, heartbeat=None):
                     table.extend('| ' + ' | '.join(row) + ' |' for row in rows[1:])
                     blocks.append('\n'.join(table))
         return [(1, '\n\n'.join(blocks))]
+    if ext in {'.csv', '.json', '.html', '.htm'}:
+        return [(1, extract_structured(path, ext))]
     return [(1, Path(path).read_text(encoding='utf-8-sig'))]
 
 def split_text(text, size=1800, overlap=240):

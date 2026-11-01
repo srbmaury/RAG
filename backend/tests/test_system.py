@@ -500,3 +500,36 @@ def test_connected_chat_uses_standard_chat_citation_contract(client, monkeypatch
     assert result['sources'][0]['document_id'] == 'doc-123'
     assert result['sources'][0]['page'] == 2
     assert result['sources'][0]['location_type'] == 'section'
+
+def test_health_and_processing_stats(client):
+    workspace_id=wid(client)
+    assert client.get('/api/health/live').json()['status']=='ok'
+    assert client.get('/api/health/ready').json()['status']=='ready'
+    response=client.get(f'/api/workspaces/{workspace_id}/processing-stats')
+    assert response.status_code==200
+    assert response.json()=={'queued':0,'processing':0,'ready':0,'failed':0}
+    created=upload(client,workspace_id,'metrics.md','A sufficiently long sample for metrics.')
+    assert client.get(f'/api/workspaces/{workspace_id}/processing-stats').json()['queued']==1
+    drain()
+
+def test_retrieval_diversifies_sources():
+    from app.retrieval import diversify_ranked_chunks
+    ranked=[SimpleNamespace(id=f'a{i}',document_id='a') for i in range(6)]
+    ranked += [SimpleNamespace(id=f'b{i}',document_id='b') for i in range(3)]
+    picked=diversify_ranked_chunks(ranked,6,per_document=3)
+    assert len(picked)==6
+    assert len([x for x in picked if x.document_id=='b'])==3
+
+def test_transient_worker_failure_requeues_with_delay(client,monkeypatch):
+    from app import worker
+    workspace_id=wid(client)
+    document=upload(client,workspace_id,'retry-transient.md','A sample document.')
+    def unavailable(*args,**kwargs):
+        raise RuntimeError('Temporary embedding outage')
+    monkeypatch.setattr(worker,'ingest',unavailable)
+    assert worker.run_one()
+    with Session() as db:
+        state=db.get(Document,document['id'])
+        assert state.status=='queued'
+        assert state.lease>time.time()
+        assert state.generation==1

@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 def claim(model):
     now = time.time()
     with Session() as db:
-        eligible = or_(model.status == 'queued', and_(model.status == 'processing', model.lease < now))
+        eligible = or_(and_(model.status == 'queued', model.lease <= now), and_(model.status == 'processing', model.lease < now))
         job = db.query(model).filter(eligible).order_by(model.created).first()
         if not job: return None
         generation = job.generation + 1
@@ -36,7 +36,15 @@ def run_one():
             # Persist a useful error without exposing provider secrets or response bodies.
             message = str(exc)[:400] if isinstance(exc, (ValueError, UnicodeError)) else 'Processing failed. Check server logs, then retry.'
             with Session() as db:
-                db.query(model).filter_by(id=job_id, generation=generation, status='processing').update({'status': 'failed', 'error': message})
+                # Validation failures require user action. Retry transient provider/network
+                # failures up to three total attempts, with bounded exponential backoff.
+                permanent = isinstance(exc, (ValueError, UnicodeError))
+                retry = not permanent and generation < 3
+                next_lease = time.time() + min(300, 2 ** generation * 5) if retry else 0
+                db.query(model).filter_by(id=job_id, generation=generation, status='processing').update({
+                    'status': 'queued' if retry else 'failed', 'lease': next_lease,
+                    'error': None if retry else message,
+                })
                 db.commit()
         return True
     return False
