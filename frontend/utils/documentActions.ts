@@ -173,3 +173,26 @@ export function createDocumentActions({
   }
   return { importWebPage, upload, remove, retry, inspect };
 }
+
+/** Fetch the next preview page without putting transport logic in the inspector JSX. */
+export async function loadMoreDocumentPassages({
+  workspaceId,
+  preview,
+  onPreviewChange,
+  onError,
+}: {
+  workspaceId: string;
+  preview: DocumentPreview | null;
+  onPreviewChange: (preview: DocumentPreview) => void;
+  onError: (message: string) => void;
+}) {
+  if (!preview) return;
+  try {
+    const next = await api<DocumentPreview>(
+      `/workspaces/${workspaceId}/documents/${preview.document.id}/chunks?offset=${preview.chunks.length}`,
+    );
+    if (next) onPreviewChange({ ...preview, chunks: [...preview.chunks, ...next.chunks] });
+  } catch (error) {
+    onError((error as Error).message);
+  }
+}

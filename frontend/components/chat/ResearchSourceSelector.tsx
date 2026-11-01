@@ -113,7 +113,7 @@ export function ResearchSourceSelector({
                     )[p]}
         </label>
       ))}
-      <button type="button" className="unified-source-manage" onClick={() => onManage()}>
+      <button type="button" className="unified-source-manage" onClick={onManage}>
         Manage connections <ArrowUpRight size={13} />
       </button>
     </div>

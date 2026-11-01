@@ -51,17 +51,11 @@ export function WorkspaceSidebar({
       <div className="brand-row">
         <AtlasMark />
         <span>Atlas</span>
-        <button
-          className="sidebar-collapse"
-          aria-label="Collapse sidebar"
-          onClick={() => {
-            onCollapse();
-          }}
-        >
+        <button className="sidebar-collapse" aria-label="Collapse sidebar" onClick={onCollapse}>
           <PanelLeftClose />
         </button>
       </div>
-      <button className="workspace-btn" onClick={() => onWorkspaceSettings()}>
+      <button className="workspace-btn" onClick={onWorkspaceSettings}>
         <span className="ws-avatar">{workspace?.name[0]?.toUpperCase() || 'A'}</span>
         <span>
           <strong>{workspace?.name || 'Choose workspace'}</strong>
@@ -105,12 +99,7 @@ export function WorkspaceSidebar({
             <span>{item.title}</span>
           </button>
         ))}
-        <button
-          className="workspace-stat"
-          onClick={() => {
-            onAllChats();
-          }}
-        >
+        <button className="workspace-stat" onClick={onAllChats}>
           <Clock3 />
           <span>All conversations ({chats.length})</span>
         </button>
@@ -130,7 +119,7 @@ export function WorkspaceSidebar({
             className="icon-button"
             aria-label="Sign out"
             title="Sign out"
-            onClick={() => onSignOut()}
+            onClick={onSignOut}
           >
             <LogOut />
           </button>

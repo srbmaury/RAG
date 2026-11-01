@@ -1,6 +1,6 @@
 'use client';
 import { ArrowUpRight, Download } from 'lucide-react';
-import { api } from '../../lib/api';
+import { loadMoreDocumentPassages } from '../../utils/documentActions';
 import { sourceLocation } from '../../lib/evidence';
 import type { DocumentPreview, Source } from '../../lib/types';
 import { DocumentPassage } from '../DocumentPassage';
@@ -69,20 +69,14 @@ export function EvidenceInspector({
               {preview.document.chunk_count > preview.chunks.length && (
                 <button
                   className="btn"
-                  onClick={async () => {
-                    try {
-                      const next = await api<typeof preview>(
-                        `/workspaces/${wid}/documents/${preview.document.id}/chunks?offset=${preview.chunks.length}`,
-                      );
-                      if (next)
-                        onPreviewChange({
-                          ...preview,
-                          chunks: [...preview.chunks, ...next.chunks],
-                        });
-                    } catch (e) {
-                      onError((e as Error).message);
-                    }
-                  }}
+                  onClick={() =>
+                    void loadMoreDocumentPassages({
+                      workspaceId: wid,
+                      preview,
+                      onPreviewChange,
+                      onError,
+                    })
+                  }
                 >
                   Load more passages
                 </button>
@@ -106,12 +100,7 @@ export function EvidenceInspector({
             Download original
           </a>
         )}
-        <button
-          className="btn"
-          onClick={() => {
-            onClose();
-          }}
-        >
+        <button className="btn" onClick={onClose}>
           Close
         </button>
       </div>

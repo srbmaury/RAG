@@ -323,6 +323,10 @@ npm run build
 
 The tests use an isolated temporary database and mock provider calls. They do not verify OAuth credentials or live access to Gmail, Drive, GitHub, Notion, or Slack.
 
+Install the development requirements before running style checks. From the repository root,
+`make format` applies Ruff import sorting/formatting and Prettier; `make format-check`
+checks Python lint/formatting and frontend formatting without changing files.
+
 For browser tests, install Playwright and Chromium:
 
 ```sh
@@ -358,10 +362,11 @@ Tokens and originals are workspace data. Protect the database, document volume, 
 - `backend/app/drive.py` and `backend/app/gmail.py`: Google connectors.
 - `backend/app/worker.py`: durable ingestion queue worker.
 - `frontend/app/page.tsx`: lightweight Next.js entry point.
-- `frontend/components/AtlasWorkspace.tsx`: workspace orchestration and API actions.
+- `frontend/components/AtlasWorkspace.tsx`: workspace state and screen composition.
 - `frontend/components/{home,documents,chat,sources,auth,layout,ui}/`: feature-level UI and shared components.
 - `frontend/hooks/`: theme, conversation, Gmail and connected-source state.
-- `frontend/app/rebuild.css`: current feature-specific visual refinements; consolidation with legacy `globals.css` remains future cleanup.
+- `frontend/utils/`: typed session, document, and conversation actions.
+- `frontend/app/{globals,rebuild}.css`: ordered entry points for styles in `frontend/app/styles/`; rule order is preserved for existing visual refinements.
 - `compose.yaml`: PostgreSQL, API, worker, and web services.
 
 ## Design preview

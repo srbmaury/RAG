@@ -71,7 +71,7 @@ import { AuthView } from './auth/AuthView';
 import { AtlasMark, FileBadge, EmptyState, Dialog } from './ui/WorkspacePrimitives';
 import { flushSync } from 'react-dom';
 
-import { prettyBytes, prompts } from '../utils/utils';
+import { formatBytes, researchPrompts } from '../utils/workspacePresentation';
 
 export function AtlasWorkspace() {
   const { theme, toggleTheme } = useAtlasTheme();
@@ -496,7 +496,7 @@ export function AtlasWorkspace() {
           void refreshChats();
         }}
         readyCount={ready.length}
-        storageLabel={storage ? prettyBytes(storage) : '0 KB'}
+        storageLabel={storage ? formatBytes(storage) : '0 KB'}
         initials={initials}
         email={user.email}
         onSignOut={() => void signOut()}
@@ -628,7 +628,7 @@ export function AtlasWorkspace() {
               maxSizeMB={Math.round(user.max_file_bytes / 1024 / 1024)}
               uploading={uploading}
               onBrowse={() => input.current?.click()}
-              formatSize={prettyBytes}
+              formatSize={formatBytes}
             />
           )}
           {workspaceId && tab === 'chat' && (
@@ -734,7 +734,7 @@ export function AtlasWorkspace() {
                       busy={busy}
                       readyCount={ready.length}
                       uploadButton={uploadButton}
-                      prompts={prompts}
+                      prompts={researchPrompts}
                       onPrompt={(p) => void ask(p)}
                       initials={initials}
                       renderAnswer={renderAnswer}
@@ -792,7 +792,7 @@ export function AtlasWorkspace() {
               }
               totalDocuments={docs.length}
               readyDocuments={ready.length}
-              storageLabel={storage ? prettyBytes(storage) : '0 KB'}
+              storageLabel={storage ? formatBytes(storage) : '0 KB'}
               filteredCount={filtered.length}
               filter={filter}
               onFilter={setFilter}
@@ -806,7 +806,7 @@ export function AtlasWorkspace() {
                   onRetry={(d) => void retry(d)}
                   onRemove={(d) => void remove(d)}
                   downloadUrl={(d) => `/api/workspaces/${workspaceId}/documents/${d.id}/original`}
-                  formatSize={prettyBytes}
+                  formatSize={formatBytes}
                 />
               }
               dragging={dragging}

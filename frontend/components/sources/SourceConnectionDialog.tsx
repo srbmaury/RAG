@@ -68,14 +68,10 @@ export function SourceConnectionDialog({
                       placeholder="Search Drive file names or text"
                       aria-label="Search Drive"
                     />
-                    <button className="btn" disabled={driveBusy} onClick={() => onSearchDrive()}>
+                    <button className="btn" disabled={driveBusy} onClick={onSearchDrive}>
                       Search Drive
                     </button>
-                    <button
-                      className="btn"
-                      disabled={driveBusy}
-                      onClick={() => onDisconnectDrive()}
-                    >
+                    <button className="btn" disabled={driveBusy} onClick={onDisconnectDrive}>
                       Disconnect
                     </button>
                   </div>
@@ -93,7 +89,7 @@ export function SourceConnectionDialog({
                 <button
                   className="btn primary"
                   disabled={driveBusy || !driveStatus?.configured}
-                  onClick={() => onConnectDrive()}
+                  onClick={onConnectDrive}
                 >
                   Connect Google Drive
                 </button>
@@ -200,7 +196,7 @@ export function SourceConnectionDialog({
                     <button
                       className="btn"
                       disabled={sourceBusy || !sourceSearch.trim()}
-                      onClick={() => onSearchSource()}
+                      onClick={onSearchSource}
                     >
                       Search
                     </button>

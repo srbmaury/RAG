@@ -60,13 +60,7 @@ export function GmailWorkspaceView({
   return (
     <section className="gmail-page gmail-integrated">
       <div className="gmail-integrated-back">
-        <button
-          className="btn"
-          type="button"
-          onClick={() => {
-            onBack();
-          }}
-        >
+        <button className="btn" type="button" onClick={onBack}>
           ← All sources
         </button>
       </div>
@@ -76,7 +70,7 @@ export function GmailWorkspaceView({
           <p className="subtitle">Find messages and summarize only the emails you select.</p>
         </div>
         {gmailStatus?.connected && (
-          <button className="btn" disabled={gmailBusy} onClick={() => onDisconnect()}>
+          <button className="btn" disabled={gmailBusy} onClick={onDisconnect}>
             Disconnect
           </button>
         )}
@@ -93,7 +87,7 @@ export function GmailWorkspaceView({
           </p>
         </div>
         {!gmailStatus?.connected && (
-          <button className="btn primary" disabled={gmailBusy} onClick={() => onConnect()}>
+          <button className="btn primary" disabled={gmailBusy} onClick={onConnect}>
             Connect Gmail <ArrowUpRight />
           </button>
         )}
@@ -278,7 +272,7 @@ export function GmailWorkspaceView({
                 <button
                   className="btn primary"
                   disabled={gmailBusy || !gmailSelected.length}
-                  onClick={() => onSummarizeSelected()}
+                  onClick={onSummarizeSelected}
                 >
                   {gmailSummarizing ? 'Generating summary…' : 'Summarize selected'}
                 </button>
@@ -365,7 +359,7 @@ export function GmailWorkspaceView({
                     <button
                       className="btn"
                       disabled={gmailBusy || !gmailSelected.length}
-                      onClick={() => onSummarizeSelected()}
+                      onClick={onSummarizeSelected}
                     >
                       <RotateCcw size={15} /> Regenerate
                     </button>

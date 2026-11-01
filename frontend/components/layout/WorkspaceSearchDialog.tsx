@@ -1,13 +1,8 @@
 'use client';
 import { ArrowUpRight, ChevronRight, Search, Sparkles } from 'lucide-react';
 import type { Doc } from '../../lib/types';
+import { formatBytes } from '../../utils/workspacePresentation';
 import { FileBadge, Dialog } from '../ui/WorkspacePrimitives';
-
-function prettyBytes(n: number) {
-  return n < 1024 * 1024
-    ? `${Math.max(1, Math.round(n / 1024))} KB`
-    : `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
 
 export function WorkspaceSearchDialog({
   query,
@@ -54,7 +49,7 @@ export function WorkspaceSearchDialog({
             <span className="doc-item-info">
               <strong>{doc.name}</strong>
               <small>
-                {prettyBytes(doc.size)} · {doc.chunk_count} passages
+                {formatBytes(doc.size)} · {doc.chunk_count} passages
               </small>
             </span>
             <ChevronRight />

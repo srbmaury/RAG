@@ -100,7 +100,7 @@ export function HomeView({
               <FileText size={15} />
               {includeDocuments ? `${readyCount} ready documents` : 'No documents selected'}{' '}
               <span>·</span>{' '}
-              <button type="button" onClick={() => onOpenSources()}>
+              <button type="button" onClick={onOpenSources}>
                 Manage sources <ArrowUpRight size={13} />
               </button>
             </div>
@@ -118,7 +118,7 @@ export function HomeView({
         <div>
           <h2>Recent work</h2>
         </div>
-        <button className="text-action" onClick={() => onOpenSources()}>
+        <button className="text-action" onClick={onOpenSources}>
           Connected sources <ArrowUpRight size={15} />
         </button>
       </div>
@@ -131,12 +131,7 @@ export function HomeView({
               </span>
               <h3>Recent conversations</h3>
             </div>
-            <button
-              aria-label="Open conversations"
-              onClick={() => {
-                onOpenConversations();
-              }}
-            >
+            <button aria-label="Open conversations" onClick={onOpenConversations}>
               <ArrowUpRight size={18} />
             </button>
           </div>
@@ -155,11 +150,7 @@ export function HomeView({
           ) : (
             <div className="home-card-empty">
               <p>Every good question starts a conversation.</p>
-              <button
-                onClick={() => {
-                  onStartChat();
-                }}
-              >
+              <button onClick={onStartChat}>
                 Start researching <ArrowUpRight size={14} />
               </button>
             </div>
@@ -173,7 +164,7 @@ export function HomeView({
               </span>
               <h3>Recent documents</h3>
             </div>
-            <button aria-label="Open document library" onClick={() => onOpenDocuments()}>
+            <button aria-label="Open document library" onClick={onOpenDocuments}>
               <ArrowUpRight size={18} />
             </button>
           </div>
@@ -220,7 +211,7 @@ export function HomeView({
           <strong>Upload documents</strong>
           <p>Drop PDF, DOCX, TXT, Markdown, CSV, JSON or HTML files. Up to {maxSizeMB} MB each.</p>
         </div>
-        <button className="btn" disabled={uploading} onClick={() => onBrowse()}>
+        <button className="btn" disabled={uploading} onClick={onBrowse}>
           Choose files
         </button>
       </div>

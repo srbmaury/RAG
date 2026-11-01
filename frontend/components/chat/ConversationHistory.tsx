@@ -27,7 +27,7 @@ export function ConversationHistory({
         <strong>Conversations</strong>
         <button
           type="button"
-          onClick={() => onRefresh()}
+          onClick={onRefresh}
           title="Refresh saved conversations"
           aria-label="Refresh saved conversations"
         >
