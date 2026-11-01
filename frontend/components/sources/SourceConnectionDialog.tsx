@@ -5,7 +5,7 @@ import {useSourceConnections} from '../../hooks/useSourceConnections';
 type State=ReturnType<typeof useSourceConnections>;
 export function SourceConnectionDialog({state,onClose,onSearchDrive,onDisconnectDrive,onConnectDrive,onConnectSource,onSearchSource,onDisconnectSource}:{state:State;onClose:()=>void;onSearchDrive:()=>void;onDisconnectDrive:()=>void;onConnectDrive:()=>void;onConnectSource:()=>void;onSearchSource:()=>void;onDisconnectSource:(provider:'github'|'notion'|'slack')=>void}){
 const {driveStatus,setDriveStatus,driveQuery,setDriveQuery,driveResults,setDriveResults,driveBusy,setDriveBusy,sourceStatuses,setSourceStatuses,sourceChecks,setSourceChecks,sourceChecksBusy,setSourceChecksBusy,sourceManage,setSourceManage,sourceProvider,setSourceProvider,sourceCredential,setSourceCredential,sourceSearch,setSourceSearch,sourceResults,setSourceResults,sourceBusy,setSourceBusy,connectedGmail,setConnectedGmail,connectedProviders,setConnectedProviders,connectedGmailQuery,setConnectedGmailQuery}=state;
-return {sourceManage&&sourceManage!=='gmail'&&<Dialog title="Manage source connection" onClose={()=>{onClose();}} className="source-dialog">
+return <>{sourceManage&&sourceManage!=='gmail'&&<Dialog title="Manage source connection" onClose={()=>{onClose();}} className="source-dialog">
           {sourceManage==='drive'&&<div className="connected-card" id="drive-connection">
             <h2>Google Drive</h2>
             <p className="caption">Authorize read-only access to browse and search Drive. Atlas fetches selected content on demand.</p>
@@ -29,5 +29,5 @@ return {sourceManage&&sourceManage!=='gmail'&&<Dialog title="Manage source conne
               {sourceResults.map(x=><div className="connected-evidence" key={x.id}><strong>{x.title}</strong><p>{x.excerpt}</p>{x.url&&<a href={x.url} target="_blank" rel="noopener noreferrer">Open source <ArrowUpRight size={14}/></a>}</div>)}
             </>}
           </div>}
-          </Dialog>};
+          </Dialog>}</>;
 }
