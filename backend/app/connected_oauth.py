@@ -33,7 +33,7 @@ def _settings(provider):
     google = provider == "calendar"
     client_id = os.getenv("GOOGLE_CLIENT_ID" if google else "MICROSOFT_CLIENT_ID", "")
     secret = os.getenv("GOOGLE_CLIENT_SECRET" if google else "MICROSOFT_CLIENT_SECRET", "")
-    base = os.getenv("ATLAS_CONNECTED_OAUTH_REDIRECT_BASE", "http://localhost:8000/api/connected-oauth").rstrip("/")
+    base = os.getenv("ATLAS_CONNECTED_OAUTH_REDIRECT_BASE", "http://localhost:3000/api/connected-oauth").rstrip("/")
     redirect = f"{base}/{provider}/callback"
     if not client_id or not redirect:
         raise HTTPException(503, "Configure OAuth client credentials and redirect URL.")
