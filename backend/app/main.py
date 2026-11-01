@@ -501,7 +501,7 @@ def connected_sources_for_payload(payload, document_evidence):
                 original_text = (DATA / 'files' / original['document_id']).read_text(encoding='utf-8')[:4096]
             except (OSError, UnicodeError):
                 original_text = ''
-            match = re.search(r'(?m)^Source URL: (https?://\\S+)', original_text)
+            match = re.search(r'(?m)^Source URL: (https?://\S+)', original_text)
             if match:
                 origin_url = match.group(1)
         sources.append({
