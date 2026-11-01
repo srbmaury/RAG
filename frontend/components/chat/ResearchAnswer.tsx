@@ -23,6 +23,7 @@ export const ResearchAnswer=memo(function ResearchAnswer({result,onOpenSource}:{
    p:({children})=><p>{citationText(children,sources.length?result.sources:[],onOpenSource)}</p>,
    li:({children})=><li>{citationText(children,sources.length?result.sources:[],onOpenSource)}</li>,
   }}>{result.answer}</ReactMarkdown></div>
+  {result.related_sources&&result.related_sources.length>0&&<section className="connected-card" aria-label="Related evidence"><strong>Connected evidence</strong><p className="caption">Sources sharing explicit issue or PR references; not proof of a decision or causal relationship.</p>{result.related_sources.map((link,index)=><div key={index} className="source-search-controls"><button className="source-chip" onClick={()=>{const source=result.sources[link.left-1];if(source)onOpenSource(source)}}>Source [{link.left}]</button><span className="caption">{link.references.join(', ')}</span><button className="source-chip" onClick={()=>{const source=result.sources[link.right-1];if(source)onOpenSource(source)}}>Source [{link.right}]</button></div>)}</section>}
   {sources.length>0&&<div className="source-chips evidence-source-links">{sources.map(({source,number})=><button className="source-chip" key={`${number}-${source.chunk_id}`} onClick={()=>onOpenSource(source)}>
    <FileBadge name={source.name}/><span><b>{source.name}</b><small>{result.mode==='local_excerpts'?'Search match':'Citation'} [{number}] · {sourceLocation(source)}</small></span>
   </button>)}</div>}
