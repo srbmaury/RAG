@@ -8,9 +8,8 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "format": "prettier --config .prettierrc.json --write \"{app,components,e2e,hooks,lib,tests,utils}/**/*.{ts,tsx,js,jsx,mjs,css}\" next.config.ts playwright.config.ts ../compose.yaml \"../.github/workflows/*.{yml,yaml}\"",
-    "format:check": "prettier --config .prettierrc.json --check \"{app,components,e2e,hooks,lib,tests,utils}/**/*.{ts,tsx,js,jsx,mjs,css}\" next.config.ts playwright.config.ts ../compose.yaml \"../.github/workflows/*.{yml,yaml}\"",
-    "format:imports": "node scripts/format-imports.mjs"
+    "format": "prettier --write \"{app,components,hooks,lib,tests,utils}/**/*.{ts,tsx,js,jsx,mjs,css}\"",
+    "format:check": "prettier --check \"{app,components,hooks,lib,tests,utils}/**/*.{ts,tsx,js,jsx,mjs,css}\""
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -24,7 +23,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "prettier": "^3.9.10",
-    "typescript": "^5.9.3"
+    "typescript": "^5.7.0",
+    "prettier": "^3.6.2"
   }
 }
