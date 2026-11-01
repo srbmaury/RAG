@@ -29,14 +29,17 @@ def evaluate(dataset, k=3):
         if not gold or not gold.issubset(available):
             raise ValueError("Gold evidence must be present among candidates: " + identifier)
         label = case["category"]
-        row = scores.setdefault(label, {"count": 0, "hits": 0})
+        row = scores.setdefault(label, {"count": 0, "hits": 0, "top1": 0})
         row["count"] += 1
         row["hits"] += len(gold.intersection(ids)) == len(gold)
+        row["top1"] += bool(ids and ids[0] in gold)
     return {"cases": len(cases), "review_status": dataset.get("review_status", "unknown"),
             "source_recall_at_k": round(sum(row["hits"] for row in scores.values()) / len(cases), 4),
-            "categories": {key: {"cases": value["count"], "recall_at_k": round(value["hits"] / value["count"], 4)}
+            "top1_hit_rate": round(sum(row["top1"] for row in scores.values()) / len(cases), 4),
+            "categories": {key: {"cases": value["count"], "recall_at_k": round(value["hits"] / value["count"], 4),
+                                 "top1_hit_rate": round(value["top1"] / value["count"], 4)}
                            for key, value in sorted(scores.items())},
-            "warning": "Synthetic ranking fixture; does not measure answer truth or provider integration."}
+            "warning": "Tiny synthetic candidate sets; recall_at_k can be trivial when k exceeds candidate count. Top-1 measures ordering, not factual correctness."}
 
 
 def main():

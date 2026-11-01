@@ -1,0 +1,60 @@
+{
+  "cases": [
+    {
+      "question": "redis cache invalidation",
+      "candidates": [
+        {
+          "id": "a",
+          "text": "Travel booking itinerary and hotels"
+        },
+        {
+          "id": "b",
+          "text": "Redis cache invalidation strategy with TTL and cache keys"
+        },
+        {
+          "id": "c",
+          "text": "CSS design tokens and typography"
+        },
+        {
+          "id": "d",
+          "text": "Kafka consumer lag alert"
+        },
+        {
+          "id": "e",
+          "text": "Payment gateway chargeback flow"
+        }
+      ],
+      "relevant_ids": [
+        "b"
+      ]
+    },
+    {
+      "question": "payment retry idempotency",
+      "candidates": [
+        {
+          "id": "a",
+          "text": "Idempotent payment retry strategy with request idempotency keys"
+        },
+        {
+          "id": "b",
+          "text": "React animation transitions"
+        },
+        {
+          "id": "c",
+          "text": "Team calendar events"
+        },
+        {
+          "id": "d",
+          "text": "Redis eviction policies"
+        },
+        {
+          "id": "e",
+          "text": "Image processing compression"
+        }
+      ],
+      "relevant_ids": [
+        "a"
+      ]
+    }
+  ]
+}
