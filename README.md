@@ -4,6 +4,115 @@ Atlas is a private, workspace-based research app. Upload documents, connect read
 
 The app uses a Next.js/TypeScript frontend and a FastAPI backend. Local development uses SQLite; Docker Compose runs PostgreSQL with pgvector. You can generate answers with Ollama on your machine, OpenAI, or use source excerpts without an AI provider.
 
+## Architecture and request flows
+
+The diagrams below describe the code in this repository, rather than a proposed architecture. GitHub renders them directly with Mermaid.
+
+### System architecture
+
+```mermaid
+flowchart LR
+  User["Browser user"] --> UI["Next.js frontend<br/>frontend/app and components"]
+  UI --> Proxy["Next.js /api proxy"]
+  Proxy --> API["FastAPI<br/>backend/app/main.py"]
+  API --> DB[("SQLite in local dev<br/>PostgreSQL / pgvector in Compose")]
+  API --> Files[("Original uploaded files")]
+  API --> Conn["On-demand provider adapters<br/>Gmail · Drive · GitHub · Notion · Slack"]
+  Conn --> Providers["External provider APIs"]
+  API --> Retrieval["Keyword / vector retrieval<br/>backend/app/retrieval.py"]
+  Retrieval --> DB
+  API --> Synthesis["Grounded answer generation<br/>ai.py / connected_synthesis.py"]
+  Synthesis --> Model["Optional Ollama or OpenAI"]
+  API --> Queue["Document status / lease<br/>stored in database"]
+  Queue --> Worker["Ingestion worker<br/>backend/app/worker.py"]
+  Worker --> Parser["Parsing · OCR · chunking<br/>backend/app/ingest.py"]
+  Parser --> Files
+  Parser --> Model
+  Worker --> DB
+```
+
+In local development the API and worker can run in the same environment; Compose runs separate API and worker services. The worker claims document records from the database rather than consuming messages from a separate queue broker. Connector records are fetched on demand, not automatically ingested into the document library.
+
+### Code flow: upload and index a document
+
+```mermaid
+sequenceDiagram
+  actor User
+  participant Web as Next.js UI
+  participant API as FastAPI
+  participant DB as Database
+  participant Store as Original file storage
+  participant Worker as Ingestion worker
+  participant Extract as Parser / OCR / chunker
+  User->>Web: Choose one or more files
+  Web->>API: POST /workspaces/{wid}/documents
+  Note over Web,API: Large files use staged /uploads endpoints
+  API->>Store: Store original file
+  API->>DB: Create queued document record
+  API-->>Web: Return document status
+  loop Until eligible work is available
+    Worker->>DB: Claim queued / expired-lease document
+  end
+  Worker->>Extract: Parse text, OCR if configured, split into passages
+  opt Embeddings configured
+    Extract->>Extract: Generate passage embeddings
+  end
+  Worker->>DB: Persist passages and ready / failed status
+  Web->>API: Refresh document list / status
+  API-->>Web: Updated indexing state
+```
+
+The worker renews leases during processing and can retry transient failures. Search uses only documents marked ready.
+
+### Code flow: ask a question and inspect evidence
+
+```mermaid
+sequenceDiagram
+  actor User
+  participant Web as Ask Atlas
+  participant API as FastAPI
+  participant Search as Retrieval and source adapters
+  participant DB as Indexed document passages
+  participant Provider as Connected provider APIs
+  participant AI as Ollama / OpenAI (optional)
+  User->>Web: Ask question and choose source scope
+  Web->>API: POST /workspaces/{wid}/connected-chat/stream
+  API-->>Web: Search progress event
+  API->>Search: Collect scoped evidence
+  opt Documents selected
+    Search->>DB: Keyword + optional vector retrieval
+    DB-->>Search: Ranked passages
+  end
+  opt External sources selected
+    Search->>Provider: Read permitted records on demand
+    Provider-->>Search: Matching records and excerpts
+  end
+  Search-->>API: Numbered evidence
+  alt AI provider configured
+    API->>AI: Question + bounded source excerpts
+    AI-->>API: Grounded answer with source references
+    API->>API: Validate reference IDs
+    API-->>Web: Answer / completion events
+  else No AI provider
+    API-->>Web: Retrieved excerpts or explicit configuration error
+  end
+  Web-->>User: Answer with cited sources
+  User->>Web: Select citation
+  Web-->>User: Show passage / open original provider URL
+```
+
+For documents-only requests, the server may use the document answer-generation path rather than cross-source synthesis. Source IDs are checked, but a valid ID is **not proof** that every claim is supported by its citation. If the model cannot produce a valid answer, clients should show an explicit failure instead of inventing conclusions.
+
+### Where to follow the code
+
+| Workflow | Entry point | Key modules |
+| --- | --- | --- |
+| Frontend workspace | `frontend/app/page.tsx` | `components/AtlasWorkspace.tsx`, `components/chat/`, `components/documents/` |
+| Upload and background indexing | `backend/app/main.py` document/upload routes | `worker.py`, `ingest.py`, `db.py` |
+| Document retrieval | `backend/app/main.py` chat routes | `retrieval.py`, `ai.py` |
+| Cross-source answers | `backend/app/main.py` connected-chat routes | `external_sources.py`, `gmail.py`, `drive.py`, `connected_synthesis.py` |
+| Citation display | `frontend/components/chat/ResearchAnswer.tsx` | `frontend/lib/evidence.ts` |
+
 ## Get started locally
 
 ### Requirements
