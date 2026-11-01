@@ -18,11 +18,11 @@ function citationText(children:ReactNode,evidence:Source[],onOpen:(source:Source
 export function ResearchAnswer({result,onOpenSource}:{result:Answer;onOpenSource:(source:Source)=>void}){
  const sources=visibleEvidence(result);
  return <>
-  <div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+  <div className="markdown research-answer-content"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{
    p:({children})=><p>{citationText(children,result.sources,onOpenSource)}</p>,
    li:({children})=><li>{citationText(children,result.sources,onOpenSource)}</li>,
   }}>{result.answer}</ReactMarkdown></div>
-  {sources.length>0&&<div className="source-chips">{sources.map(({source,number})=><button className="source-chip" key={`${number}-${source.chunk_id}`} onClick={()=>onOpenSource(source)}>
+  {sources.length>0&&<div className="source-chips evidence-source-links">{sources.map(({source,number})=><button className="source-chip" key={`${number}-${source.chunk_id}`} onClick={()=>onOpenSource(source)}>
    <FileBadge name={source.name}/><span><b>{source.name}</b><small>{result.mode==='local_excerpts'?'Search match':'Citation'} [{number}] · {source.location_type==='page'?'Page':'Section'} {source.page}</small></span>
   </button>)}</div>}
  </>;
