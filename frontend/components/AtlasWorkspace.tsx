@@ -1,5 +1,5 @@
-import {IntegrationsGallery} from './sources/IntegrationsGallery';
 'use client';
+import {IntegrationsGallery} from './sources/IntegrationsGallery';
 
 import {Children, useEffect, useRef, useState, useCallback, type ReactNode} from 'react';
 import {ArrowUp, ArrowUpRight, BookOpen, Check, ChevronDown, ChevronRight, CircleHelp, FileText, FolderOpen, Layers3, LogOut, Plus, Search, ShieldCheck, Sparkles, Trash2, Upload, X, LoaderCircle, RotateCcw, Download, MessageSquare, Mail, Github, HardDrive, Hash, Lightbulb, Clock3, Moon, Sun, Home as HomeIcon, PanelLeftClose, PanelLeftOpen, Menu, Copy, SlidersHorizontal, CheckCircle2, AlertCircle, NotebookPen, ArrowDownToLine} from 'lucide-react';
