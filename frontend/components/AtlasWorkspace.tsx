@@ -57,6 +57,7 @@ import '../app/rebuild.css';
 import { ConversationTranscript } from './chat/ConversationTranscript';
 import { ResearchComposer } from './chat/ResearchComposer';
 import { ResearchAnswer } from './chat/ResearchAnswer';
+import { EvidenceInspector } from './chat/EvidenceInspector';
 import { ConversationHistory } from './chat/ConversationHistory';
 import { ResearchSourceSelector } from './chat/ResearchSourceSelector';
 import { DocumentsView } from './documents/DocumentsView';
@@ -1456,102 +1457,14 @@ export function AtlasWorkspace() {
           </form>
         </Dialog>
       )}
-      {(source || preview) && (
-        <Dialog
-          title={source ? 'Source passage' : 'Document preview'}
-          closeLabel="Close preview"
-          className="evidence-inspector"
-          onClose={() => {
-            setSource(null);
-            setPreview(null);
-          }}
-        >
-          <div className="drawer-header">
-            <div>
-              <div className="caption">{source ? 'Source excerpt' : 'Document preview'}</div>
-              <h2>{source?.name || preview?.document.name}</h2>
-              <div className="caption">
-                {source
-                  ? sourceLocation(source)
-                  : `${preview?.document.chunk_count} passages · ${preview?.document.status}`}
-              </div>
-            </div>
-          </div>
-          <div className="drawer-body">
-            {source ? (
-              <div className="evidence-inspector-passage">
-                <p className="caption evidence-disclaimer">
-                  Retrieved excerpt. Check the original source to confirm context.
-                </p>
-                <DocumentPassage name={source.name} text={source.text} />
-              </div>
-            ) : (
-              preview && (
-                <>
-                  {preview.document.error && (
-                    <p className="feedback error">{preview.document.error}</p>
-                  )}
-                  {preview.chunks.map((c) => (
-                    <section className="preview-chunk" key={c.id}>
-                      <span className="caption">
-                        {preview.document.name.toLowerCase().endsWith('.pdf') ? 'Page' : 'Section'}{' '}
-                        {c.page}
-                      </span>
-                      <DocumentPassage name={preview.document.name} text={c.text} />
-                    </section>
-                  ))}
-                  {!preview.chunks.length && (
-                    <p className="evidence-empty">No indexed passages yet.</p>
-                  )}
-                  {preview.document.chunk_count > preview.chunks.length && (
-                    <button
-                      className="btn"
-                      onClick={async () => {
-                        try {
-                          const next = await api<typeof preview>(
-                            `/workspaces/${wid}/documents/${preview.document.id}/chunks?offset=${preview.chunks.length}`,
-                          );
-                          if (next)
-                            setPreview({ ...preview, chunks: [...preview.chunks, ...next.chunks] });
-                        } catch (e) {
-                          setError((e as Error).message);
-                        }
-                      }}
-                    >
-                      Load more passages
-                    </button>
-                  )}
-                </>
-              )
-            )}
-          </div>
-          <div className="drawer-footer">
-            {source?.url ? (
-              <a className="btn" href={source.url} target="_blank" rel="noopener noreferrer">
-                <ArrowUpRight />
-                Open source
-              </a>
-            ) : (
-              <a
-                className="btn"
-                href={`/api/workspaces/${wid}/documents/${source?.document_id || preview?.document.id}/original`}
-              >
-                <Download />
-                Download original
-              </a>
-            )}
-            <button
-              className="btn"
-              onClick={() => {
-                setSource(null);
-                setPreview(null);
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </Dialog>
-      )}
+      <EvidenceInspector
+        wid={wid}
+        source={source}
+        preview={preview}
+        onClose={() => { setSource(null); setPreview(null); }}
+        onPreviewChange={setPreview}
+        onError={setError}
+      />
     </div>
   );
 }
