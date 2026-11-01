@@ -6,35 +6,48 @@ endpoints or arbitrary caller-supplied API hosts are supported.
 """
 import os
 import re
+import time
 from urllib.parse import quote
 import httpx
 from fastapi import HTTPException
 
-NEW_PROVIDERS = ("calendar", "linear", "jira", "onedrive", "outlook")
+NEW_PROVIDERS = ("calendar", "linear", "jira", "onedrive", "outlook", "sharepoint")
 
 
 def _request(provider, token, url, *, params=None, graphql=None):
+    """Read-only requests with bounded retries for transient upstream errors."""
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-    try:
-        with httpx.Client(timeout=18, follow_redirects=False, trust_env=False) as client:
-            if graphql is not None:
-                response = client.post(url, headers=headers, json=graphql)
-            else:
-                response = client.get(url, headers=headers, params=params)
-            response.raise_for_status()
-            data = response.json()
-        if isinstance(data, dict) and data.get("errors"):
-            raise HTTPException(422, f"{provider.title()} rejected the request or permissions.")
-        return data
-    except httpx.HTTPStatusError as exc:
-        status = exc.response.status_code
-        if status in (401, 403):
-            raise HTTPException(422, f"{provider.title()} access expired or is insufficient.") from exc
-        if status == 429:
-            raise HTTPException(429, f"{provider.title()} rate limit reached.") from exc
-        raise HTTPException(502, f"{provider.title()} returned HTTP {status}.") from exc
-    except (httpx.RequestError, ValueError) as exc:
-        raise HTTPException(502, f"{provider.title()} could not be read.") from exc
+    for attempt in range(3):
+        try:
+            with httpx.Client(timeout=httpx.Timeout(18, connect=5),
+                              follow_redirects=False, trust_env=False) as client:
+                if graphql is not None:
+                    response = client.post(url, headers=headers, json=graphql)
+                else:
+                    response = client.get(url, headers=headers, params=params)
+                if response.status_code in (429, 502, 503, 504) and attempt < 2:
+                    retry_after = response.headers.get("Retry-After", "")
+                    delay = min(1.0, float(retry_after)) if retry_after.isdigit() else 0.15 * (2 ** attempt)
+                    time.sleep(delay)
+                    continue
+                response.raise_for_status()
+                data = response.json()
+            if isinstance(data, dict) and data.get("errors"):
+                raise HTTPException(422, f"{provider.title()} rejected the query or permissions.")
+            return data
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            if status in (401, 403):
+                raise HTTPException(422, f"{provider.title()} access expired or is insufficient.") from exc
+            if status == 429:
+                raise HTTPException(429, f"{provider.title()} rate limit reached.") from exc
+            raise HTTPException(502, f"{provider.title()} returned HTTP {status}.") from exc
+        except (httpx.RequestError, ValueError) as exc:
+            if isinstance(exc, httpx.RequestError) and attempt < 2:
+                time.sleep(0.15 * (2 ** attempt))
+                continue
+            raise HTTPException(502, f"{provider.title()} could not be read.") from exc
+    raise HTTPException(502, f"{provider.title()} could not be read.")
 
 
 def _jira_base():
@@ -121,6 +134,24 @@ def search(provider, token, query):
                      params={"$top": 15, "$select": "id,name,webUrl,description,file"})
         return [v for e in d.get("value", []) if (v := _result(provider, e.get("id"), e.get("name"),
                                                                e.get("description") or e.get("name"), e.get("webUrl")))]
+    if provider == "sharepoint":
+        # Search delegated SharePoint content accessible to the signed-in user.
+        # The search endpoint returns metadata/snippets, not complete file bodies.
+        d = _request(provider, token, "https://graph.microsoft.com/v1.0/search/query",
+                     graphql={"requests": [{"entityTypes": ["driveItem"], "query": {"queryString": query},
+                                            "from": 0, "size": 20}]})
+        rows = []
+        for container in d.get("value", []):
+            for hit in container.get("hitsContainers", []):
+                for entry in hit.get("hits", []):
+                    item = entry.get("resource") or {}
+                    parent = item.get("parentReference") or {}
+                    if not parent.get("siteId"):
+                        continue
+                    rows.append(_result(provider, item.get("id"), item.get("name"),
+                                        entry.get("summary") or item.get("description") or item.get("name"),
+                                        item.get("webUrl")))
+        return [x for x in rows if x]
     if provider == "outlook":
         d = _request(provider, token, "https://graph.microsoft.com/v1.0/me/messages",
                      params={"$search": '"' + query.replace('"', "") + '"', "$top": 15,

@@ -3,7 +3,7 @@ import {ArrowUpRight} from 'lucide-react';
 import {Dialog} from '../ui/WorkspacePrimitives';
 import {useSourceConnections} from '../../hooks/useSourceConnections';
 type State=ReturnType<typeof useSourceConnections>;
-export function SourceConnectionDialog({state,onClose,onSearchDrive,onDisconnectDrive,onConnectDrive,onConnectSource,onSearchSource,onDisconnectSource}:{state:State;onClose:()=>void;onSearchDrive:()=>void;onDisconnectDrive:()=>void;onConnectDrive:()=>void;onConnectSource:()=>void;onSearchSource:()=>void;onDisconnectSource:(provider:string)=>void}){
+export function SourceConnectionDialog({state,onClose,onSearchDrive,onDisconnectDrive,onConnectDrive,onConnectSource,onConnectOAuthSource,onSearchSource,onDisconnectSource}:{state:State;onClose:()=>void;onSearchDrive:()=>void;onDisconnectDrive:()=>void;onConnectDrive:()=>void;onConnectSource:()=>void;onConnectOAuthSource:()=>void;onSearchSource:()=>void;onDisconnectSource:(provider:string)=>void}){
 const {driveStatus,driveQuery,setDriveQuery,driveResults,driveBusy,sourceStatuses,sourceManage,sourceProvider,sourceCredential,setSourceCredential,sourceSearch,setSourceSearch,sourceResults,sourceBusy}=state;
 return <>{sourceManage&&sourceManage!=='gmail'&&<Dialog title="Manage source connection" onClose={()=>{onClose();}} className="source-dialog">
           {sourceManage==='drive'&&<div className="connected-card" id="drive-connection">
@@ -16,12 +16,14 @@ return <>{sourceManage&&sourceManage!=='gmail'&&<Dialog title="Manage source con
             {!driveStatus?.configured&&<p className="caption">Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_DRIVE_REDIRECT_URI on the server to enable Drive.</p>}
           </div>}
           {sourceManage!==null&&sourceManage!=='drive'&&<div className="connected-card">
-            <h2>{({github:'GitHub',notion:'Notion',slack:'Slack',calendar:'Google Calendar',linear:'Linear',jira:'Jira',onedrive:'OneDrive',outlook:'Outlook'} as Record<string,string>)[sourceProvider]} connection</h2>
-            <p className="caption">{sourceProvider==='notion'?'Provide a Notion integration token, then share the pages Atlas should read with that integration. Atlas cannot access unshared workspace pages.':sourceProvider==='slack'?'Slack message search needs a user-scoped token with search:read. Bot tokens can authenticate, but Slack does not allow them to search messages.':'Provide a read-only provider-issued token. Atlas validates it and stores it encrypted on the server. This setup uses a provider-issued token, not one-click OAuth. Calendar and Microsoft access tokens expire; reconnect when needed. Jira requires server-side ATLAS_JIRA_BASE_URL.'}</p>
-            <form onSubmit={e=>{e.preventDefault();onConnectSource()}}>
+            <h2>{({github:'GitHub',notion:'Notion',slack:'Slack',calendar:'Google Calendar',linear:'Linear',jira:'Jira',onedrive:'OneDrive',outlook:'Outlook',sharepoint:'SharePoint'} as Record<string,string>)[sourceProvider]} connection</h2>
+            <p className="caption">{sourceProvider==='notion'?'Provide a Notion integration token, then share the pages Atlas should read with that integration. Atlas cannot access unshared workspace pages.':sourceProvider==='slack'?'Slack message search needs a user-scoped token with search:read. Bot tokens can authenticate, but Slack does not allow them to search messages.':(['calendar','onedrive','outlook','sharepoint'].includes(sourceProvider)?'Authorize read-only access through your provider. Atlas keeps the refresh credential encrypted.':'Connect with a provider-issued read-only access token. Atlas encrypts it at rest.')}</p>
+            {(['calendar','onedrive','outlook'].includes(sourceProvider))&&<div className="source-search-controls"><button className="btn primary" disabled={sourceBusy} onClick={onConnectOAuthSource}>Connect with OAuth</button><p className="caption">Read-only permissions. Atlas encrypts your refresh credential so you can reconnect automatically.</p></div>}
+            {(['linear','jira'].includes(sourceProvider))&&<p className="caption" role="note">Use a provider-issued read-only token. Jira requires server-side ATLAS_JIRA_BASE_URL.</p>}
+            {!(['calendar','onedrive','outlook'].includes(sourceProvider))&&<form onSubmit={e=>{e.preventDefault();onConnectSource()}}>
               <input className="connected-field" type="password" autoComplete="off" aria-label="Provider access token" value={sourceCredential} onChange={e=>setSourceCredential(e.target.value)} placeholder="Paste read-only access token"/>
               <button type="submit" className="btn primary" disabled={sourceBusy||!sourceCredential.trim()}>{sourceBusy?'Connecting…':'Connect account'}</button>
-            </form>
+            </form>}
             {sourceStatuses.some(x=>x.provider===sourceProvider&&x.connected)&&<>
               <div className="source-search-controls"><input className="connected-field" value={sourceSearch} onChange={e=>setSourceSearch(e.target.value)} placeholder={sourceProvider==='github'?'Search issues and PRs':sourceProvider==='notion'?'Search page titles':'Search messages'} aria-label="Search connected provider"/>
               <button className="btn" disabled={sourceBusy||!sourceSearch.trim()} onClick={()=>onSearchSource()}>Search</button>

@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, DriveOAuthState, SourceHealthCheck, uid
+from .db import Session, init_db, User, Login, Workspace, Document, Chunk, Conversation, GmailConnection, GmailOAuthState, ExternalConnection, DriveOAuthState, ConnectedOAuthState, SourceHealthCheck, uid
 from .config import DATA, MAX_FILE_BYTES, COOKIE_SECURE
 from . import config
 from .ingest import SUPPORTED
@@ -28,6 +28,7 @@ from .external_sources import router as external_router
 from .drive import router as drive_router
 from .health import router as health_router
 from .web_sources import router as web_router
+from .connected_oauth import router as connected_oauth_router
 from starlette.concurrency import run_in_threadpool
 
 @asynccontextmanager
@@ -49,6 +50,7 @@ app.include_router(external_router)
 app.include_router(drive_router)
 app.include_router(health_router)
 app.include_router(web_router)
+app.include_router(connected_oauth_router)
 log = logging.getLogger('atlas.requests')
 
 @app.middleware('http')
@@ -61,6 +63,12 @@ async def request_diagnostics(request: Request, call_next):
         log.exception('request_failed id=%s method=%s path=%s', request_id, request.method, request.url.path)
         raise
     elapsed_ms = round((time.monotonic() - started) * 1000)
+    # The frontend and API remain on one origin via the Next.js proxy.
+    # These headers protect browser-facing content without assuming a CDN/WAF.
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
     response.headers['X-Request-ID'] = request_id
     response.headers['Server-Timing'] = f'api;dur={elapsed_ms}'
     log.info('request id=%s method=%s path=%s status=%s duration_ms=%s',
@@ -201,6 +209,7 @@ def delete_workspace(wid: str, body: DeleteWorkspaceRequest, actor=Depends(user)
     # Use explicit deletes for SQLite and PostgreSQL; no reliance on ORM cascades.
     db.query(GmailOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(DriveOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
+    db.query(ConnectedOAuthState).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(GmailConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(ExternalConnection).filter_by(workspace_id=wid).delete(synchronize_session=False)
     db.query(Conversation).filter_by(workspace_id=wid).delete(synchronize_session=False)
@@ -385,55 +394,7 @@ class ConnectedQuestion(Question):
     providers: List[str] = Field(default_factory=list, max_length=4)
 
 
-QUERY_STOPWORDS = {'what','which','where','when','why','how','can','could','would','should',
-                   'please','find','list','show','tell','me','about','the','and','or','from',
-                   'my','their','in','on','for','are','is','was','were','does','did','with','give',
-                   'summarize','summary','latest','recent','recently','exact','file','files','name','names','source','sources',
-                   'any','there','have','google','drive','gmail','github','notion','slack','email','emails'}
-
-
-def natural_search_terms(question):
-    import re
-    terms = []
-    for word in re.findall(r"[A-Za-z0-9_+.#-]{2,}", question):
-        word = word.strip('._-+#')
-        if not word:
-            continue
-        if word.lower() not in QUERY_STOPWORDS and word.lower() not in terms:
-            terms.append(word.lower())
-    return terms[:8]
-
-
-def gmail_query_for_question(scope, question):
-    terms = natural_search_terms(question)
-    return ' '.join([scope.strip(), *terms]).strip()
-
-
-def is_credit_card_offer_question(question):
-    terms = set(natural_search_terms(question))
-    has_card_context = 'card' in terms or 'cards' in terms
-    has_credit_context = 'credit' in terms or bool(re.search(r'\bcredit\s+cards?\b', question, re.I))
-    offer_terms = {'offer', 'offers', 'deal', 'deals', 'promotion', 'promotions', 'promo',
-                   'cashback', 'reward', 'rewards', 'discount', 'discounts', 'waive', 'waived',
-                   'waiver', 'bonus', 'bonuses', 'perk', 'perks'}
-    return has_card_context and has_credit_context and bool(terms & offer_terms)
-
-
-def filter_credit_card_offer_evidence(question, evidence):
-    """Keep only records with both card context and a concrete offer signal."""
-    if not is_credit_card_offer_question(question):
-        return evidence
-    offer_pattern = re.compile(
-        r'\b(?:offers?|deals?|promotions?|promos?|cash\s*back|rewards?|discounts?|'
-        r'waiv(?:e|ed|er)|bonuses?|perks?)\b', re.I)
-    card_pattern = re.compile(r'\b(?:credit\s+)?cards?\b', re.I)
-    return [item for item in evidence
-            if card_pattern.search(f'{item.title}\n{item.excerpt}')
-            and offer_pattern.search(f'{item.title}\n{item.excerpt}')]
-
-
-def drive_query_for_question(question):
-    return ' '.join(natural_search_terms(question))
+from .research_queries import gmail_query_for_question, drive_query_for_question, filter_credit_card_offer_evidence
 
 
 def collect_connected_evidence(wid, body, actor, db):
@@ -486,7 +447,9 @@ def collect_connected_evidence(wid, body, actor, db):
     except Exception as exc:
         log.exception('Connected retrieval failed')
         raise HTTPException(502, 'Could not retrieve connected sources.') from exc
-    return filter_credit_card_offer_evidence(body.question, evidence), document_evidence
+    from .evidence_quality import prepare_evidence
+    filtered = filter_credit_card_offer_evidence(body.question, evidence)
+    return prepare_evidence(body.question, filtered), document_evidence
 
 
 def connected_sources_for_payload(payload, document_evidence):
@@ -499,7 +462,7 @@ def connected_sources_for_payload(payload, document_evidence):
                 original_text = (DATA / 'files' / original['document_id']).read_text(encoding='utf-8')[:4096]
             except (OSError, UnicodeError):
                 original_text = ''
-            match = re.search(r'(?m)^Source URL: (https?://\\S+)', original_text)
+            match = re.search(r'(?m)^Source URL: (https?://\S+)', original_text)
             if match:
                 origin_url = match.group(1)
         sources.append({

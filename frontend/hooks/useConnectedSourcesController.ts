@@ -70,6 +70,14 @@ export function useConnectedSourcesController({wid,tab,scope,sourceState,gmailSt
       if(scope.current===wid)setSourceChecks(Object.fromEntries(result.checks.map(item=>[item.provider,item])));
     }catch{/* A health check has not been recorded yet. */}
   }
+  async function connectOAuthSource(){
+    if(!(['calendar','onedrive','outlook','sharepoint'] as string[]).includes(sourceProvider))return;
+    setSourceBusy(true);setError('');
+    try{
+      const response=await api<{authorization_url:string}>(`/connected-oauth/${sourceProvider}/connect?wid=${encodeURIComponent(wid)}`);
+      window.location.assign(response.authorization_url);
+    }catch(e){setError((e as Error).message);setSourceBusy(false);}
+  }
   async function connectSource(){
     if(!sourceCredential.trim())return;
     setSourceBusy(true);setError('');
@@ -139,5 +147,5 @@ export function useConnectedSourcesController({wid,tab,scope,sourceState,gmailSt
     finally{setGmailBusy(false);}
   }
 
-return {connectGmail,refreshDrive,connectDrive,disconnectDrive,searchDrive,refreshConnections,verifySourceConnections,refreshSourceStatuses,loadSourceChecks,connectSource,disconnectSource,searchSource,searchGmail,summarizeGmailQuery,summarizeGmail,disconnectGmail};
+return {connectGmail,refreshDrive,connectDrive,disconnectDrive,searchDrive,refreshConnections,verifySourceConnections,refreshSourceStatuses,loadSourceChecks,connectSource,connectOAuthSource,disconnectSource,searchSource,searchGmail,summarizeGmailQuery,summarizeGmail,disconnectGmail};
 }

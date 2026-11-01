@@ -77,6 +77,16 @@ class SourceHealthCheck(Base):
     matches = Column(Integer)
     error = Column(String(500))
 
+class ConnectedOAuthState(Base):
+    __tablename__ = 'connected_oauth_states'
+    value = Column(String, primary_key=True)
+    provider = Column(String, nullable=False)
+    user_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    workspace_id = Column(String, ForeignKey('workspaces.id', ondelete='CASCADE'), nullable=False)
+    verifier = Column(String, nullable=False)
+    expires = Column(Float, nullable=False)
+
+
 class GmailConnection(Base):
     __tablename__ = 'gmail_connections'
     workspace_id = Column(String, ForeignKey('workspaces.id', ondelete='CASCADE'), primary_key=True)

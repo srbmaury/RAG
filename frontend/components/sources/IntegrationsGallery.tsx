@@ -1,5 +1,5 @@
 'use client';
-import {Mail,HardDrive,Github,NotebookPen,Hash,CalendarDays,ListTodo,Ticket,Cloud,Inbox} from 'lucide-react';
+import {Mail,HardDrive,Github,NotebookPen,Hash,CalendarDays,ListTodo,Ticket,Cloud,Inbox,Building2} from 'lucide-react';
 import {IntegrationTile} from '../IntegrationTile';
 type Health={healthy:boolean;matches:number|null;error:string|null;checked_at:number};
 type SourceStatus={provider:string;connected:boolean;account:string|null};
@@ -12,7 +12,7 @@ return <>
             <IntegrationTile name="GitHub" description="Find issues, pull requests and decisions." icon={<Github size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='github')?.connected} account={sourceStatuses.find(x=>x.provider==='github')?.account} health={sourceChecks.github} onClick={()=>{onOpen('github');}}/>
             <IntegrationTile name="Notion" description="Search shared pages and knowledge." icon={<NotebookPen size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='notion')?.connected} account={sourceStatuses.find(x=>x.provider==='notion')?.account} health={sourceChecks.notion} onClick={()=>{onOpen('notion');}}/>
             <IntegrationTile name="Slack" description="Find team conversations and updates." icon={<Hash size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='slack')?.connected} account={sourceStatuses.find(x=>x.provider==='slack')?.account} health={sourceChecks.slack} onClick={()=>{onOpen('slack');}}/>
-            {([['calendar','Google Calendar','Search meeting events.',CalendarDays],['linear','Linear','Search engineering issues.',ListTodo],['jira','Jira','Search project tickets.',Ticket],['onedrive','OneDrive','Search Microsoft files.',Cloud],['outlook','Outlook','Search Microsoft email.',Inbox]] as const).map(([id,name,description,Icon])=><IntegrationTile key={id} name={name} description={description} icon={<Icon size={23}/>} connected={!!sourceStatuses.find(x=>x.provider===id)?.connected} account={sourceStatuses.find(x=>x.provider===id)?.account} health={sourceChecks[id]} onClick={()=>onOpen(id)}/>)}
+            {([['calendar','Google Calendar','Search meeting events.',CalendarDays],['linear','Linear','Search engineering issues.',ListTodo],['jira','Jira','Search project tickets.',Ticket],['onedrive','OneDrive','Search Microsoft files.',Cloud],['outlook','Outlook','Search Microsoft email.',Inbox],['sharepoint','SharePoint','Search accessible SharePoint files.',Building2]] as const).map(([id,name,description,Icon])=><IntegrationTile key={id} name={name} description={description} icon={<Icon size={23}/>} connected={!!sourceStatuses.find(x=>x.provider===id)?.connected} account={sourceStatuses.find(x=>x.provider===id)?.account} health={sourceChecks[id]} onClick={()=>onOpen(id)}/>)}
           </div>
 </>;
 }

@@ -1,42 +1,68 @@
-# Additional read-only source connectors
+# Connected source setup
 
-New providers: **Google Calendar, Linear, Jira, OneDrive, and Outlook**.
-These providers appear under Sources and can be selected in Ask Atlas.
-The existing workspace-scoped ExternalConnection table stores encrypted
-credentials: **no schema migration** is introduced.
+Atlas supports read-only searches across Google Calendar, Linear, Jira,
+OneDrive, Outlook and SharePoint. Connect accounts from **Sources** and enable them per
+question in **Ask Atlas**. Credentials are encrypted and scoped to a workspace.
 
-## First batch limitations
+## Google Calendar OAuth
 
-This version uses manually supplied provider access tokens, NOT production-ready
-OAuth consent or refresh workflows. All connectors are read-only. Atlas does
-not background-sync these providers. Calendar and Microsoft Graph access tokens
-are short-lived and must be replaced when they expire.
+Use the existing `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+Enable the Google Calendar API and register this additional redirect in the
+Google Cloud OAuth client:
 
-- **Google Calendar:** a Google OAuth access token with `calendar.events.readonly`
-  and, for the initial account profile check, `calendar.calendarlist.readonly`.
-  Queries search primary-calendar event summaries/descriptions; this is not a
-  calendar-wide semantic index.
-- **Linear:** an authorized Linear personal API key or OAuth token with read access
-  to issues. The adapter uses Linear's GraphQL API.
-- **Jira:** set `ATLAS_JIRA_BASE_URL=https://YOUR-TENANT.atlassian.net`
-  on the server. Use an OAuth access token with permission to read issues.
-  Jira API tokens used with HTTP Basic authentication are not supported.
-- **OneDrive:** a Microsoft Graph delegated access token with
-  `Files.Read` (or `Files.Read.All` where required). Searches the user's
-  default drive metadata; it does not download document bodies or search all
-  SharePoint sites.
-- **Outlook:** a Microsoft Graph delegated access token with `Mail.Read`.
-  Searches mailbox message metadata and body previews (not full messages).
+`http://localhost:3000/api/connected-oauth/calendar/callback`
 
-All accounts must grant permissions themselves. Provider permission checks
-are enforced upstream as well as by Atlas's workspace access control.
+Atlas requests `calendar.readonly`, refreshes the credential when searching,
+and searches the primary calendar's available event text.
 
-## Production requirements
+## Microsoft OneDrive, Outlook and SharePoint OAuth
 
-Add official OAuth authorization-code flows, refresh-token rotation,
-token expiry/revocation handling, provider rate-limit backoff, pagination,
-audit logging, and consent/permission UX before treating this batch as
-production-ready. Avoid pasting secrets into issues, logs or screenshots.
+Register an Azure/Entra app that supports organizational accounts and add
+the redirect URIs:
 
-Run: `PYTHONPATH=backend pytest backend/tests -q`;
+`http://localhost:3000/api/connected-oauth/onedrive/callback`
+
+`http://localhost:3000/api/connected-oauth/outlook/callback`
+
+`http://localhost:3000/api/connected-oauth/sharepoint/callback`
+
+Configure `MICROSOFT_CLIENT_ID` and, when using a confidential web
+application, `MICROSOFT_CLIENT_SECRET`. The scopes requested are
+`User.Read Files.Read offline_access` (OneDrive) and
+`User.Read Mail.Read offline_access` (Outlook) and
+`User.Read Sites.Read.All Files.Read.All offline_access` (SharePoint), with profile/OpenID scopes.
+SharePoint queries use delegated Graph search to retrieve accessible file metadata and snippets.
+Full file content extraction or background indexing is **not** included.
+
+OneDrive currently searches metadata in the user's default drive rather than
+SharePoint or file contents. Outlook searches message subjects and previews.
+These connectors do not index or cache full remote content.
+
+## Public deployments
+
+Configure `ATLAS_CONNECTED_OAUTH_REDIRECT_BASE` to the exact HTTPS public
+origin ending with `/api/connected-oauth`. Register the three callback URLs
+with the identity providers. Public callbacks **must** use HTTPS.
+
+The source encryption key `GMAIL_TOKEN_ENCRYPTION_KEY` must remain stable and
+private. Existing source tokens can be replaced by OAuth connections from the
+Sources UI. Disconnect removes stored credentials in Atlas; revoke grants at
+the provider separately.
+
+## Linear and Jira
+
+Linear continues to use its authorized read-only API token or OAuth access
+token. Jira requires `ATLAS_JIRA_BASE_URL=https://TENANT.atlassian.net`
+with an appropriately scoped OAuth bearer token. Basic-auth API tokens are
+not supported.
+
+## Known limits
+
+OAuth credentials are refreshed and rotated when a source is accessed, but
+there is no background sync, exhaustive pagination, provider-specific audit
+dashboard, or production consent verification in this branch. External API
+access and OAuth flows require live credential testing. Read-only API requests
+have bounded retry on transient upstream failures.
+
+Run `PYTHONPATH=backend pytest backend/tests -q` and
 `cd frontend && npm run typecheck && npm run build`.
