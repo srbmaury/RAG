@@ -27,6 +27,7 @@ from .gmail import router as gmail_router
 from .external_sources import router as external_router
 from .drive import router as drive_router
 from .health import router as health_router
+from .web_sources import router as web_router
 from starlette.concurrency import run_in_threadpool
 
 @asynccontextmanager
@@ -47,6 +48,7 @@ app.include_router(gmail_router)
 app.include_router(external_router)
 app.include_router(drive_router)
 app.include_router(health_router)
+app.include_router(web_router)
 log = logging.getLogger('atlas.requests')
 
 @app.middleware('http')
