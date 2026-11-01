@@ -59,3 +59,19 @@ def test_onedrive_query_escapes_quotes(monkeypatch):
     monkeypatch.setattr(batch_connectors, "_request", fake)
     assert batch_connectors.search("onedrive", "token", "O'Brien") == []
     assert "O%27%27Brien" in calls[0]
+
+
+def test_sharepoint_search_returns_only_site_items(monkeypatch):
+    monkeypatch.setattr(batch_connectors, "_request", lambda *a, **kw: {
+        "value": [{"hitsContainers": [{"hits": [
+            {"resource": {"id": "sp1", "name": "Design.docx",
+                          "webUrl": "https://example.sharepoint.com/design",
+                          "parentReference": {"siteId": "site-1"}}, "summary": "Cache architecture"},
+            {"resource": {"id": "personal", "name": "Private.docx",
+                          "parentReference": {"driveId": "personal"}}}
+        ]}]}]})
+    rows = batch_connectors.search("sharepoint", "token", "cache")
+    assert len(rows) == 1
+    assert rows[0]["provider"] == "sharepoint"
+    assert rows[0]["id"] == "sp1"
+    assert rows[0]["url"] == "https://example.sharepoint.com/design"
