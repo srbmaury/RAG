@@ -91,7 +91,7 @@ def _trim_excerpt(text, question, limit):
 
 
 def bounded_payload(evidence, max_items=50, per_source=3000, max_total=16000, question=''):
-    # Put the strongest query matches first, then round-robin sources to preserve diversity.
+    # Evidence is deduplicated/ranked before this step; preserve diversity when budgeting model context.
     groups = {}
     for item in evidence:
         groups.setdefault(item.provider, []).append(item)
