@@ -5,9 +5,22 @@ import type { Workspace } from '../../lib/types';
 import { Dialog } from '../ui/WorkspacePrimitives';
 
 export function WorkspaceManagerDialog({
-  workspaces, activeId, busy, uploading, deleting,
-  deleteId, confirmation, name, onClose, onSelect, onSelectDelete,
-  onConfirmation, onCancelDelete, onDelete, onName, onCreate,
+  workspaces,
+  activeId,
+  busy,
+  uploading,
+  deleting,
+  deleteId,
+  confirmation,
+  name,
+  onClose,
+  onSelect,
+  onSelectDelete,
+  onConfirmation,
+  onCancelDelete,
+  onDelete,
+  onName,
+  onCreate,
 }: {
   workspaces: Workspace[];
   activeId: string;
@@ -55,7 +68,11 @@ export function WorkspaceManagerDialog({
         ))}
       </div>
       {target && (
-        <div className="workspace-delete-confirm" role="group" aria-label="Confirm workspace deletion">
+        <div
+          className="workspace-delete-confirm"
+          role="group"
+          aria-label="Confirm workspace deletion"
+        >
           <strong>Delete “{target.name}”?</strong>
           <p>
             This permanently deletes its documents, indexed passages, and saved chats. Type the
@@ -69,7 +86,9 @@ export function WorkspaceManagerDialog({
             placeholder="Exact workspace name"
           />
           <div className="dialog-actions">
-            <button className="btn" type="button" onClick={onCancelDelete}>Cancel</button>
+            <button className="btn" type="button" onClick={onCancelDelete}>
+              Cancel
+            </button>
             <button
               className="btn danger"
               type="button"
@@ -92,7 +111,10 @@ export function WorkspaceManagerDialog({
             placeholder="e.g. Product research"
           />
         </label>
-        <button className="btn primary"><Plus />Create workspace</button>
+        <button className="btn primary">
+          <Plus />
+          Create workspace
+        </button>
       </form>
     </Dialog>
   );

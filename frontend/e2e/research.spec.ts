@@ -252,3 +252,104 @@ test('authentication failure stays actionable and announced',async({page})=>{
  await expect(page.locator('.auth-form').getByRole('alert')).toContainText('Incorrect email or password.');
  await page.screenshot({path:'/tmp/atlas-audit/after-auth.png',animations:'disabled'});
 });
+
+test('session actions create and delete a workspace then sign out',async({page})=>{
+ await page.route('**/api/workspaces',route=>{
+  if(route.request().method()!=='POST')return route.fallback();
+  expect(route.request().postDataJSON()).toEqual({name:'Research review'});
+  return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({id:'w2',name:'Research review'})});
+ });
+ await page.route('**/api/workspaces/w2',route=>{
+  expect(route.request().method()).toBe('DELETE');
+  expect(route.request().postDataJSON()).toEqual({name:'Research review'});
+  return route.fulfill({status:200,contentType:'application/json',body:'{}'});
+ });
+ await page.getByRole('button',{name:'Manage workspaces',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'Your workspaces'});
+ await dialog.getByLabel('New workspace',{exact:true}).fill('Research review');
+ await dialog.getByRole('button',{name:'Create workspace',exact:true}).click();
+ await expect(dialog).toHaveCount(0);
+ await expect(page.locator('.workspace-btn')).toContainText('Research review');
+ await page.getByRole('button',{name:'Manage workspaces',exact:true}).click();
+ await dialog.getByRole('button',{name:'Delete workspace Research review',exact:true}).click();
+ const remove=dialog.getByRole('button',{name:'Delete workspace',exact:true});
+ await expect(remove).toBeDisabled();
+ await dialog.getByLabel('Type workspace name to confirm').fill('Research review');
+ await remove.click();
+ await expect(dialog).toHaveCount(0);
+ await expect(page.locator('.workspace-btn')).toContainText('Test workspace');
+ await page.getByRole('button',{name:'Sign out',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Create your workspace',exact:true})).toBeVisible();
+});
+
+test('document actions preview, retry and remove a workspace file',async({page})=>{
+ await page.route('**/api/workspaces/w1/documents/d1/chunks',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({document:{id:'d1',name:'notes.md',size:128,status:'ready',pages:1,chunk_count:1},chunks:[{id:'c1',page:1,text:'Review the release checklist.'}]})}));
+ await page.getByRole('button',{name:'Documents',exact:true}).click();
+ await page.getByRole('button',{name:'notes.md',exact:true}).click();
+ const preview=page.getByRole('dialog',{name:'Document preview'});
+ await expect(preview).toContainText('Review the release checklist.');
+ await preview.getByRole('button',{name:'Close preview'}).click();
+ const retry=page.waitForRequest(request=>request.url().endsWith('/documents/d1/retry')&&request.method()==='POST');
+ await page.getByRole('button',{name:'Reindex notes.md',exact:true}).click();
+ await retry;
+ page.once('dialog',dialog=>dialog.accept());
+ const removed=page.waitForRequest(request=>request.url().endsWith('/documents/d1')&&request.method()==='DELETE');
+ await page.getByRole('button',{name:'Delete notes.md',exact:true}).click();
+ await removed;
+});
+
+test('stopping an answer preserves the submitted question and releases busy state',async({page})=>{
+ let pending:import('@playwright/test').Route|undefined;
+ await page.route('**/api/workspaces/w1/connected-chat/stream',route=>{pending=route;});
+ await page.getByRole('textbox',{name:'Your question'}).fill('A question that takes time');
+ await page.getByRole('button',{name:'Send question'}).click();
+ await expect.poll(()=>Boolean(pending)).toBe(true);
+ await page.getByRole('button',{name:'Stop',exact:true}).click();
+ await expect(page.getByRole('status').filter({hasText:'Answer stopped.'})).toBeVisible();
+ await expect(page.locator('.user-message')).toHaveText(/A question that takes time/);
+ await expect(page.locator('.answer-row')).toHaveCount(0);
+ await pending!.abort().catch(()=>undefined);
+ await page.getByRole('textbox',{name:'Your question'}).fill('Try another question');
+ await expect(page.getByRole('button',{name:'Send question'})).toBeEnabled();
+});
+
+test('workspace metadata uses the backend wid query parameter',async({page})=>{
+ const statusRequest=page.waitForRequest(request=>{
+  const url=new URL(request.url());
+  return url.pathname==='/api/gmail/status'&&url.searchParams.get('wid')==='w1';
+ });
+ await page.reload();
+ const request=await statusRequest;
+ expect(new URL(request.url()).searchParams.has('workspaceId')).toBe(false);
+ await expect(page.getByRole('navigation',{name:'Main navigation'})).toBeVisible();
+});
+
+test('document imports recover an accepted staged upload after a lost acknowledgement',async({page})=>{
+ const size=9*1024*1024;
+ let chunks=0,completions=0;
+ await page.route('**/api/workspaces/w1/uploads**',route=>{
+  const path=new URL(route.request().url()).pathname;
+  const json=(data:unknown)=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)});
+  if(path.endsWith('/uploads'))return json({id:'upload-1',part_bytes:size});
+  if(route.request().method()==='PUT'){chunks++;return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({detail:'Acknowledgement lost'})});}
+  if(path.endsWith('/complete')){completions++;return json({id:'d1',name:'large.txt',size,status:'ready',pages:1,chunk_count:1});}
+  return json({offset:size});
+ });
+ await page.locator('input[type=file]').setInputFiles({name:'large.txt',mimeType:'text/plain',buffer:Buffer.alloc(size,97)});
+ await expect(page.getByRole('status').filter({hasText:'1 ready to search'})).toBeVisible();
+ expect(chunks).toBe(1);
+ expect(completions).toBe(1);
+ await expect(page.getByRole('status').filter({hasText:'Uploading'})).toHaveCount(0);
+});
+
+test('web import reports success and clears its input',async({page})=>{
+ await page.route('**/api/workspaces/w1/web-pages',route=>{
+  expect(route.request().postDataJSON()).toEqual({url:'https://example.com/article'});
+  return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({name:'Article',duplicate:false})});
+ });
+ await page.getByRole('button',{name:'Documents',exact:true}).click();
+ await page.getByLabel('Save public web page').fill('https://example.com/article');
+ await page.getByRole('button',{name:'Add URL',exact:true}).click();
+ await expect(page.getByRole('status').filter({hasText:'Added Article to your library for indexing.'})).toBeVisible();
+ await expect(page.getByLabel('Save public web page')).toHaveValue('');
+});

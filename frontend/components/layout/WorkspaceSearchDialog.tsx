@@ -26,9 +26,7 @@ export function WorkspaceSearchDialog({
   documents: Doc[];
   canAsk: boolean;
 }) {
-  const matches = documents.filter((doc) =>
-    doc.name.toLowerCase().includes(query.toLowerCase()),
-  );
+  const matches = documents.filter((doc) => doc.name.toLowerCase().includes(query.toLowerCase()));
   return (
     <Dialog title="Search your workspace" onClose={onClose} className="search-dialog">
       <div className="modal-search">
@@ -55,7 +53,9 @@ export function WorkspaceSearchDialog({
             <FileBadge name={doc.name} />
             <span className="doc-item-info">
               <strong>{doc.name}</strong>
-              <small>{prettyBytes(doc.size)} · {doc.chunk_count} passages</small>
+              <small>
+                {prettyBytes(doc.size)} · {doc.chunk_count} passages
+              </small>
             </span>
             <ChevronRight />
           </button>
