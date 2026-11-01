@@ -57,7 +57,7 @@ def validate_public_url(raw: str) -> str:
 
 
 class PageText(HTMLParser):
-    ignored = {"script", "style", "nav", "noscript", "svg", "footer", "head"}
+    ignored = {"script", "style", "nav", "noscript", "svg", "footer"}
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.skip = []
