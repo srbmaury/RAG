@@ -943,3 +943,17 @@ def test_transient_worker_failure_requeues_with_delay(client,monkeypatch):
         assert state.status=='queued'
         assert state.lease>time.time()
         assert state.generation==1
+
+
+def test_operations_endpoint_is_workspace_scoped(client):
+    w = wid(client)
+    response = client.get(f'/api/workspaces/{w}/operations')
+    assert response.status_code == 200
+    assert response.json()['documents']['total'] == 0
+    upload(client, w, 'operations-note.txt', 'hello world')
+    assert client.get(f'/api/workspaces/{w}/operations').json()['documents']['total'] == 1
+    with TestClient(app) as guest:
+        assert guest.get(f'/api/workspaces/{w}/operations').status_code == 401
+        guest.post('/api/auth/register', json={'email':f'{time.time_ns()}@guest.example',
+                                           'password':'another-long-password'})
+        assert guest.get(f'/api/workspaces/{w}/operations').status_code == 404
