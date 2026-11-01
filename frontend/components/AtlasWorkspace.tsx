@@ -1,3 +1,4 @@
+import {IntegrationsGallery} from './sources/IntegrationsGallery';
 'use client';
 
 import {Children, useEffect, useRef, useState, useCallback, type ReactNode} from 'react';
@@ -575,14 +576,7 @@ export function AtlasWorkspace() {
           {sourceManage!=='gmail' && <div className="sources-overview">
           <div className="crumb">Workspace<span>›</span>Sources</div><div className="heading-row"><div><span className="eyebrow">YOUR INTEGRATIONS</span><h1>Connected sources</h1><p className="subtitle">Connect external services to your research workspace. Access stays read-only.</p></div>
           <div className="source-header-actions"><button className="btn" onClick={()=>void refreshConnections()}>Refresh list</button><button className="btn primary" disabled={sourceChecksBusy} onClick={()=>void verifySourceConnections()}>{sourceChecksBusy?<><LoaderCircle className="spin"/>Checking access…</>:'Check source access'}</button></div></div>
-          <div className="integration-overview"><div><h2>Your integrations</h2><p>Choose a service to connect or manage its access.</p></div><span>{[gmailStatus?.connected,driveStatus?.connected,...sourceStatuses.map(x=>x.connected)].filter(Boolean).length} connected</span></div>
-          <div className="integrations-grid">
-            <IntegrationTile name="Gmail" description="Search conversations and summarize email." icon={<Mail size={23}/>} connected={!!gmailStatus?.connected} account={gmailStatus?.email} health={sourceChecks.gmail} onClick={()=>{setSourceManage('gmail');window.scrollTo({top:0,behavior:'instant'});}}/>
-            <IntegrationTile name="Google Drive" description="Explore documents and cloud files." icon={<HardDrive size={23}/>} connected={!!driveStatus?.connected} account={driveStatus?.account} health={sourceChecks.drive} onClick={()=>setSourceManage('drive')}/>
-            <IntegrationTile name="GitHub" description="Find issues, pull requests and decisions." icon={<Github size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='github')?.connected} account={sourceStatuses.find(x=>x.provider==='github')?.account} health={sourceChecks.github} onClick={()=>{setSourceProvider('github');setSourceManage('github');setSourceResults([]);}}/>
-            <IntegrationTile name="Notion" description="Search shared pages and knowledge." icon={<NotebookPen size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='notion')?.connected} account={sourceStatuses.find(x=>x.provider==='notion')?.account} health={sourceChecks.notion} onClick={()=>{setSourceProvider('notion');setSourceManage('notion');setSourceResults([]);}}/>
-            <IntegrationTile name="Slack" description="Find team conversations and updates." icon={<Hash size={23}/>} connected={!!sourceStatuses.find(x=>x.provider==='slack')?.connected} account={sourceStatuses.find(x=>x.provider==='slack')?.account} health={sourceChecks.slack} onClick={()=>{setSourceProvider('slack');setSourceManage('slack');setSourceResults([]);}}/>
-          </div>
+          <IntegrationsGallery gmailStatus={gmailStatus} driveStatus={driveStatus} sourceStatuses={sourceStatuses} sourceChecks={sourceChecks} onOpen={provider=>{setSourceManage(provider);if(provider==='gmail')window.scrollTo({top:0,behavior:'instant'});if(['github','notion','slack'].includes(provider)){setSourceProvider(provider as 'github'|'notion'|'slack');setSourceResults([]);}}}/>
           </div>}
         {sourceManage==='gmail' && <section className="gmail-page gmail-integrated">
           <div className="gmail-integrated-back"><button className="btn" type="button" onClick={()=>{setSourceManage(null);window.scrollTo({top:0,behavior:'instant'});}}>← All sources</button></div>
