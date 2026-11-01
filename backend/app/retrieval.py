@@ -88,7 +88,7 @@ def diversify_ranked_chunks(ranked, limit, per_document=3):
     return chosen
 
 def source(chunk, name):
-    return {**{'chunk_id': chunk.id, 'document_id': chunk.document_id, 'name': name, 'page': chunk.page, 'text': chunk.text, 'location_type': 'page' if name.lower().endswith('.pdf') else 'section'}, 'provider': 'documents', 'source_id': chunk.id}
+    return {'chunk_id': chunk.id, 'document_id': chunk.document_id, 'name': name, 'page': chunk.page, 'text': chunk.text, 'location_type': 'page' if name.lower().endswith('.pdf') else 'section', 'provider': 'documents', 'source_id': chunk.id}
 
 def retrieve(workspace_id, query, document_ids=None, limit=8):
     with Session() as db:
