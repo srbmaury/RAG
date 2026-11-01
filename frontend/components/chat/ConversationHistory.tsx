@@ -2,82 +2,46 @@
 import { RotateCcw, Plus, MessageSquare, Trash2 } from 'lucide-react';
 import type { ChatSummary } from '../../lib/types';
 
-export function ConversationHistory({
-  chats,
-  chatId,
-  busy,
-  onRefresh,
-  onNewChat,
-  onOpenChat,
-  onRenameChat,
-  onDeleteChat,
-}: {
-  chats: ChatSummary[];
-  chatId: string | null;
-  busy: boolean;
-  onRefresh: () => void;
-  onNewChat: () => void;
-  onOpenChat: (id: string) => void;
-  onRenameChat: (item: ChatSummary) => void;
-  onDeleteChat: (item: ChatSummary) => void;
-}) {
-  return (
-    <aside className="chat-history">
-      <div className="chat-history-header">
-        <strong>Conversations</strong>
-        <button
-          type="button"
-          onClick={() => onRefresh()}
-          title="Refresh saved conversations"
-          aria-label="Refresh saved conversations"
-        >
-          <RotateCcw size={15} />
-        </button>
-        <button
-          type="button"
-          onClick={onNewChat}
-          title="New conversation"
-          aria-label="New conversation"
-        >
-          <Plus size={16} />
-        </button>
-      </div>
-      <div className="chat-history-list">
-        {chats.map((item) => (
-          <div className={`chat-history-item ${chatId === item.id ? 'current' : ''}`} key={item.id}>
-            <button
-              className="chat-history-open"
-              onClick={() => onOpenChat(item.id)}
-              disabled={busy}
-              title={item.title}
-            >
-              <MessageSquare size={15} />
-              <span>{item.title}</span>
-            </button>
-            <button
-              className="chat-history-action"
-              onClick={() => onRenameChat(item)}
-              disabled={busy}
-              aria-label={`Rename ${item.title}`}
-              title="Rename"
-            >
-              ✎
-            </button>
-            <button
-              className="chat-history-action"
-              onClick={() => onDeleteChat(item)}
-              disabled={busy}
-              aria-label={`Delete ${item.title}`}
-              title="Delete"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-        {!chats.length && (
-          <p className="caption chat-history-empty">Your saved conversations will appear here.</p>
-        )}
-      </div>
-    </aside>
-  );
+interface ConversationHistoryProps {
+    chats: ChatSummary[];
+    chatId: string | null;
+    busy: boolean;
+    onRefresh: () => void;
+    onNewChat: () => void;
+    onOpenChat: (id: string) => void;
+    onRenameChat: (item: ChatSummary) => void;
+    onDeleteChat: (item: ChatSummary) => void;
+}
+
+export function ConversationHistory({ chats, chatId, busy, onRefresh, onNewChat, onOpenChat, onRenameChat, onDeleteChat }: ConversationHistoryProps) {
+    return (
+        <aside className="chat-history">
+            <div className="chat-history-header">
+                <strong>Conversations</strong>
+                <button type="button" onClick={onRefresh} title="Refresh saved conversations" aria-label="Refresh saved conversations">
+                    <RotateCcw size={15} />
+                </button>
+                <button type="button" onClick={onNewChat} title="New conversation" aria-label="New conversation">
+                    <Plus size={16} />
+                </button>
+            </div>
+            <div className="chat-history-list">
+                {chats.map((item) => (
+                    <div className={`chat-history-item ${chatId === item.id ? 'current' : ''}`} key={item.id}>
+                        <button className="chat-history-open" onClick={() => onOpenChat(item.id)} disabled={busy} title={item.title}>
+                            <MessageSquare size={15} />
+                            <span>{item.title}</span>
+                        </button>
+                        <button className="chat-history-action" onClick={() => onRenameChat(item)} disabled={busy} aria-label={`Rename ${item.title}`} title="Rename">
+                            ✎
+                        </button>
+                        <button className="chat-history-action" onClick={() => onDeleteChat(item)} disabled={busy} aria-label={`Delete ${item.title}`} title="Delete">
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
+                ))}
+                {!chats.length && <p className="caption chat-history-empty">Your saved conversations will appear here.</p>}
+            </div>
+        </aside>
+    );
 }

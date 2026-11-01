@@ -12,3 +12,4 @@ __pycache__/
 
 # Rebuild with: python evals/render.py
 evals/report.html
+.ruff_cache/

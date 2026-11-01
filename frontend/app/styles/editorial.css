@@ -1,0 +1,487 @@
+/* Atlas research workspace · editorial UI refinement.
+   Neutral surfaces and typography; green reserved for interaction. */
+:root {
+    --bg: #ffffff;
+    --sidebar: #fcfcfb;
+    --panel: #ffffff;
+    --text: #171b22;
+    --sub: #626b77;
+    --faint: #87909b;
+    --line: #eceef0;
+    --line2: #e0e4e8;
+    --hover: #f7f8f8;
+    --pill: #f5f6f7;
+    --active: #edf3ef;
+    --brand: #204a37;
+    --brandhover: #163b2a;
+    --brandtext: #fff;
+    --user: #f4f5f6;
+    --evidence: #fff6de;
+    --shadow: 0 16px 45px #11182712;
+}
+:root[data-theme='dark'] {
+    --bg: #151719;
+    --sidebar: #181a1c;
+    --panel: #1a1d20;
+    --text: #f0f1f3;
+    --sub: #abb1bb;
+    --faint: #828c99;
+    --line: #2b3035;
+    --line2: #383e45;
+    --hover: #22262a;
+    --pill: #25292d;
+    --active: #26372f;
+    --brand: #347858;
+    --brandhover: #42966b;
+    --brandtext: #fff;
+    --user: #252a2f;
+    --evidence: #383020;
+    --shadow: 0 20px 60px #0005;
+}
+body {
+    font-size: 14px;
+    line-height: 1.6;
+    letter-spacing: -0.005em;
+}
+h1,
+h2,
+h3 {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-weight: 700;
+}
+.sidebar {
+    width: 248px;
+    padding: 23px 16px 17px;
+}
+.main {
+    margin-left: 248px;
+}
+.brand-row {
+    font-size: 23px;
+    letter-spacing: -0.95px;
+    padding-bottom: 30px;
+}
+.workspace-btn {
+    padding: 11px;
+    border-radius: 8px;
+    box-shadow: none;
+}
+.nav {
+    gap: 4px;
+}
+.nav button,
+.secondary-nav button {
+    padding: 10px 12px;
+    font-weight: 500;
+}
+.nav button.active {
+    font-weight: 650;
+}
+.topbar {
+    height: 64px;
+    padding: 0 34px;
+}
+.global-search {
+    max-width: 540px;
+    height: 39px;
+    font-size: 12px;
+}
+.content {
+    max-width: 1680px;
+    padding: 29px 36px 52px;
+}
+.heading-row h1 {
+    font-size: 30px;
+    letter-spacing: -1.05px;
+    font-weight: 750;
+}
+.subtitle {
+    font-size: 13px;
+    line-height: 1.65;
+}
+.eyebrow {
+    letter-spacing: 1px;
+    font-size: 10px;
+    color: var(--sub);
+}
+.btn,
+.filter {
+    border-radius: 7px;
+    box-shadow: none;
+}
+.filters {
+    margin-top: 20px;
+    margin-bottom: 16px;
+}
+.research {
+    grid-template-columns: minmax(0, 1fr) minmax(270px, 330px);
+    gap: 20px;
+}
+.thread {
+    border-radius: 10px;
+    padding: 25px 24px 18px;
+    min-height: 475px;
+}
+.answer {
+    border-color: var(--line);
+    border-radius: 9px;
+    padding: 19px 20px;
+    box-shadow: 0 1px 3px #11182705;
+}
+.answer p,
+.answer li {
+    font-size: 14px;
+    line-height: 1.75;
+}
+.answer-head {
+    margin-bottom: 14px;
+}
+.bubble {
+    border-radius: 9px;
+    font-size: 13px;
+    padding: 12px 16px;
+}
+.assistant-mark {
+    background: #214d38;
+    font-size: 15px;
+}
+.cite {
+    border: 1px solid var(--line2);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--text);
+    background: var(--pill);
+}
+.cite:hover {
+    background: var(--active);
+    color: var(--brand);
+}
+.evidence-panel {
+    border-radius: 10px;
+}
+.tabs {
+    padding: 10px 12px 0;
+    justify-content: space-between;
+}
+.tabs button {
+    font-size: 12px;
+    padding: 10px 8px;
+}
+.doc-item {
+    padding: 16px 14px;
+    gap: 13px;
+}
+.doc-item-info strong {
+    font-size: 12px;
+}
+.doc-item-info small {
+    font-size: 11px;
+}
+.source-chip {
+    flex: 0 1 230px;
+    min-height: 56px;
+    border-radius: 7px;
+}
+.prompt-row button {
+    border-color: var(--line2);
+    background: transparent;
+    font-size: 12px;
+    padding: 7px 12px;
+}
+.prompt-row button:hover {
+    background: var(--hover);
+    color: var(--text);
+}
+.composer {
+    border-radius: 10px;
+    padding: 11px 13px;
+}
+.composer textarea {
+    font-size: 13px;
+    min-height: 29px;
+}
+.home-intro {
+    margin: 28px 0 25px;
+}
+.home-intro h1 {
+    font-size: 31px;
+    letter-spacing: -1px;
+}
+.home-ask {
+    max-width: none;
+    border-radius: 10px;
+    padding: 24px 25px;
+    background: var(--panel);
+}
+.home-ask h2 {
+    font-size: 17px;
+}
+.home-ask textarea {
+    font-size: 14px;
+    min-height: 80px;
+}
+.home-grid {
+    margin-top: 32px;
+    gap: 24px;
+}
+.list-card,
+.table-wrap {
+    border-radius: 9px;
+}
+.list-row {
+    padding: 15px 16px;
+}
+.list-row strong {
+    font-size: 13px;
+    font-weight: 600;
+}
+.list-row small {
+    font-size: 11px;
+}
+.usage {
+    border-radius: 8px;
+}
+.research-welcome h2 {
+    letter-spacing: -0.7px;
+}
+.document-markdown,
+.markdown {
+    font-size: 14px;
+    line-height: 1.75;
+}
+.document-markdown p,
+.markdown p {
+    line-height: 1.75;
+}
+@media (max-width: 1140px) {
+    .sidebar {
+        width: 218px;
+    }
+    .main {
+        margin-left: 218px;
+    }
+    .content {
+        padding: 25px 24px 45px;
+    }
+    .research {
+        grid-template-columns: minmax(0, 1fr) 270px;
+    }
+}
+@media (max-width: 930px) {
+    .sidebar {
+        width: 64px;
+    }
+    .main {
+        margin-left: 64px;
+    }
+    .research {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width: 600px) {
+    .sidebar {
+        width: 250px;
+    }
+    .main {
+        margin-left: 0;
+    }
+    .content {
+        padding: 20px 14px 36px;
+    }
+    .thread {
+        padding: 14px 12px;
+    }
+    .answer {
+        padding: 14px;
+    }
+    .heading-row h1 {
+        font-size: 24px;
+    }
+}
+
+/* Persistent conversation navigation */
+.chat-workspace {
+    display: grid;
+    grid-template-columns: 228px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+.chat-workspace .research {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 310px);
+}
+.chat-history {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 10px;
+    overflow: hidden;
+    position: sticky;
+    top: 16px;
+}
+.chat-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 13px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+}
+.chat-history-header button {
+    border: 0;
+    background: transparent;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+}
+.chat-history-header button:hover,
+.chat-history-action:hover {
+    background: var(--hover);
+}
+.chat-history-list {
+    padding: 7px;
+    max-height: 65vh;
+    overflow: auto;
+}
+.chat-history-item {
+    display: flex;
+    align-items: center;
+    border-radius: 7px;
+    gap: 1px;
+}
+.chat-history-item.current {
+    background: var(--active);
+}
+.chat-history-open {
+    border: 0;
+    background: transparent;
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+    padding: 11px 7px;
+    font-size: 12px;
+}
+.chat-history-open span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.chat-history-open svg {
+    width: 15px;
+    height: 15px;
+    color: var(--sub);
+}
+.chat-history-action {
+    flex: none;
+    border: 0;
+    background: transparent;
+    padding: 5px;
+    border-radius: 5px;
+    color: var(--sub);
+    font-size: 15px;
+    opacity: 0.75;
+}
+.chat-history-empty {
+    padding: 12px;
+    line-height: 1.55;
+}
+@media (max-width: 1350px) {
+    .chat-workspace {
+        grid-template-columns: 195px minmax(0, 1fr);
+    }
+    .chat-workspace .research {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+@media (max-width: 750px) {
+    .chat-workspace {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .chat-history {
+        position: static;
+    }
+    .chat-history-list {
+        display: flex;
+        gap: 5px;
+        max-height: 145px;
+        overflow: auto;
+    }
+    .chat-history-item {
+        min-width: 190px;
+        max-width: 235px;
+    }
+    .chat-history-open {
+        padding: 9px;
+    }
+}
+
+/* Workspace management and recent conversation discovery */
+.workspace-manage-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 7px;
+}
+.workspace-manage-row > button:first-child {
+    flex: 1;
+    min-width: 0;
+}
+.workspace-delete {
+    flex: none;
+    border: 1px solid var(--line2);
+    background: var(--panel);
+    color: var(--sub);
+    border-radius: 7px;
+    padding: 10px;
+    display: grid;
+    place-items: center;
+}
+.workspace-delete:hover {
+    color: #b44740;
+    background: var(--hover);
+}
+.workspace-delete-confirm {
+    margin: 15px 0;
+    padding: 15px;
+    border: 1px solid var(--line2);
+    border-radius: 9px;
+}
+.workspace-delete-confirm strong {
+    font-size: 13px;
+}
+.workspace-delete-confirm p {
+    color: var(--sub);
+    font-size: 12px;
+    margin: 8px 0 11px;
+}
+.workspace-delete-confirm input {
+    width: 100%;
+    border: 1px solid var(--line2);
+    border-radius: 7px;
+    padding: 10px;
+    background: var(--panel);
+}
+.workspace-delete-confirm .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+}
+.btn.danger {
+    background: #9d3430;
+    border-color: #9d3430;
+    color: white;
+}
+.btn.danger:hover {
+    background: #822b28;
+}
+.sidebar-research .workspace-stat span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
