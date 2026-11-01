@@ -10,6 +10,10 @@ export type Doc = {
   pages: number;
   chunk_count: number;
 };
+export type DocumentPreview = {
+  document: Doc;
+  chunks: { id: string; page: number; text: string }[];
+};
 export type Source = {
   chunk_id: string;
   document_id: string;

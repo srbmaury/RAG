@@ -1,26 +1,22 @@
 'use client';
-import { IntegrationsGallery } from './sources/IntegrationsGallery';
-import { SourceConnectionDialog } from './sources/SourceConnectionDialog';
-import { GmailWorkspaceView } from './sources/gmail/GmailWorkspaceView';
+import { ConnectedSourcesView } from './sources/ConnectedSourcesView';
+import { WorkspaceSearchDialog } from './layout/WorkspaceSearchDialog';
+import { WorkspaceManagementDialog } from './layout/WorkspaceManagementDialog';
+import { DocumentScopeDialog } from './documents/DocumentScopeDialog';
+import { EvidenceInspector } from './documents/EvidenceInspector';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  ArrowUpRight,
   Check,
   ChevronDown,
-  ChevronRight,
   CircleHelp,
   FileText,
   FolderOpen,
-  Layers3,
   Plus,
   Search,
-  Sparkles,
-  Trash2,
   Upload,
   X,
   LoaderCircle,
-  Download,
   MessageSquare,
   Moon,
   Sun,
@@ -31,8 +27,8 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { conversationPlan } from '../lib/conversation';
-import { sourceLocation } from '../lib/evidence';
 import { requestedConnectedSource } from '../lib/query-routing';
+import { useDocumentImports } from '../hooks/useDocumentImports';
 import { useConversation } from '../hooks/useConversation';
 import { useAtlasTheme } from '../hooks/useAtlasTheme';
 import { useSourceConnections } from '../hooks/useSourceConnections';
@@ -43,6 +39,7 @@ import type {
   User,
   Workspace,
   Doc,
+  DocumentPreview,
   Source,
   Answer,
   Message,
@@ -50,7 +47,6 @@ import type {
   ChatSummary,
   SavedChat,
 } from '../lib/types';
-import { DocumentPassage } from '../components/DocumentPassage';
 import '../app/rebuild.css';
 import { ConversationTranscript } from './chat/ConversationTranscript';
 import { ResearchComposer } from './chat/ResearchComposer';
@@ -62,7 +58,7 @@ import { DocumentTable } from './documents/DocumentTable';
 import { HomeView } from './home/HomeView';
 import { AuthView } from './auth/AuthView';
 import { WorkspaceSidebar } from './layout/WorkspaceSidebar';
-import { AtlasMark, FileBadge, EmptyState, Dialog } from './ui/WorkspacePrimitives';
+import { AtlasMark, EmptyState } from './ui/WorkspacePrimitives';
 import { flushSync } from 'react-dom';
 
 const prettyBytes = (n: number) =>
@@ -111,12 +107,8 @@ export function AtlasWorkspace() {
     setDriveResults,
     sourceStatuses,
     setSourceStatuses,
-    sourceChecks,
     setSourceChecks,
-    sourceChecksBusy,
-    sourceManage,
     setSourceManage,
-    setSourceProvider,
     setSourceCredential,
     setSourceSearch,
     setSourceResults,
@@ -159,20 +151,10 @@ export function AtlasWorkspace() {
   const [busy, setBusy] = useState(false);
   const [answerProgress, setAnswerProgress] = useState('');
   const askController = useRef<AbortController | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [webUrl, setWebUrl] = useState('');
-  const [webBusy, setWebBusy] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [uploadSummary, setUploadSummary] = useState<{ ids: string[]; duplicates: number } | null>(
-    null,
-  );
   const [source, setSource] = useState<Source | null>(null);
-  const [preview, setPreview] = useState<{
-    document: Doc;
-    chunks: { id: string; page: number; text: string }[];
-  } | null>(null);
+  const [preview, setPreview] = useState<DocumentPreview | null>(null);
   const [dragging, setDragging] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('');
   const [newWorkspace, setNewWorkspace] = useState(false);
@@ -214,6 +196,25 @@ export function AtlasWorkspace() {
     setDocs(documents);
     setSelected((old) => old.filter((id) => documents.some((d) => d.id === id)));
   }, [wid]);
+  const {
+    uploading,
+    webUrl,
+    setWebUrl,
+    webBusy,
+    uploadProgress,
+    uploadSummary,
+    setUploadSummary,
+    upload,
+    importWebPage,
+  } = useDocumentImports({
+    wid,
+    maxFileBytes: user?.max_file_bytes || 0,
+    scope,
+    input,
+    refresh,
+    setError,
+    setNotice,
+  });
   useEffect(() => {
     setDocs([]);
     setMessages([]);
@@ -273,131 +274,6 @@ export function AtlasWorkspace() {
       setBusy(false);
     }
   }
-  async function importWebPage(event: React.FormEvent) {
-    event.preventDefault();
-    if (!wid || webBusy || !webUrl.trim()) return;
-    const target = wid;
-    setWebBusy(true);
-    setError('');
-    setNotice('');
-    try {
-      const result = await api<{ name: string; duplicate: boolean }>(
-        `/workspaces/${target}/web-pages`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ url: webUrl.trim() }),
-        },
-      );
-      if (scope.current === target) {
-        setWebUrl('');
-        setNotice(
-          result.duplicate
-            ? 'Web page already exists in this workspace.'
-            : `Added ${result.name} to your library for indexing.`,
-        );
-        await refresh();
-      }
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setWebBusy(false);
-    }
-  }
-  async function upload(files: FileList | File[]) {
-    if (!files.length || uploading) return;
-    const target = wid;
-    setUploading(true);
-    setError('');
-    setNotice('');
-    setUploadSummary(null);
-    const added: string[] = [];
-    let duplicates = 0;
-    const problems: string[] = [];
-    const list = Array.from(files);
-    try {
-      for (let index = 0; index < list.length; index++) {
-        if (scope.current !== target) break;
-        const file = list[index];
-        let staged: string | null = null;
-        try {
-          if (file.size > user!.max_file_bytes)
-            throw new Error(
-              `Exceeds the ${Math.round(user!.max_file_bytes / 1024 / 1024)} MB file limit.`,
-            );
-          setUploadProgress(`Uploading ${index + 1} of ${list.length}: ${file.name} · 0%`);
-          let documents: (Doc & { duplicate?: boolean })[];
-          if (file.size > 8 * 1024 * 1024) {
-            const job = await api<{ id: string; part_bytes: number }>(
-              `/workspaces/${target}/uploads`,
-              { method: 'POST', body: JSON.stringify({ name: file.name, size: file.size }) },
-            );
-            staged = job.id;
-            let offset = 0;
-            while (offset < file.size) {
-              const end = Math.min(offset + job.part_bytes, file.size);
-              let sent = false;
-              for (let attempt = 0; attempt < 3 && !sent; attempt++) {
-                try {
-                  await api(`/workspaces/${target}/uploads/${job.id}?offset=${offset}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/octet-stream' },
-                    body: file.slice(offset, end),
-                  });
-                  sent = true;
-                } catch (error) {
-                  const state = await api<{ offset: number }>(
-                    `/workspaces/${target}/uploads/${job.id}`,
-                  );
-                  if (state.offset === end) sent = true;
-                  else if (state.offset !== offset || attempt === 2) throw error;
-                }
-              }
-              offset = end;
-              setUploadProgress(
-                `Uploading ${index + 1} of ${list.length}: ${file.name} · ${Math.round((offset / file.size) * 100)}%`,
-              );
-            }
-            const doc = await api<Doc & { duplicate?: boolean }>(
-              `/workspaces/${target}/uploads/${job.id}/complete`,
-              { method: 'POST' },
-            );
-            staged = null;
-            documents = [doc];
-          } else {
-            const data = new FormData();
-            data.append('files', file);
-            documents = (
-              await api<{ documents: (Doc & { duplicate?: boolean })[] }>(
-                `/workspaces/${target}/documents`,
-                { method: 'POST', body: data },
-              )
-            ).documents;
-          }
-          for (const doc of documents) {
-            if (!doc.id) problems.push(`${doc.name}: ${doc.error}`);
-            else if (doc.duplicate) duplicates++;
-            else added.push(doc.id);
-          }
-        } catch (error) {
-          problems.push(`${file.name}: ${(error as Error).message}`);
-          if (staged)
-            await api(`/workspaces/${target}/uploads/${staged}`, { method: 'DELETE' }).catch(
-              () => undefined,
-            );
-        }
-        if (scope.current === target) {
-          setUploadSummary({ ids: [...added], duplicates });
-          await refresh().catch(() => undefined);
-        }
-      }
-      if (scope.current === target && problems.length) setError(problems.join(' '));
-    } finally {
-      setUploading(false);
-      setUploadProgress('');
-      if (input.current) input.current.value = '';
-    }
-  }
-
   async function loadChat(id: string) {
     if (busy) return;
     try {
@@ -641,6 +517,17 @@ export function AtlasWorkspace() {
       setError((e as Error).message);
     }
   }
+  async function loadMorePassages() {
+    if (!preview) return;
+    try {
+      const next = await api<DocumentPreview>(
+        `/workspaces/${wid}/documents/${preview.document.id}/chunks?offset=${preview.chunks.length}`,
+      );
+      if (next) setPreview({ ...preview, chunks: [...preview.chunks, ...next.chunks] });
+    } catch (error) {
+      setError((error as Error).message);
+    }
+  }
   function navigate(next: typeof tab) {
     flushSync(() => {
       setTab(next);
@@ -695,22 +582,7 @@ export function AtlasWorkspace() {
       setError((e as Error).message);
     }
   }
-  const {
-    connectGmail,
-    connectDrive,
-    disconnectDrive,
-    searchDrive,
-    refreshConnections,
-    verifySourceConnections,
-    connectSource,
-    connectOAuthSource,
-    disconnectSource,
-    searchSource,
-    searchGmail,
-    summarizeGmailQuery,
-    summarizeGmail,
-    disconnectGmail,
-  } = useConnectedSourcesController({
+  const sourceController = useConnectedSourcesController({
     wid,
     tab,
     scope,
@@ -1220,405 +1092,67 @@ export function AtlasWorkspace() {
             />
           )}
           {wid && tab === 'sources' && (
-            <section className="connected-page">
-              {sourceManage !== 'gmail' && (
-                <div className="sources-overview">
-                  <div className="crumb">
-                    Workspace<span>›</span>Sources
-                  </div>
-                  <div className="heading-row">
-                    <div>
-                      <span className="eyebrow">YOUR INTEGRATIONS</span>
-                      <h1>Connected sources</h1>
-                      <p className="subtitle">
-                        Connect external services to your research workspace. Access stays
-                        read-only.
-                      </p>
-                    </div>
-                    <div className="source-header-actions">
-                      <button className="btn" onClick={() => void refreshConnections()}>
-                        Refresh list
-                      </button>
-                      <button
-                        className="btn primary"
-                        disabled={sourceChecksBusy}
-                        onClick={() => void verifySourceConnections()}
-                      >
-                        {sourceChecksBusy ? (
-                          <>
-                            <LoaderCircle className="spin" />
-                            Checking access…
-                          </>
-                        ) : (
-                          'Check source access'
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <IntegrationsGallery
-                    gmailStatus={gmailStatus}
-                    driveStatus={driveStatus}
-                    sourceStatuses={sourceStatuses}
-                    sourceChecks={sourceChecks}
-                    onOpen={(provider) => {
-                      setSourceManage(provider);
-                      if (provider === 'gmail') window.scrollTo({ top: 0, behavior: 'instant' });
-                      if (
-                        [
-                          'github',
-                          'notion',
-                          'slack',
-                          'calendar',
-                          'linear',
-                          'jira',
-                          'onedrive',
-                          'outlook',
-                          'sharepoint',
-                        ].includes(provider)
-                      ) {
-                        setSourceProvider(
-                          provider as
-                            | 'github'
-                            | 'notion'
-                            | 'slack'
-                            | 'calendar'
-                            | 'linear'
-                            | 'jira'
-                            | 'onedrive'
-                            | 'outlook'
-                            | 'sharepoint',
-                        );
-                        setSourceResults([]);
-                      }
-                    }}
-                  />
-                </div>
-              )}
-              {sourceManage === 'gmail' && (
-                <GmailWorkspaceView
-                  state={gmailState}
-                  onBack={() => {
-                    setSourceManage(null);
-                    window.scrollTo({ top: 0, behavior: 'instant' });
-                  }}
-                  onDisconnect={() => void disconnectGmail()}
-                  onConnect={() => void connectGmail()}
-                  onSearch={() => void searchGmail()}
-                  onSummarizeQuery={() => void summarizeGmailQuery()}
-                  onSummarizeSelected={() => void summarizeGmail()}
-                  onNotice={setNotice}
-                  onError={setError}
-                />
-              )}
-              <SourceConnectionDialog
-                state={sourceState}
-                onClose={() => {
-                  setSourceManage(null);
-                  setSourceCredential('');
-                }}
-                onSearchDrive={() => void searchDrive()}
-                onDisconnectDrive={() => void disconnectDrive()}
-                onConnectDrive={() => void connectDrive()}
-                onConnectSource={() => void connectSource()}
-                onConnectOAuthSource={() => void connectOAuthSource()}
-                onSearchSource={() => void searchSource()}
-                onDisconnectSource={(provider) => void disconnectSource(provider)}
-              />
-              <p className="caption">
-                All connections are scoped to this workspace. Source content is accessed on demand;
-                you can disconnect accounts at any time.
-              </p>
-            </section>
+            <ConnectedSourcesView
+              sourceState={sourceState}
+              gmailState={gmailState}
+              controller={sourceController}
+              setNotice={setNotice}
+              setError={setError}
+            />
           )}
         </div>
       </main>
       {searchOpen && (
-        <Dialog
-          title="Search your workspace"
+        <WorkspaceSearchDialog
+          docs={docs}
+          globalQuery={globalQuery}
+          setGlobalQuery={setGlobalQuery}
+          busy={busy}
+          hasAskSources={hasAskSources}
           onClose={() => setSearchOpen(false)}
-          className="search-dialog"
-        >
-          <div className="modal-search">
-            <Search />
-            <input
-              autoFocus
-              data-autofocus
-              aria-label="Search your workspace"
-              placeholder="Find a document or ask a question…"
-              value={globalQuery}
-              onChange={(e) => setGlobalQuery(e.target.value)}
-            />
-          </div>
-          {globalQuery.trim() && (
-            <button
-              className="search-question"
-              disabled={busy || !hasAskSources}
-              onClick={() => {
-                setSearchOpen(false);
-                void ask(globalQuery, true);
-                setGlobalQuery('');
-              }}
-            >
-              <Sparkles />
-              <span>Ask Atlas: {globalQuery}</span>
-              <ArrowUpRight />
-            </button>
-          )}
-          <div className="search-results">
-            {docs
-              .filter((d) => d.name.toLowerCase().includes(globalQuery.toLowerCase()))
-              .slice(0, 12)
-              .map((d) => (
-                <button
-                  className="doc-item"
-                  key={d.id}
-                  onClick={() => {
-                    setSearchOpen(false);
-                    void inspect(d);
-                  }}
-                >
-                  <FileBadge name={d.name} />
-                  <span className="doc-item-info">
-                    <strong>{d.name}</strong>
-                    <small>
-                      {prettyBytes(d.size)} · {d.chunk_count} passages
-                    </small>
-                  </span>
-                  <ChevronRight />
-                </button>
-              ))}
-            {!docs.some((d) => d.name.toLowerCase().includes(globalQuery.toLowerCase())) && (
-              <p className="evidence-empty">No matching documents.</p>
-            )}
-          </div>
-        </Dialog>
+          onAsk={(question) => void ask(question, true)}
+          onInspect={(doc) => void inspect(doc)}
+          formatSize={prettyBytes}
+        />
       )}
       {scopeOpen && (
-        <Dialog title="Choose your sources" onClose={() => setScopeOpen(false)}>
-          <p className="dialog-intro">Ask across all ready documents, or choose a focused set.</p>
-          <button className="btn" onClick={() => setSelected([])}>
-            <Layers3 />
-            Use all documents
-          </button>
-          <div className="scope-list">
-            {ready.map((d) => (
-              <label key={d.id}>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(d.id)}
-                  onChange={(e) =>
-                    setSelected((old) =>
-                      e.target.checked ? [...old, d.id] : old.filter((id) => id !== d.id),
-                    )
-                  }
-                />
-                <FileBadge name={d.name} />
-                <span>{d.name}</span>
-              </label>
-            ))}
-          </div>
-          <div className="dialog-footer">
-            <span className="caption">
-              {selected.length ? `${selected.length} selected` : 'All ready documents included'}
-            </span>
-            <button className="btn primary" onClick={() => setScopeOpen(false)}>
-              Done
-              <Check />
-            </button>
-          </div>
-        </Dialog>
+        <DocumentScopeDialog
+          ready={ready}
+          selected={selected}
+          setSelected={setSelected}
+          onClose={() => setScopeOpen(false)}
+        />
       )}
       {newWorkspace && (
-        <Dialog
-          title="Your workspaces"
-          onClose={() => {
-            setNewWorkspace(false);
-            setDeleteWorkspaceId(null);
-          }}
-        >
-          <p className="dialog-intro">Manage your workspaces and their saved conversations.</p>
-          <div className="workspace-list">
-            {workspaces.map((w) => (
-              <div className="workspace-manage-row" key={w.id}>
-                <button
-                  className={w.id === wid ? 'selected' : ''}
-                  disabled={busy || uploading || deletingWorkspace}
-                  onClick={() => {
-                    setWid(w.id);
-                    setNewWorkspace(false);
-                  }}
-                >
-                  <span className="ws-avatar">{w.name[0].toUpperCase()}</span>
-                  <strong>{w.name}</strong>
-                  {w.id === wid ? <Check /> : <ChevronRight />}
-                </button>
-                <button
-                  className="workspace-delete"
-                  type="button"
-                  title={`Delete ${w.name}`}
-                  aria-label={`Delete workspace ${w.name}`}
-                  onClick={() => {
-                    setDeleteWorkspaceId(w.id);
-                    setConfirmWorkspaceName('');
-                  }}
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-          {deleteWorkspaceId && (
-            <div
-              className="workspace-delete-confirm"
-              role="group"
-              aria-label="Confirm workspace deletion"
-            >
-              <strong>Delete “{workspaces.find((w) => w.id === deleteWorkspaceId)?.name}”?</strong>
-              <p>
-                This permanently deletes its documents, indexed passages, and saved chats. Type the
-                workspace name to confirm.
-              </p>
-              <input
-                aria-label="Type workspace name to confirm"
-                autoComplete="off"
-                value={confirmWorkspaceName}
-                onChange={(e) => setConfirmWorkspaceName(e.target.value)}
-                placeholder="Exact workspace name"
-              />
-              <div className="dialog-actions">
-                <button className="btn" type="button" onClick={() => setDeleteWorkspaceId(null)}>
-                  Cancel
-                </button>
-                <button
-                  className="btn danger"
-                  type="button"
-                  disabled={
-                    deletingWorkspace ||
-                    busy ||
-                    uploading ||
-                    confirmWorkspaceName !==
-                      workspaces.find((w) => w.id === deleteWorkspaceId)?.name
-                  }
-                  onClick={() => void removeWorkspace()}
-                >
-                  {deletingWorkspace ? 'Deleting…' : 'Delete workspace'}
-                </button>
-              </div>
-            </div>
-          )}
-          <form className="workspace-form" onSubmit={addWorkspace}>
-            <label>
-              New workspace
-              <input
-                required
-                maxLength={100}
-                value={workspaceName}
-                onChange={(e) => setWorkspaceName(e.target.value)}
-                placeholder="e.g. Product research"
-              />
-            </label>
-            <button className="btn primary">
-              <Plus />
-              Create workspace
-            </button>
-          </form>
-        </Dialog>
+        <WorkspaceManagementDialog
+          workspaces={workspaces}
+          wid={wid}
+          setWid={setWid}
+          busy={busy}
+          uploading={uploading}
+          deletingWorkspace={deletingWorkspace}
+          deleteWorkspaceId={deleteWorkspaceId}
+          setDeleteWorkspaceId={setDeleteWorkspaceId}
+          confirmWorkspaceName={confirmWorkspaceName}
+          setConfirmWorkspaceName={setConfirmWorkspaceName}
+          workspaceName={workspaceName}
+          setWorkspaceName={setWorkspaceName}
+          setNewWorkspace={setNewWorkspace}
+          addWorkspace={addWorkspace}
+          removeWorkspace={() => void removeWorkspace()}
+        />
       )}
       {(source || preview) && (
-        <Dialog
-          title={source ? 'Source passage' : 'Document preview'}
-          closeLabel="Close preview"
-          className="evidence-inspector"
+        <EvidenceInspector
+          source={source}
+          preview={preview}
+          downloadUrl={`/api/workspaces/${wid}/documents/${source?.document_id || preview?.document.id}/original`}
           onClose={() => {
             setSource(null);
             setPreview(null);
           }}
-        >
-          <div className="drawer-header">
-            <div>
-              <div className="caption">{source ? 'Source excerpt' : 'Document preview'}</div>
-              <h2>{source?.name || preview?.document.name}</h2>
-              <div className="caption">
-                {source
-                  ? sourceLocation(source)
-                  : `${preview?.document.chunk_count} passages · ${preview?.document.status}`}
-              </div>
-            </div>
-          </div>
-          <div className="drawer-body">
-            {source ? (
-              <div className="evidence-inspector-passage">
-                <p className="caption evidence-disclaimer">
-                  Retrieved excerpt. Check the original source to confirm context.
-                </p>
-                <DocumentPassage name={source.name} text={source.text} />
-              </div>
-            ) : (
-              preview && (
-                <>
-                  {preview.document.error && (
-                    <p className="feedback error">{preview.document.error}</p>
-                  )}
-                  {preview.chunks.map((c) => (
-                    <section className="preview-chunk" key={c.id}>
-                      <span className="caption">
-                        {preview.document.name.toLowerCase().endsWith('.pdf') ? 'Page' : 'Section'}{' '}
-                        {c.page}
-                      </span>
-                      <DocumentPassage name={preview.document.name} text={c.text} />
-                    </section>
-                  ))}
-                  {!preview.chunks.length && (
-                    <p className="evidence-empty">No indexed passages yet.</p>
-                  )}
-                  {preview.document.chunk_count > preview.chunks.length && (
-                    <button
-                      className="btn"
-                      onClick={async () => {
-                        try {
-                          const next = await api<typeof preview>(
-                            `/workspaces/${wid}/documents/${preview.document.id}/chunks?offset=${preview.chunks.length}`,
-                          );
-                          if (next)
-                            setPreview({ ...preview, chunks: [...preview.chunks, ...next.chunks] });
-                        } catch (e) {
-                          setError((e as Error).message);
-                        }
-                      }}
-                    >
-                      Load more passages
-                    </button>
-                  )}
-                </>
-              )
-            )}
-          </div>
-          <div className="drawer-footer">
-            {source?.url ? (
-              <a className="btn" href={source.url} target="_blank" rel="noopener noreferrer">
-                <ArrowUpRight />
-                Open source
-              </a>
-            ) : (
-              <a
-                className="btn"
-                href={`/api/workspaces/${wid}/documents/${source?.document_id || preview?.document.id}/original`}
-              >
-                <Download />
-                Download original
-              </a>
-            )}
-            <button
-              className="btn"
-              onClick={() => {
-                setSource(null);
-                setPreview(null);
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </Dialog>
+          onLoadMore={() => void loadMorePassages()}
+        />
       )}
     </div>
   );

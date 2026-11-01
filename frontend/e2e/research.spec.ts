@@ -252,3 +252,61 @@ test('authentication failure stays actionable and announced',async({page})=>{
  await expect(page.locator('.auth-form').getByRole('alert')).toContainText('Incorrect email or password.');
  await page.screenshot({path:'/tmp/atlas-audit/after-auth.png',animations:'disabled'});
 });
+
+test('document scope dialog preserves selection',async({page})=>{
+ await page.getByRole('button',{name:'All documents',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'Choose your sources'});
+ await dialog.getByRole('checkbox',{name:'notes.md'}).check();
+ await dialog.getByRole('button',{name:'Done',exact:true}).click();
+ await expect(page.getByRole('button',{name:'1 selected documents',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'1 selected documents',exact:true}).click();
+ await expect(dialog.getByRole('checkbox',{name:'notes.md'})).toBeChecked();
+ await dialog.getByRole('button',{name:'Use all documents',exact:true}).click();
+ await dialog.getByRole('button',{name:'Done',exact:true}).click();
+ await expect(page.getByRole('button',{name:'All documents',exact:true})).toBeVisible();
+});
+
+test('workspace deletion still requires the exact workspace name',async({page})=>{
+ await page.getByRole('button',{name:'Manage workspaces',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'Your workspaces'});
+ await dialog.getByRole('button',{name:'Delete workspace Test workspace',exact:true}).click();
+ const remove=dialog.getByRole('button',{name:'Delete workspace',exact:true});
+ await expect(remove).toBeDisabled();
+ await dialog.getByRole('textbox',{name:'Type workspace name to confirm'}).fill('Wrong workspace');
+ await expect(remove).toBeDisabled();
+ await dialog.getByRole('textbox',{name:'Type workspace name to confirm'}).fill('Test workspace');
+ await expect(remove).toBeEnabled();
+ await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+ await expect(remove).toHaveCount(0);
+});
+
+test('resumable upload recovers a lost acknowledgement without resending the chunk',async({page})=>{
+ let puts=0,completed=0;
+ const size=9*1024*1024;
+ await page.route('**/api/workspaces/w1/uploads**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  const method=route.request().method();
+  const json=(value:unknown)=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(value)});
+  if(path.endsWith('/uploads'))return json({id:'upload-1',part_bytes:size});
+  if(method==='PUT'){puts++;return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({detail:'Acknowledgement lost'})});}
+  if(path.endsWith('/complete')){completed++;return json({id:'d1',name:'large.txt',size,status:'ready',pages:1,chunk_count:1});}
+  return json({offset:size});
+ });
+ await page.locator('input[type=file]').setInputFiles({name:'large.txt',mimeType:'text/plain',buffer:Buffer.alloc(size,97)});
+ await expect(page.getByRole('status').filter({hasText:'1 ready to search'})).toBeVisible();
+ expect(puts).toBe(1);
+ expect(completed).toBe(1);
+ await expect(page.getByRole('status').filter({hasText:'Uploading'})).toHaveCount(0);
+});
+
+test('web import submits the URL and clears the field after success',async({page})=>{
+ await page.route('**/api/workspaces/w1/web-pages',route=>{
+  expect(route.request().postDataJSON()).toEqual({url:'https://example.com/article'});
+  return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({name:'Article',duplicate:false})});
+ });
+ await page.getByRole('button',{name:'Documents',exact:true}).click();
+ await page.getByLabel('Save public web page').fill('https://example.com/article');
+ await page.getByRole('button',{name:'Add URL',exact:true}).click();
+ await expect(page.getByRole('status').filter({hasText:'Added Article to your library for indexing.'})).toBeVisible();
+ await expect(page.getByLabel('Save public web page')).toHaveValue('');
+});
