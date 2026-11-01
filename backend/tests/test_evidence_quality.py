@@ -1,4 +1,4 @@
-from app.evidence_quality import prepare_evidence, related_evidence, canonical_url
+from app.evidence_quality import prepare_evidence, canonical_url
 from app.sources import Evidence
 
 
