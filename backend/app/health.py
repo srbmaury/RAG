@@ -19,7 +19,7 @@ def ready():
             revision = connection.execute(text('SELECT version_num FROM alembic_version')).scalar_one_or_none()
             if revision != '0003':
                 raise RuntimeError('Atlas database schema migration 0003 is required.')
-    except Exception:
-        log.warning('Readiness check failed: %s', type(__import__('sys').exc_info()[1]).__name__)
+    except Exception as exc:
+        log.warning('Readiness check failed: %s', type(exc).__name__)
         raise HTTPException(status_code=503,detail='Database unavailable')
     return {'status':'ready'}
