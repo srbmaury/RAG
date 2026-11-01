@@ -71,7 +71,7 @@ export function useConnectedSourcesController({wid,tab,scope,sourceState,gmailSt
     }catch{/* A health check has not been recorded yet. */}
   }
   async function connectOAuthSource(){
-    if(!(['calendar','onedrive','outlook'] as string[]).includes(sourceProvider))return;
+    if(!(['calendar','onedrive','outlook','sharepoint'] as string[]).includes(sourceProvider))return;
     setSourceBusy(true);setError('');
     try{
       const response=await api<{authorization_url:string}>(`/connected-oauth/${sourceProvider}/connect?wid=${encodeURIComponent(wid)}`);
