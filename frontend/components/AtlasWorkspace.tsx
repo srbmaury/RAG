@@ -38,7 +38,8 @@ import { useAtlasTheme } from '../hooks/useAtlasTheme';
 import { useSourceConnections } from '../hooks/useSourceConnections';
 import { useGmailWorkspace } from '../hooks/useGmailWorkspace';
 import { useConnectedSourcesController } from '../hooks/useConnectedSourcesController';
-import { api, apiStream } from '../lib/api';
+import { api } from '../lib/api';
+import { requestResearchAnswer, persistConversation } from '../lib/researchRequests';
 import { uploadDocument } from '../lib/uploadDocuments';
 import type {
   User,
@@ -477,10 +478,7 @@ export function AtlasWorkspace() {
     let id = plan.id;
     try {
       if (!id) {
-        const created = await api<SavedChat>(`/workspaces/${target}/conversations`, {
-          method: 'POST',
-          body: JSON.stringify({ title, messages: pending }),
-        });
+        const created = await persistConversation(target, null, title, pending);
         id = created.id;
         activeChat.current = id;
         setChatId(id);
@@ -491,40 +489,28 @@ export function AtlasWorkspace() {
       const scopedDocuments = requestedSource === 'github' ? false : includeDocuments;
       const scopedGmail = requestedSource === 'github' ? false : connectedGmail;
       const useConnected = scopedGmail || scopedProviders.length > 0 || user?.mode === 'ai';
-      const answerBody = {
-        question,
-        history,
-        document_ids: selected,
-        include_documents: scopedDocuments,
-        include_gmail: scopedGmail,
-        gmail_query: connectedGmailQuery,
-        providers: scopedProviders,
-      };
-      let result: Answer;
-      if (useConnected) {
-        let draft = '';
-        result = await apiStream<Answer>(
-          `/workspaces/${target}/connected-chat/stream`,
-          answerBody,
-          (event) => {
-            if (event.type === 'status') setAnswerProgress(event.text);
-            if (event.type === 'delta') {
-              draft += event.text;
-              const live: Message[] = [...pending, { role: 'assistant', content: draft }];
-              chatMessages.current = live;
-              setMessages(live);
-            }
-          },
-          controller.signal,
-        );
-      } else {
-        result = await api<Answer>(`/workspaces/${target}/chat`, {
-          method: 'POST',
-          body: JSON.stringify({ question, history, document_ids: selected }),
-          signal: controller.signal,
-        });
-        result.scope = ['documents'];
-      }
+      let draft = '';
+      const result = await requestResearchAnswer(
+        {
+          workspaceId: target,
+          question,
+          history,
+          documentIds: selected,
+          includeDocuments: scopedDocuments,
+          includeGmail: scopedGmail,
+          gmailQuery: connectedGmailQuery,
+          providers: scopedProviders,
+          useConnected,
+        },
+        controller.signal,
+        setAnswerProgress,
+        (delta) => {
+          draft += delta;
+          const live: Message[] = [...pending, { role: 'assistant', content: draft }];
+          chatMessages.current = live;
+          setMessages(live);
+        },
+      );
       if (scope.current !== target) return;
       const completed: Message[] = [
         ...pending,
@@ -532,10 +518,7 @@ export function AtlasWorkspace() {
       ];
       chatMessages.current = completed;
       setMessages(completed);
-      const saved = await api<SavedChat>(`/workspaces/${target}/conversations/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ title, messages: completed }),
-      });
+      const saved = await persistConversation(target, id, title, completed);
       setChats((old) => [
         { id: saved.id, title: saved.title, updated: saved.updated },
         ...old.filter((c) => c.id !== saved.id),
