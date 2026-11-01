@@ -43,7 +43,9 @@ def validate_public_url(raw: str) -> str:
         raise ValueError("Invalid URL port.") from exc
     if port not in (None, 80, 443):
         raise ValueError("Only standard HTTP(S) ports are supported.")
-    hostname = parts.hostname.rstrip(".").lower()\n    if not hostname or any(ord(char) < 33 for char in hostname):\n        raise ValueError("Invalid hostname.")
+    hostname = parts.hostname.rstrip(".").lower()
+    if not hostname or any(ord(char) < 33 for char in hostname):
+        raise ValueError("Invalid hostname.")
     if hostname in ("localhost",) or hostname.endswith((".localhost", ".local", ".internal")):
         raise ValueError("Local network addresses are not allowed.")
     try:
