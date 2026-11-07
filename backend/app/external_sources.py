@@ -41,10 +41,10 @@ class SearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=250)
 
 
-def http_json(url, token, provider, params=None, method='GET'):
+def http_json(url, token, provider, params=None, method='GET', accept='application/json'):
     headers = {
         'Authorization': 'Bearer ' + token,
-        'Accept': 'application/json',
+        'Accept': accept,
         'User-Agent': 'Atlas-Connected-Research',
     }
     if provider == 'notion':
@@ -288,6 +288,203 @@ def github_repository_query(query, login):
     return ' '.join([owner, *terms[:8]]).strip()[:180]
 
 
+def github_wants_code(query):
+    """Recognize requests for source files and symbol implementations."""
+    return bool(
+        re.search(
+            r'\b(?:code|source\s+code|function|class|method|implementation|implemented|definition|symbol)\b',
+            query,
+            re.I,
+        )
+    )
+
+
+def github_code_search_query(query, login):
+    """Build a bounded GitHub code-search query scoped to the connected account."""
+    qualifiers = re.findall(
+        r'\b(?:repo|org|user|language|extension|path|filename|in):[^\s]+',
+        query,
+        re.I,
+    )
+    terms = [
+        word
+        for word in provider_query_terms(query)
+        if word.lower() not in GITHUB_QUERY_STOPWORDS
+        and word.lower()
+        not in {
+            'code',
+            'source',
+            'search',
+            'find',
+            'show',
+            'where',
+            'implemented',
+            'trace',
+            'tracing',
+            'flow',
+            'chain',
+            'end',
+        }
+    ]
+    if not terms:
+        raise HTTPException(422, 'Add a function, class, identifier, or topic to search in code.')
+    scope = qualifiers or ([f'user:{login}'] if login else [])
+    if not scope:
+        raise HTTPException(
+            422, 'Could not identify the connected GitHub account. Reconnect GitHub and try again.'
+        )
+    return ' '.join([*terms[:9], *scope, 'in:file'])[:240]
+
+
+def github_wants_flow(query):
+    """Recognize requests to trace a feature across application layers."""
+    return bool(
+        re.search(
+            r'\b(?:trace|tracing|call\s+chain|code\s+flow|request\s+flow|end[- ]to[- ]end\s+flow)\b',
+            query,
+            re.I,
+        )
+    )
+
+
+def github_flow_layer(path):
+    """Assign a cautious architectural layer label from a source-file path."""
+    normalized = (path or '').lower()
+    if normalized.startswith(('frontend/', 'web/', 'client/')):
+        return 'Frontend / UI'
+    if '/routes/' in normalized or normalized.endswith(('/main.py', '/router.py', '/routes.py')):
+        return 'API / routing'
+    if any(
+        part in normalized
+        for part in ('/models/', '/migrations/', '/repositories/', '/db.py', '/database')
+    ):
+        return 'Database / persistence'
+    if normalized.startswith(('backend/', 'server/')):
+        return 'Backend / service'
+    return 'Source reference'
+
+
+def github_flow_search(token, query, login):
+    """Build a bounded, two-hop code-reference trace from GitHub code search."""
+    qualifiers = re.findall(
+        r'\b(?:repo|org|user|language|extension|path|filename):[^\s]+',
+        query,
+        re.I,
+    )
+    flow_stopwords = {
+        'trace',
+        'tracing',
+        'flow',
+        'code',
+        'request',
+        'call',
+        'chain',
+        'end',
+        'to',
+        'end',
+        'the',
+        'for',
+        'how',
+        'does',
+        'work',
+        'show',
+        'me',
+        'please',
+        'from',
+        'frontend',
+        'backend',
+        'database',
+        'db',
+        'ui',
+        'api',
+        'through',
+        'across',
+        'follow',
+        'feature',
+    }
+    terms = [
+        word
+        for word in re.findall(r'[A-Za-z0-9_.$-]{2,}', query)
+        if word.lower() not in flow_stopwords and ':' not in word
+    ]
+    if not terms:
+        raise HTTPException(
+            422, 'Name the feature, endpoint, or symbol whose flow you want to trace.'
+        )
+    scope = qualifiers or ([f'user:{login}'] if login else [])
+    if not scope:
+        raise HTTPException(
+            422, 'Could not identify the connected GitHub account. Reconnect GitHub and try again.'
+        )
+    base_query = ' '.join([*terms[:8], *scope, 'in:file'])[:240]
+    scope = re.findall(r'\b(?:repo|org|user):[^\s]+', base_query, re.I)
+    scope_clause = ' '.join(scope) if scope else f'user:{login}'
+    seen = set()
+    results = []
+
+    def collect(search_query, relation):
+        data = http_json(
+            'https://api.github.com/search/code',
+            token,
+            'github',
+            {'q': search_query, 'per_page': 8},
+            accept='application/vnd.github.text-match+json',
+        )
+        for item in data.get('items', []):
+            repository = (item.get('repository') or {}).get('full_name', '')
+            path = item.get('path') or item.get('name') or 'source file'
+            key = (repository.lower(), path.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            fragments = [
+                match.get('fragment', '').strip()
+                for match in (item.get('text_matches') or [])
+                if match.get('fragment')
+            ]
+            excerpt = '\n…\n'.join(fragments)[:5000] or f'Matching source file: {path}'
+            layer = github_flow_layer(path)
+            results.append(
+                {
+                    'provider': 'github',
+                    'id': str(item.get('sha') or item.get('url') or path),
+                    'title': f'[{layer}] {repository}/{path}'
+                    if repository
+                    else f'[{layer}] {path}',
+                    'excerpt': f'{relation}\n{excerpt}'[:5200],
+                    'url': item.get('html_url'),
+                }
+            )
+            if len(results) >= 16:
+                break
+        return data.get('items', [])
+
+    initial = collect(base_query, 'Initial feature match')
+    # Follow only a few concrete function/class symbols found in returned
+    # snippets. This is a bounded reference lookup, not a complete call graph.
+    symbols = []
+    symbol_pattern = re.compile(
+        r'\b(?:async\s+def|def|class|function|const|let|var)\s+([A-Za-z_$][\w$]*)'
+    )
+    for item in initial:
+        for match in item.get('text_matches') or []:
+            fragment = match.get('fragment') or ''
+            for symbol in symbol_pattern.findall(fragment):
+                if symbol.lower() not in {value.lower() for value in symbols}:
+                    symbols.append(symbol)
+                if len(symbols) >= 3:
+                    break
+            if len(symbols) >= 3:
+                break
+        if len(symbols) >= 3:
+            break
+    for symbol in symbols:
+        if len(results) >= 16:
+            break
+        collect(f'{symbol} {scope_clause} in:file', f'Reference lookup for `{symbol}`')
+    return results
+
+
 def github_wants_repositories(query):
     terms = set(re.findall(r'[a-zA-Z]+', query.lower()))
     return bool(
@@ -449,6 +646,53 @@ def source_search(provider, token, query):
                 }
                 for x in d.get('items', [])
             ]
+        if github_wants_flow(query):
+            identity = http_json('https://api.github.com/user', token, provider)
+            login = identity.get('login')
+            if not login:
+                raise HTTPException(
+                    422,
+                    'Could not identify the connected GitHub account. Reconnect GitHub and try again.',
+                )
+            return github_flow_search(token, query, login)
+        if github_wants_code(query):
+            identity = http_json('https://api.github.com/user', token, provider)
+            login = identity.get('login')
+            if not login:
+                raise HTTPException(
+                    422,
+                    'Could not identify the connected GitHub account. Reconnect GitHub and try again.',
+                )
+            code_query = github_code_search_query(query, login)
+            data = http_json(
+                'https://api.github.com/search/code',
+                token,
+                provider,
+                {
+                    'q': code_query,
+                    'per_page': requested_result_limit(query, default=8, max_limit=20),
+                },
+                accept='application/vnd.github.text-match+json',
+            )
+            results = []
+            for item in data.get('items', []):
+                matches = item.get('text_matches') or []
+                fragments = [
+                    match.get('fragment', '').strip() for match in matches if match.get('fragment')
+                ]
+                repository = (item.get('repository') or {}).get('full_name', '')
+                path = item.get('path') or item.get('name') or 'source file'
+                results.append(
+                    {
+                        'provider': provider,
+                        'id': str(item.get('sha') or item.get('url') or path),
+                        'title': f'{repository}/{path}' if repository else path,
+                        'excerpt': '\n…\n'.join(fragments)[:8000]
+                        or f'Matching source file: {path}',
+                        'url': item.get('html_url'),
+                    }
+                )
+            return results
         if github_wants_repositories(query):
             user = http_json('https://api.github.com/user', token, provider)
             login = user.get('login', '')
